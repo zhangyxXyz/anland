@@ -312,6 +312,14 @@ GLuint awl_gl_slot_texture(struct awl_ahb_slot* s) {
         s->payload = t;
         LOGD("AHB import ok %ux%u stride=%u ino=%llu", s->w, s->h, s->stride,
              (unsigned long long)s->ino);
+    } else {
+        /* The producer may have written a new frame into this same dma-buf.
+         * Reusing the EGLImage is fine, but the cached GL texture must acquire
+         * its storage again after the producer fence has been waited. Merely
+         * binding the texture can keep a driver's previous sampled contents.
+         * Do not recreate the window/context or copy the frame through CPU. */
+        glBindTexture(GL_TEXTURE_2D, t->texture);
+        g.glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, t->image);
     }
     return t->texture;
 }
