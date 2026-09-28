@@ -1654,9 +1654,32 @@ public class AwlWindowActivity extends Activity {
      * the default — two-finger = scroll, multi-finger/pinch = touch
      * passthrough, else (single contact / physical mouse) =
      * handleMouseEvent. */
+    /** Activity events are window-local, whereas the compositor consumes
+     * SurfaceView-local pixels. Insets (IME, cutouts and rounded corners)
+     * move the surface without moving the Activity coordinate origin.
+     * Offset a copy so all pointers and historical samples stay consistent;
+     * never mutate the event that Android or the superclass will receive. */
+    private MotionEvent surfaceEvent(MotionEvent event) {
+        MotionEvent local = MotionEvent.obtain(event);
+        int[] origin = new int[2];
+        sv.getLocationInWindow(origin);
+        local.offsetLocation(-origin[0], -origin[1]);
+        return local;
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (id < 0) return super.dispatchTouchEvent(ev);   /* awaiting */
+        if (id < 0 || sv == null) return super.dispatchTouchEvent(ev);
+        MotionEvent local = surfaceEvent(ev);
+        try {
+            if (dispatchSurfaceTouch(local)) return true;
+        } finally {
+            local.recycle();
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private boolean dispatchSurfaceTouch(MotionEvent ev) {
         if (isMouse(ev)) {
             int cls = ev.getClassification();
             if (cls == CLS_TWO_FINGER_SWIPE) {
@@ -1699,7 +1722,7 @@ public class AwlWindowActivity extends Activity {
                 AwlClient.input(id, TOUCH_CANCEL, ev.getPointerId(i), 0, 0, 0, 0, 0);
             return true;
         default:
-            return super.dispatchTouchEvent(ev);
+            return false;
         }
     }
 
@@ -1723,11 +1746,24 @@ public class AwlWindowActivity extends Activity {
      *  two streams never double-process). */
     @Override
     public boolean onGenericMotionEvent(MotionEvent ev) {
-        if (id < 0) return super.onGenericMotionEvent(ev);   /* awaiting */
+        if (id < 0 || sv == null) return super.onGenericMotionEvent(ev);
+        // Captured touchpad coordinates are relative distances, not positions.
+        MotionEvent local = captureMode != CAPTURE_NONE
+                && ev.isFromSource(InputDevice.SOURCE_TOUCHPAD)
+                ? MotionEvent.obtain(ev) : surfaceEvent(ev);
+        try {
+            if (dispatchSurfaceMotion(local)) return true;
+        } finally {
+            local.recycle();
+        }
+        return super.onGenericMotionEvent(ev);
+    }
+
+    private boolean dispatchSurfaceMotion(MotionEvent ev) {
         boolean capturedPad = captureMode != CAPTURE_NONE
                 && ev.isFromSource(InputDevice.SOURCE_TOUCHPAD);
         if (!isMouse(ev) && !capturedPad)
-            return super.onGenericMotionEvent(ev);
+            return false;
         switch (ev.getActionMasked()) {
         case MotionEvent.ACTION_MOVE:
             /* captured raw touchpad stream (single finger = virtual mouse; two = scroll) */
@@ -1783,7 +1819,7 @@ public class AwlWindowActivity extends Activity {
             handleMouseEvent(ev);   /* ensure-enter + savedBS differ (dedups with the touch stream) */
             return true;
         default:
-            return super.onGenericMotionEvent(ev);
+            return false;
         }
     }
 
