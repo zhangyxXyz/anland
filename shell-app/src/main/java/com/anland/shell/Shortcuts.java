@@ -30,6 +30,7 @@ public final class Shortcuts {
         i.putExtra("id", app.id);
         i.putExtra("user", Prefs.launchUser(ctx, app.container));
         i.putExtra("window_app_id", app.windowAppId);
+        i.putExtra("desktop_session", app.desktopSession);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return i;
     }

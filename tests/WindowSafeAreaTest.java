@@ -17,6 +17,11 @@ public class WindowSafeAreaTest {
         equal(WindowSafeArea.margins(0,60,1000,640,new int[4],rounded),12,0,12,12);
         int[][] asymmetric = {{20,20,20},null,null,null};
         equal(WindowSafeArea.margins(0,0,1000,700,new int[4],asymmetric),6,6,0,0);
+        int[][] tablet = {{54,54,54},{3146,54,54},{3146,2082,54},{54,2082,54}};
+        equal(WindowSafeArea.contentMargins("org.freedesktop.Xwayland",0,0,3200,2136,new int[4],tablet),0,0,0,0);
+        equal(WindowSafeArea.contentMargins("org.freedesktop.Xwayland",0,0,3200,2136,new int[]{0,80,0,600},tablet),0,80,0,600);
+        equal(WindowSafeArea.contentMargins("ordinary.app",0,0,3200,2136,new int[4],tablet),16,16,16,16);
+        equal(WindowSafeArea.contentMargins(null,0,0,3200,2136,new int[4],tablet),16,16,16,16);
         System.out.println("window safe area tests passed");
     }
 }

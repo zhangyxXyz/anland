@@ -1,0 +1,6 @@
+<resources>
+    <string name="desktop_close_first_title">请先关闭独立窗口</string>
+    <string name="desktop_close_first">进入完整桌面前，请先保存内容并关闭其他独立 Linux 窗口。不会自动结束应用。</string>
+    <string name="desktop_manage_windows">管理窗口</string>
+    <string name="launched_in_desktop">已在 Linux 桌面中打开</string>
+</resources>

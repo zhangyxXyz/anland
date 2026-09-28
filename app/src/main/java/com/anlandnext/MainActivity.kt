@@ -135,7 +135,6 @@ private fun WindowsPage(state:WindowState) {
     var menu by remember { mutableStateOf<Awl.WlWindow?>(null) }
     var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { WorkspaceModeCard() }
         item { Card(colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
             Column(Modifier.fillMaxWidth().padding(24.dp)) {
                 Text(stringResource(R.string.app_name),style=MaterialTheme.typography.labelLarge)

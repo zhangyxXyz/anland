@@ -2,6 +2,17 @@ package com.anlandnext.awl;
 
 /** Geometry only: all measurements come from the current Android window. */
 final class WindowSafeArea {
+    /** Rootful Xwayland owns a complete desktop, including its background.
+     * Its compositor/panels own control placement; don't shrink its wallpaper.
+     * This is the Xwayland protocol identity, not a user-editable window title. */
+    static boolean isDesktop(String appId) {
+        return "org.freedesktop.Xwayland".equals(appId);
+    }
+
+    static int[] contentMargins(String appId, int x, int y, int width, int height,
+                                int[] base, int[][] corners) {
+        return isDesktop(appId) ? base.clone() : margins(x, y, width, height, base, corners);
+    }
     // Corners in Android order TL, TR, BR, BL; each {centerX, centerY, radius}.
     // The returned {left, top, right, bottom} also respects existing obstructions.
     static int[] margins(int x, int y, int width, int height, int[] base, int[][] corners) {

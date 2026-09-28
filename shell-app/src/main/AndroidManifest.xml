@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries><package android:name="com.anlandnext"/></queries>
 
     <!-- Legacy fallback for launchers without pin-shortcut support. -->
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT"/>
@@ -27,7 +28,7 @@
              only, so no intent-filter): ensures the container is running,
              then launches the app detached inside it. -->
         <activity android:name=".AppLaunchActivity" android:exported="true"
-                  android:theme="@android:style/Theme.Translucent.NoTitleBar"
+                  android:theme="@style/Theme.MaterialDesignShell"
                   android:excludeFromRecents="true"
                   android:noHistory="true"/>
     </application>
