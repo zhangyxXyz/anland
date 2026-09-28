@@ -24,7 +24,7 @@ jobs:
           git submodule update --init third_party/xserver
           cd third_party/xserver
           patch -p1 < ../../patches/xwayland/anland-kgsl-glamor.patch
-          meson setup build -Dxvfb=false -Dxwayland_ei=false
+          meson setup build --prefix=/usr -Dxvfb=false -Dxwayland_ei=false -Dxkb_dir=/usr/share/X11/xkb -Dxkb_bin_dir=/usr/bin
           meson compile -C build -j 4
           mkdir -p ../../release
           cp build/hw/xwayland/Xwayland ../../release/Xwayland
