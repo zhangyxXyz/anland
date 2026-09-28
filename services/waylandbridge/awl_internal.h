@@ -152,6 +152,11 @@ struct awl_surface {
      * cycle attached (empty commit / ack commit must not clear current). */
     struct wl_resource* pending_buffer_res;
     struct wl_resource* current_buffer_res;
+    /* Committed content dimensions outlive the wl_buffer protocol object.
+     * A client may destroy that object after release while the renderer still
+     * displays its uploaded texture / retained dmabuf. Only a new attach
+     * changes these dimensions; attach(NULL) clears them. Protected by ev_lock. */
+    uint32_t content_width, content_height;
 
     struct wl_list frame_callbacks;
 

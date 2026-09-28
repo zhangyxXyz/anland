@@ -153,6 +153,19 @@ static void q_push_null(struct awl_surface* s) {
  * window with more buffers than the ring holds). */
 void awl_surface_apply_buffer(struct awl_surface* s, struct wl_resource* res,
                               int acquire_fd, struct wl_resource* release_res) {
+    /* Snapshot at state application (also used by synchronized subsurfaces),
+     * not at resource destruction: destroying wl_buffer is not an unmap. */
+    s->content_width = s->content_height = 0;
+    if (res) {
+        struct wl_shm_buffer* shm = wl_shm_buffer_get(res);
+        if (shm) {
+            s->content_width = (uint32_t)wl_shm_buffer_get_width(shm);
+            s->content_height = (uint32_t)wl_shm_buffer_get_height(shm);
+        } else {
+            struct awl_buffer* b = wl_resource_get_user_data(res);
+            if (b) { s->content_width = b->width; s->content_height = b->height; }
+        }
+    }
     if (!res) {
         awl_surface_discard_sync(acquire_fd, release_res);   /* commit_check already refused these; defensive */
         s->shm_live = 0;

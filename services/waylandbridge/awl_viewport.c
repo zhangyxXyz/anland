@@ -36,18 +36,13 @@
 
 /* ---------------- logical size (public helpers, awl_internal.h) ---------------- */
 
-/* Current buffer size in pixels (caller holds ev_lock; 0 = no buffer) */
+/* Committed content size in pixels (caller holds ev_lock; 0 = detached).
+ * wl_buffer.destroy only ends the protocol handle's lifetime. Reading its
+ * resource here made released shm cursors disappear on the next mouse move,
+ * even though their texture was still valid and Android's pointer was hidden. */
 static void vp_buf_size(struct awl_surface* s, uint32_t* w, uint32_t* h) {
-    *w = *h = 0;
-    if (!s->current_buffer_res) return;
-    struct wl_shm_buffer* shm = wl_shm_buffer_get(s->current_buffer_res);
-    if (shm) {
-        *w = (uint32_t)wl_shm_buffer_get_width(shm);
-        *h = (uint32_t)wl_shm_buffer_get_height(shm);
-        return;
-    }
-    struct awl_buffer* b = wl_resource_get_user_data(s->current_buffer_res);
-    if (b && b->width) { *w = b->width; *h = b->height; }
+    *w = s->content_width;
+    *h = s->content_height;
 }
 
 /* isomorphic to kwin SurfaceInterfacePrivate::applyState surfaceSize */
