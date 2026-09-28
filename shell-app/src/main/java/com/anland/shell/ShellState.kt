@@ -62,7 +62,7 @@ class ShellState(app:Application):AndroidViewModel(app) {
             apps=emptyList(); users=emptyList(); anlandxInstalled=null
             val selected=list.firstOrNull{it.name==active}
             val needAutoStart=!autoStarted && selected!=null && !selected.running()
-            autoStarted=true
+            if(selected!=null)autoStarted=true
             if(needAutoStart) { changeRunning(selected!!); return@launch }
             if(list.any {it.name==active && it.running()}) {
                 val name=active

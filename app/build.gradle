@@ -62,3 +62,10 @@ dependencies {
 dependencies {
     implementation project(':ui-common')
 }
+
+// Same Kotlin 2.2 / lint compatibility exclusions as MaterialDesignTmpl.
+// These detectors crash in the analysis API; keep all other checks enabled.
+android.lint {
+    disable += ['NullSafeMutableLiveData', 'RememberInComposition',
+                'FrequentlyChangingValue', 'AutoboxingStateCreation']
+}

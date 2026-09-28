@@ -11,12 +11,33 @@ name: build
 on:
   push:
     branches: [dev]
+    paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      rootfs: ${{ steps.changed.outputs.rootfs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: changed
+        env:
+          BASE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          rebuild=true
+          if [ "$EVENT_NAME" = push ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            if git diff --quiet "$BASE_SHA" HEAD -- rootfs anland-session .github/workflows/build.yml; then rebuild=false; fi
+          fi
+          echo "rootfs=$rebuild" >> "$GITHUB_OUTPUT"
+
   build:
     runs-on: ubuntu-latest
     env:
@@ -120,6 +141,8 @@ jobs:
           gh release upload "$tag" build/anland-wayland.apk build/anland-awllib.aar build/module/anland-awl.zip build/anlandx.tar.gz SHA256SUMS
 
   debian:
+    needs: scope
+    if: needs.scope.outputs.rootfs == 'true'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 180
     steps:

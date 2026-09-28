@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -40,9 +42,11 @@ class WindowState : ViewModel() {
     fun refresh() { viewModelScope.launch { gate.withLock {
             val snapshot=withContext(Dispatchers.IO) {
                 val windows=Awl.getWindows()
-                if(windows!=null) Awl.ensureSubscribed() // daemon restart invalidates the previous event subscription
                 windows to keys.associateWith { WlBinder.configGet(it) }
             }
+            // libawl subscription/ref-count operations belong to the main thread.
+            // A daemon restart invalidates the previous event subscription.
+            if(snapshot.first!=null) Awl.ensureSubscribed()
         connected=snapshot.first!=null; windows=snapshot.first.orEmpty(); config=snapshot.second
     } } }
     fun set(values: Map<String,Int>) { viewModelScope.launch { gate.withLock {
@@ -102,6 +106,7 @@ internal fun AutoLaunch(state:WindowState) {
         trailingContent={Switch(state.config["auto_attach"]==1,{state.set("auto_attach",if(it)1 else 0)},enabled=state.connected && !state.writing)})
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WindowsPage(state:WindowState) {
     val context=LocalContext.current
@@ -116,7 +121,7 @@ private fun WindowsPage(state:WindowState) {
         item { SettingGroup(stringResource(R.string.launch_behavior)) { AutoLaunch(state) } }
         if(state.connected && state.windows.isEmpty()) item { Text(stringResource(R.string.status_empty),Modifier.padding(20.dp),style=MaterialTheme.typography.bodyLarge) }
         items(state.windows,key={it.id}) { window ->
-            Card(onClick={Awl.attachWindow(context,window.id,window.title)}) {
+            Card(Modifier.combinedClickable(onClick={Awl.attachWindow(context,window.id,window.title)},onLongClick={menu=window})) {
                 Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Window,null,tint=MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f).padding(horizontal=16.dp)) {

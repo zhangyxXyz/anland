@@ -38,7 +38,7 @@ auto-start, per-user XWayland detection, complete app-info fields, ENV clear,
 waiting for shortcut icons, event coalescing and zoom debounce. Preserved the
 old signing-cache path when moving the Shell build into this repository.
 
-Intentional UI changes: overflow replaces hidden long-press for window actions;
+Intentional UI changes: overflow supplements long-press for window actions;
 initial dimensions use validated numeric inputs with Apply rather than a long
 NumberPicker. The terminal renderer and translucent launch progress screen
 remain native views. No full desktop session has been installed or claimed.
