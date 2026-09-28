@@ -16,6 +16,11 @@ replace_once(builder / "scripts/configure-chrome.sh",
     "    --render-node-override=/dev/dri/renderD128 \\\n    --ignore-gpu-blocklist \\\n    --use-angle=vulkan \\\n    --enable-features=VaapiVideoDecodeLinux,VaapiVideoDecoder,VaapiVideoDecodeLinuxGL \\\n",
     '    --use-angle="${ANLAND_CHROME_ANGLE:-gl}" \\\n    --ignore-gpu-blocklist \\\n')
 
+# The launcher selects the live desktop backend; independent launches keep Wayland.
+replace_once(builder / "scripts/configure-chrome.sh",
+    "--ozone-platform=wayland",
+    '--ozone-platform="${ANLAND_OZONE_PLATFORM:-wayland}"')
+
 replace_once(builder / "scripts/configure-desktop.sh",
     "configure_anland_next_runtime() {\n",
     "configure_anland_next_runtime() {\n"
