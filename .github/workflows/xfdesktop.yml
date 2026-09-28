@@ -1,0 +1,41 @@
+name: Xfdesktop ARM64
+on:
+  push:
+    branches: [dev]
+    paths: ['patches/xfdesktop/**', '.github/workflows/xfdesktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  xfdesktop:
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - name: Build dependencies
+        run: |
+          sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates build-essential gh patch devscripts
+          apt-get build-dep -y xfdesktop4
+      - uses: actions/checkout@v4
+      - name: Build Debian desktop with touch activation
+        run: |
+          mkdir source release
+          cd source
+          apt-get source xfdesktop4=4.20.1-1
+          cd xfdesktop4-4.20.1
+          patch -p1 < ../../patches/xfdesktop/touch-double-tap.patch
+          DEBEMAIL=build@anland.invalid DEBFULLNAME=Anland dch --local +anland --distribution trixie 'Recognize touch double taps without changing mouse activation or drag handling.'
+          DEB_BUILD_OPTIONS='nocheck parallel=4' dpkg-buildpackage -b -uc -us
+          cp ../xfdesktop4_*_arm64.deb ../../release/
+          cp ../xfdesktop4-data_*_all.deb ../../release/
+          cd ../../release
+          sha256sum *.deb > SHA256SUMS
+      - name: Upload to draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="xfdesktop-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Xfdesktop ARM64 touch activation" --notes "Debian 13 ARM64 desktop touch support. Source: $GITHUB_SHA"
+          gh release upload "$tag" release/*

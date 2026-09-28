@@ -1,0 +1,85 @@
+--- a/src/xfdesktop-icon-view.c
++++ b/src/xfdesktop-icon-view.c
+@@ -346,6 +346,7 @@
+     gint ncols;
+     ViewItem **grid_layout;
+ 
++    GtkGesture *touch_multi_press;
+     GtkSelectionMode sel_mode;
+     guint maybe_begin_drag:1,
+           definitely_dragging:1,
+@@ -434,6 +435,9 @@
+                                              guint property_id,
+                                              GValue *value,
+                                              GParamSpec *pspec);
++static void xfdesktop_icon_view_touch_released(GtkGestureMultiPress *gesture,
++                                               gint n_press, gdouble x, gdouble y,
++                                               XfdesktopIconView *icon_view);
+ static void xfdesktop_icon_view_dispose(GObject *obj);
+ static void xfdesktop_icon_view_finalize(GObject *obj);
+ 
+@@ -1087,6 +1091,16 @@
+                           | GDK_LEAVE_NOTIFY_MASK
+                           | GDK_POINTER_MOTION_MASK);
+ 
++    /* Gtk's drag source installs touch handling; its emulated button events
++     * do not include GDK_2BUTTON_PRESS. Recognize touch taps explicitly using
++     * Gtk's configured time/distance thresholds. Mouse clicks keep the existing
++     * event path, and this observer never claims a sequence from drag handling. */
++    icon_view->touch_multi_press = gtk_gesture_multi_press_new(GTK_WIDGET(icon_view));
++    gtk_gesture_single_set_touch_only(GTK_GESTURE_SINGLE(icon_view->touch_multi_press), TRUE);
++    gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(icon_view->touch_multi_press), GTK_PHASE_CAPTURE);
++    g_signal_connect(icon_view->touch_multi_press, "released",
++                     G_CALLBACK(xfdesktop_icon_view_touch_released), icon_view);
++
+     context = gtk_widget_get_style_context(GTK_WIDGET(icon_view));
+     gtk_style_context_add_class(context, GTK_STYLE_CLASS_VIEW);
+ 
+@@ -1121,6 +1135,8 @@
+         g_signal_handlers_disconnect_by_data(icon_view->channel, icon_view);
+         g_clear_object(&icon_view->channel);
+     }
++
++    g_clear_object(&icon_view->touch_multi_press);
+ 
+     xfdesktop_icon_view_set_model(icon_view, NULL);  // Call so ->items are freed too
+ 
+@@ -1694,6 +1710,38 @@
+     }
+ 
+     return FALSE;
++}
++
++static void
++xfdesktop_icon_view_touch_released(GtkGestureMultiPress *gesture,
++                                   gint n_press, gdouble x, gdouble y,
++                                   XfdesktopIconView *icon_view) {
++    if (n_press != 2 || icon_view->single_click
++        || icon_view->definitely_dragging || icon_view->definitely_rubber_banding)
++        return;
++
++    GdkEventSequence *sequence = gtk_gesture_single_get_current_sequence(GTK_GESTURE_SINGLE(gesture));
++    const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
++    GdkModifierType state = 0;
++    if (event != NULL)
++        gdk_event_get_state(event, &state);
++    if ((state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) != 0)
++        return;
++
++    /* Reuse the same icon hit regions as mouse activation. The cursor must
++     * still be on the item selected by this tap; an empty-space tap cannot
++     * launch an earlier selection. Activate only after release, so a drag or
++     * cancelled touch cannot open an icon. */
++    GdkEventButton hit = { 0 };
++    hit.x = x;
++    hit.y = y;
++    GList *item_l = g_list_find_custom(icon_view->items, &hit,
++                                     (GCompareFunc)xfdesktop_check_icon_clicked);
++    if (item_l != NULL && icon_view->cursor == item_l->data) {
++        xfdesktop_icon_view_clear_drag_event(icon_view);
++        g_signal_emit(G_OBJECT(icon_view), __signals[SIG_ICON_ACTIVATED], 0);
++        xfdesktop_icon_view_unselect_all(icon_view);
++    }
+ }
+ 
+ static gboolean
