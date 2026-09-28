@@ -39,6 +39,7 @@ internal fun ContainersPage(state:ShellState, onApps:()->Unit) {
     val context=LocalContext.current
     var stop by remember{mutableStateOf<ContainerState?>(null)}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        item { WorkspaceModeCard() }
         if(state.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth())}
         if(state.containers.isEmpty())item{Text(stringResource(R.string.status_no_containers))}
         items(state.containers,key={it.name}) { container ->
@@ -46,11 +47,12 @@ internal fun ContainersPage(state:ShellState, onApps:()->Unit) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text(container.name,style=MaterialTheme.typography.titleLarge)
                     Text(if(container.running())stringResource(R.string.running_fmt,container.pid)else stringResource(R.string.stopped))
-                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick={state.select(container.name);onApps()},enabled=!state.busy){Text(stringResource(R.string.apps))}
-                        OutlinedButton(onClick={context.startActivity(Intent(context,ConsoleActivity::class.java).putExtra("container",container.name))},enabled=container.running()&&!state.busy){Text(stringResource(R.string.enter_console))}
-                        OutlinedButton(onClick={if(container.running())stop=container else state.changeRunning(container)},enabled=!state.busy){Text(stringResource(if(container.running())R.string.stop else R.string.start))}
-                    }
+                    NavigationSettingItem(stringResource(R.string.apps),icon=Icons.Outlined.Apps,enabled=!state.busy,onClick={state.select(container.name);onApps()})
+                    val desktops=if(container.name==state.active)state.apps.filter{it.desktopSession}else emptyList()
+                    desktops.forEach{desktop->NavigationSettingItem(stringResource(R.string.desktop_legacy_entry),description=stringResource(R.string.desktop_legacy_help),icon=Icons.Outlined.DesktopWindows,enabled=!state.busy,
+                        onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))})}
+                    NavigationSettingItem(stringResource(R.string.enter_console),icon=Icons.Outlined.Terminal,enabled=container.running()&&!state.busy,onClick={context.startActivity(Intent(context,ConsoleActivity::class.java).putExtra("container",container.name))})
+                    NavigationSettingItem(stringResource(if(container.running())R.string.stop else R.string.start),icon=if(container.running())Icons.Outlined.StopCircle else Icons.Outlined.PlayCircle,enabled=!state.busy,onClick={if(container.running())stop=container else state.changeRunning(container)})
                 }
             }
         }

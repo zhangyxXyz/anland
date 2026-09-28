@@ -1,0 +1,8 @@
+<resources>
+    <string name="window_open_timeout">No matching window appeared. Check the application session log or choose its window from the window list.</string>
+    <string name="window_open">Open window</string>
+    <string name="window_close">Close window</string>
+    <string name="window_close_confirm">Ask “%1$s” to close? Unsaved changes may need confirmation in the application.</string>
+    <string name="window_close_failed">The window close request failed. Check that the window service is available.</string>
+    <string name="window_close_waiting">The close request was sent, but the application has not closed yet. Open its window to check for an unsaved-changes prompt.</string>
+</resources>

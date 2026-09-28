@@ -1,0 +1,9 @@
+<resources>
+    <string name="desktop_legacy_entry">旧版 XFCE 会话</string>
+    <string name="desktop_legacy_help">独立的嵌套桌面，其中的应用无法移出成为独立窗口。</string>
+    <string name="desktop_entry">完整桌面</string>
+    <string name="desktop_entry_help">打开桌面、面板和文件管理器。</string>
+    <string name="desktop_not_ready">启动此容器后可读取桌面入口。</string>
+    <string name="desktop_missing">此容器尚未安装完整桌面会话。</string>
+    <string name="host_update_needed">请更新 Anland Wayland，以便直接打开此窗口。</string>
+</resources>

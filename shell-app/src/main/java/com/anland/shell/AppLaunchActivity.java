@@ -85,8 +85,16 @@ public final class AppLaunchActivity extends Activity {
             RootExec.Result r = DsCli.launchApp(container, argv, user, customEnv);
             if (r.ok) {
                 runOnUiThread(() -> {
-                    Toast.makeText(this, getString(R.string.launch_ok_fmt, appName),
-                            Toast.LENGTH_SHORT).show();
+                    String windowAppId = getIntent().getStringExtra("window_app_id");
+                    if (windowAppId != null && !windowAppId.isEmpty()) {
+                        try {
+                            startActivity(new android.content.Intent().setClassName("com.anlandnext", "com.anlandnext.OpenWindowActivity")
+                                    .putExtra("window_app_id",windowAppId)
+                                    .putExtra("desktop_id",getIntent().getStringExtra("id")));
+                        } catch (android.content.ActivityNotFoundException e) {
+                            Toast.makeText(this,R.string.host_update_needed,Toast.LENGTH_LONG).show();
+                        }
+                    }
                     finish();
                 });
             } else {

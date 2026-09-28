@@ -27,6 +27,7 @@ import com.anland.design.*
 import com.anlandnext.awl.Awl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,6 +38,9 @@ class WindowState : ViewModel() {
     var connected by mutableStateOf(false); private set
     var writing by mutableStateOf(false); private set
     var error by mutableStateOf(false)
+    var closeFailed by mutableStateOf(false)
+    var closeWaiting by mutableStateOf(false)
+    var closing by mutableStateOf<Set<Long>>(emptySet()); private set
     private val gate=Mutex()
     private val keys=listOf("auto_attach","zoom","scale_mode","xwayland_scale","init_w","init_h","sc_enabled")
     fun refresh() { viewModelScope.launch { gate.withLock {
@@ -60,7 +64,22 @@ class WindowState : ViewModel() {
         } finally { writing=false }
     } } }
     fun set(key:String,value:Int)=set(mapOf(key to value))
-    fun close(id:Long) { viewModelScope.launch { withContext(Dispatchers.IO) { Awl.closeWindow(id) }; refresh() } }
+    fun close(id:Long) {
+        if(id in closing)return
+        closing=closing+id
+        viewModelScope.launch {
+            try {
+                val rc=withContext(Dispatchers.IO){Awl.closeWindow(id)}
+                if(rc!=0){closeFailed=true;return@launch}
+                // A successful request is not a closed window. The client may
+                // need to show an unsaved-document dialog. Never kill it or retry.
+                delay(1500)
+                val remaining=withContext(Dispatchers.IO){Awl.getWindows()}
+                closeWaiting=remaining?.any{it.id==id}==true
+                refresh()
+            } finally {closing=closing-id}
+        }
+    }
 }
 
 /** Window-list management uses libawl, the same public API as consumer apps.
@@ -94,6 +113,9 @@ open class MainActivity : AppCompatActivity() {
                 when(tab) { 0->WindowsPage(state); 1->WindowSettings(state); else->Page { AppearanceSettings(appearance) } }
             }
             if(state.error) AlertDialog(onDismissRequest={state.error=false},title={Text(stringResource(R.string.setting_write_failed))},confirmButton={TextButton(onClick={state.error=false}){Text(stringResource(R.string.dialog_ok))}})
+            if(state.closeFailed||state.closeWaiting) AlertDialog(onDismissRequest={state.closeFailed=false;state.closeWaiting=false},
+                text={Text(stringResource(if(state.closeFailed)R.string.window_close_failed else R.string.window_close_waiting))},
+                confirmButton={TextButton(onClick={state.closeFailed=false;state.closeWaiting=false}){Text(stringResource(R.string.dialog_ok))}})
         } }
     }
     override fun onStart() { super.onStart(); visible=true; Awl.registerCallback(events); state.refresh() }
@@ -111,7 +133,9 @@ internal fun AutoLaunch(state:WindowState) {
 private fun WindowsPage(state:WindowState) {
     val context=LocalContext.current
     var menu by remember { mutableStateOf<Awl.WlWindow?>(null) }
+    var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item { WorkspaceModeCard() }
         item { Card(colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
             Column(Modifier.fillMaxWidth().padding(24.dp)) {
                 Text(stringResource(R.string.app_name),style=MaterialTheme.typography.labelLarge)
@@ -133,6 +157,13 @@ private fun WindowsPage(state:WindowState) {
             }
         }
     }
-    menu?.let { w -> AlertDialog(onDismissRequest={menu=null},title={Text(w.title.orEmpty())},text={Text(stringResource(R.string.window_info_format,w.id,w.title.orEmpty(),stringResource(if(w.attached)R.string.state_visible else R.string.state_background)))},
-        confirmButton={TextButton(onClick={state.close(w.id);menu=null}){Text(stringResource(R.string.menu_close))}},dismissButton={TextButton(onClick={menu=null}){Text(stringResource(R.string.dialog_ok))}}) }
+    menu?.let { w -> AlertDialog(onDismissRequest={menu=null},title={Text(w.title.orEmpty())},text={Column {
+        Text(stringResource(R.string.window_info_format,w.id,w.title.orEmpty(),stringResource(if(w.attached)R.string.state_visible else R.string.state_background)))
+        NavigationSettingItem(stringResource(R.string.window_open),icon=Icons.Outlined.OpenInNew,onClick={menu=null;Awl.attachWindow(context,w.id,w.title)})
+        NavigationSettingItem(stringResource(R.string.window_close),icon=Icons.Outlined.Close,enabled=w.id !in state.closing,onClick={menu=null;confirmClose=w})
+    }},confirmButton={TextButton(onClick={menu=null}){Text(stringResource(android.R.string.cancel))}}) }
+    confirmClose?.let { w -> AlertDialog(onDismissRequest={confirmClose=null},title={Text(stringResource(R.string.window_close))},
+        text={Text(stringResource(R.string.window_close_confirm,w.title.orEmpty()))},
+        confirmButton={TextButton(onClick={state.close(w.id);confirmClose=null}){Text(stringResource(R.string.window_close))}},
+        dismissButton={TextButton(onClick={confirmClose=null}){Text(stringResource(android.R.string.cancel))}}) }
 }

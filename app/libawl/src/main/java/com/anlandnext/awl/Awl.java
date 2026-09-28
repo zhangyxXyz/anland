@@ -45,6 +45,25 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class Awl {
     private static final String TAG = "anland-awl";
 
+    /** Optional presentation policy of the consuming app. No policy is installed
+     * by the library itself, so third-party consumers keep independent tasks. */
+    public interface WindowRouter {
+        boolean route(Context context, long id, String title);
+        default void onAttached(long id, boolean embedded) {}
+        default void onAttachFailed(long id, boolean embedded) {}
+    }
+    private static WindowRouter router;
+    public static void setWindowRouter(WindowRouter value) { router = value; }
+    static boolean routeWindow(Context context, long id, String title) {
+        return router != null && router.route(context, id, title);
+    }
+    static void hostAttached(long id, boolean embedded) {
+        if (router != null) router.onAttached(id, embedded);
+    }
+    static void hostAttachFailed(long id, boolean embedded) {
+        if (router != null) router.onAttachFailed(id, embedded);
+    }
+
     /** One daemon window (own-uid scope applied server-side). */
     public static final class WlWindow {
         public final long id;
@@ -91,6 +110,12 @@ public final class Awl {
      *  windows only, enforced server-side). 0 = requested. */
     public static int closeWindow(long id) {
         return AwlClient.close(id);
+    }
+
+    /** Protocol app_id/desktop ID, scoped by the same ownership rule as list. */
+    public static String applicationId(long id) {
+        AwlClient.DesktopInfo info = AwlClient.desktopInfo(id);
+        return info == null ? null : info.appId;
     }
 
     /* ---- event subscription (process-wide; main thread bookkeeping) ---- */
@@ -293,6 +318,7 @@ public final class Awl {
     /** Same, taking the window from {@link #getWindows} / a created event. */
     public static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs) {
         if (ctx == null || win == null) return;
+        if (routeWindow(ctx, win.id, win.title)) return;
         Intent it = new Intent(ctx, AwlWindowActivity.class);
         it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);

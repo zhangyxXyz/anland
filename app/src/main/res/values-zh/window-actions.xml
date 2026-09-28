@@ -1,0 +1,8 @@
+<resources>
+    <string name="window_open_timeout">未找到对应窗口，请检查应用会话日志，或前往窗口列表选择窗口。</string>
+    <string name="window_open">打开窗口</string>
+    <string name="window_close">关闭窗口</string>
+    <string name="window_close_confirm">请求关闭“%1$s”？如有未保存的内容，应用可能会要求确认。</string>
+    <string name="window_close_failed">关闭请求失败，请检查窗口服务是否可用。</string>
+    <string name="window_close_waiting">关闭请求已发送，应用尚未退出。请打开窗口，检查是否需要确认保存内容。</string>
+</resources>

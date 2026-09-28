@@ -85,8 +85,13 @@ public final class DesktopEntry {
         if (id.endsWith(".desktop"))
             id = id.substring(0, id.length() - ".desktop".length());
 
+        // Use desktop metadata, never an application-specific alias table.
+        String windowId = kv.get("X-Anland-WindowAppId");
+        if (windowId == null || windowId.isEmpty()) windowId = kv.get("StartupWMClass");
+        if (windowId == null || windowId.isEmpty()) windowId = id;
         byId.put(id, new AppEntry(container, id, name, exec,
-                kv.get("Icon"), path));
+                kv.get("Icon"), path, windowId,
+                isTrue(kv.get("X-Anland-DesktopSession"))));
     }
 
     private static boolean isTrue(String v) {

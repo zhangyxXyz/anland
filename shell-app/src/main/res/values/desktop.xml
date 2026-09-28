@@ -1,0 +1,9 @@
+<resources>
+    <string name="desktop_legacy_entry">Legacy XFCE session</string>
+    <string name="desktop_legacy_help">Separate nested desktop. Its applications cannot move into independent windows.</string>
+    <string name="desktop_entry">Full desktop</string>
+    <string name="desktop_entry_help">Open the desktop, panel and file manager.</string>
+    <string name="desktop_not_ready">Start this container to load its desktop entry.</string>
+    <string name="desktop_missing">The full desktop session is not installed in this container.</string>
+    <string name="host_update_needed">Update Anland Wayland to open this window directly.</string>
+</resources>

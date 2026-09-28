@@ -1,0 +1,27 @@
+<resources>
+    <string name="workspace_title">Anland 工作區</string>
+    <string name="workspace_scope">共用 Anland 圖形工作階段 · 所有容器</string>
+    <string name="workspace_apps">應用程式</string>
+    <string name="workspace_hide">返回 Android · 保留應用程式執行</string>
+    <string name="workspace_menu">工作區選單</string>
+    <string name="workspace_to_independent">切換為獨立視窗</string>
+    <string name="workspace_to_desktop">進入桌面工作區</string>
+    <string name="workspace_open">開啟工作區</string>
+    <string name="workspace_end">結束圖形工作階段</string>
+    <string name="workspace_switching">正在移轉視窗…</string>
+    <string name="workspace_unavailable">圖形服務無法使用，請檢查 Anland Wayland。</string>
+    <string name="workspace_empty">點選「應用程式」啟動 Linux 應用程式</string>
+    <string name="workspace_enter_confirm">將現有 %1$d 個視窗移入工作區？應用程式會繼續執行，新視窗也在這裡開啟。舊的巢狀桌面（包括 XFCE）會保留為一個完整視窗，無法拆出其中的應用程式。</string>
+    <string name="workspace_leave_confirm">將 %1$d 個視窗顯示為獨立的 Android 工作？應用程式與內容會繼續保留，這不會結束圖形工作階段。</string>
+    <string name="workspace_end_confirm">要求全部 %1$d 個視窗正常關閉？請先儲存工作。若應用程式顯示儲存對話方塊，會保留視窗供你處理。容器繼續執行。</string>
+    <string name="workspace_failed">切換未完成，已恢復先前的模式，沒有重新啟動應用程式。請在視窗清單檢查是否有仍需開啟的視窗。</string>
+    <string name="workspace_close_pending">仍有視窗未關閉，請先處理應用程式中的儲存對話方塊。</string>
+    <string name="workspace_minimize">最小化</string>
+    <string name="workspace_maximize">最大化或還原</string>
+    <string name="workspace_close">關閉這個視窗</string>
+    <string name="workspace_resize">調整視窗大小</string>
+    <string name="workspace_desktop_mode">桌面工作區模式</string>
+    <string name="workspace_independent_mode">獨立視窗模式</string>
+    <string name="workspace_window_count">正在執行 %1$d 個視窗</string>
+    <string name="workspace_host_update">請先安裝或更新 Anland Wayland</string>
+</resources>

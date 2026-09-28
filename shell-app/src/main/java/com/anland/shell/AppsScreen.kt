@@ -40,7 +40,12 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
     var search by rememberSaveable { mutableStateOf("") }
     var selected by remember {mutableStateOf<AppEntry?>(null)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        WorkspaceModeCard()
         SettingGroup(state.active.ifBlank{stringResource(R.string.no_container_selected)}) {
+            state.apps.filter{it.desktopSession}.forEach{desktop ->
+                NavigationSettingItem(stringResource(R.string.desktop_legacy_entry),description=stringResource(R.string.desktop_legacy_help),icon=Icons.Outlined.DesktopWindows,
+                    onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))})
+            }
             NavigationSettingItem(stringResource(R.string.windows_entry),description=stringResource(R.string.windows_entry_help),icon=Icons.Outlined.OpenInNew,onClick={openWindows(context)})
         }
         OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text(stringResource(R.string.search_apps))},leadingIcon={Icon(Icons.Outlined.Search,null)})
