@@ -10,7 +10,7 @@ display resolution, username or hardcoded list of application names.
 * PulseAudio creates its runtime directory before staging its libraries, and
   records copy errors. Session clients receive the host endpoint even when
   PulseAudio starts later. The Debian image also provides a PipeWire PulseAudio
-  tunnel for clients outside the Anland session.
+  tunnel with reconnection for clients outside the Anland session.
 * Module updates preserve existing renderer, zoom and runtime-directory settings.
 * Recents identity uses xdg app_id and .desktop metadata from the client's own
   filesystem root. XDG data directory precedence, localized Name values and

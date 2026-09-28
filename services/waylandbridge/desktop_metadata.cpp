@@ -1,5 +1,6 @@
 #include "desktop_metadata.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <dirent.h>
 #include <fcntl.h>
 #include <fstream>

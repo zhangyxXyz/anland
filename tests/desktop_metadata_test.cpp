@@ -1,5 +1,6 @@
 #include "desktop_metadata.hpp"
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>

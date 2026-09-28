@@ -6,6 +6,6 @@ cat > "$rootfs/etc/pipewire/pipewire-pulse.conf.d/90-anland.conf" <<'EOF'
 # Keep ordinary PulseAudio clients connected to the Android host as well as
 # applications started with anland-session's explicit PULSE_SERVER.
 pulse.cmd = [
-    { cmd = "load-module" args = "module-tunnel-sink server=unix:/run/anland/pulse.sock sink_name=anland_android" flags = [ ] }
+    { cmd = "load-module" args = "module-tunnel-sink server=unix:/run/anland/pulse.sock sink_name=anland_android reconnect_interval_ms=2000" flags = [ ] }
 ]
 EOF
