@@ -35,6 +35,7 @@ final class AwlClient {
     static final int T_CLIPBOARD = 11; /* Android clipboard text → wl selection (ONEWAY) */
     static final int T_CLOSE = 14;    /* (id) → ok: ask the client to close the window */
     static final int T_ICON = 15;     /* (id) → w,h,bytes[RGBA] toplevel icon */
+    static final int T_APP_ID = 19;
     static final int T_SUBSCRIBE = 16;   /* (eventBinder) → ok: window lifecycle events */
     static final int T_UNSUBSCRIBE = 17; /* (eventBinder) → ok: stop events */
     static final int T_CONNECT = 18;     /* (fd) → ok: wayland connection over binder */
@@ -243,8 +244,33 @@ final class AwlClient {
         }
     }
 
-    /** Toplevel icon as RGBA bytes (Bitmap ARGB_8888 order); outWH[0]/[1] get
-     *  the dimensions. null = no icon / daemon gone. */
+    static final class DesktopInfo {
+        String appId, name;
+        byte[] icon;
+    }
+
+    static DesktopInfo desktopInfo(long id) {
+        IBinder b = get();
+        if (b == null) return null;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(DESCRIPTOR);
+            d.writeLong(id);
+            d.writeString(java.util.Locale.getDefault().toString());
+            // An older daemon does not implement this optional transaction.
+            if (!b.transact(T_APP_ID, d, r, 0) || r.dataSize() < 4) return null;
+            DesktopInfo info = new DesktopInfo();
+            info.appId = r.readString();
+            info.name = r.readString();
+            info.icon = r.createByteArray();
+            return info;
+        } catch (Exception e) {
+            Log.w(TAG, "APP_ID unavailable", e);
+            return null;
+        } finally { d.recycle(); r.recycle(); }
+    }
+
+    /** Current toplevel RGBA pixels; null on unavailable/reset. */
     static byte[] icon(long id, int[] outWH) {
         IBinder b = get();
         if (b == null) return null;
@@ -260,7 +286,7 @@ final class AwlClient {
             if (outWH != null && outWH.length >= 2) { outWH[0] = w; outWH[1] = h; }
             return w > 0 && h > 0 ? r.createByteArray() : null;
         } catch (Exception e) {
-            s = null;
+            Log.w(TAG, "ICON transact failed", e);
             return null;
         } finally {
             d.recycle();

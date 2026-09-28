@@ -144,6 +144,11 @@ start_pulse() {
   PAR="$RT/pulse"
   PH="$RT/pulse-home"
   : > "$LOG"
+  # The background Wayland daemon may not have created its runtime dir yet.
+  if ! mkdir -p "$RT" 2>>"$LOG" || ! chmod 777 "$RT" 2>>"$LOG"; then
+    echo "anland: pulse failed (cannot create $RT)" >> "$LOG"
+    return 1
+  fi
   if [ ! -f "$PA/bin/pulseaudio" ]; then
     stop_pulse
     echo "anland: pulse skipped ($PA/bin/pulseaudio missing — module built without pulse/)" >> "$LOG"
@@ -160,7 +165,7 @@ start_pulse() {
   # uid) still holds the old tree and socket — replace it whole
   stop_pulse
   rm -rf "$PAR"
-  if ! cp -r "$PA" "$PAR"; then
+  if ! cp -r "$PA" "$PAR" 2>>"$LOG"; then
     echo "anland: pulse failed (cannot copy $PA to $PAR)" >> "$LOG"
     return 1
   fi

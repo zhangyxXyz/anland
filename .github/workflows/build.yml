@@ -40,6 +40,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             meson ninja-build pkg-config m4 patch
 
+      - name: Desktop metadata regression tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I services/waylandbridge \
+            services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \
+            -o /tmp/desktop-metadata-test
+          /tmp/desktop-metadata-test
+
       # libffi: overlay the v3.4.6 release tarball (same pin as the
       # submodule) over third_party/libffi — it ships a generated configure,
       # so `make libffi` skips autogen.sh. Ubuntu 24.04's libtool 2.4.7
@@ -114,10 +121,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          path: anland-fixes
+      - uses: actions/checkout@v4
+        with:
           repository: Goldzxcbug/Droidspaces-rootfs-Desktop-builder
           ref: ffc712071a04cc50d1aed26aab064f0295b6251d
+          path: rootfs-builder
           persist-credentials: false
+      - name: Apply Chrome and audio fixes from this dev commit
+        run: python3 anland-fixes/rootfs/apply-builder-fixes.py rootfs-builder
       - name: Build Debian ARM64 with Docker
+        working-directory: rootfs-builder
         env:
           ANLAND_RELEASE_REPOSITORY: Goldzxcbug/droidspaces-package
         run: |
@@ -128,6 +142,7 @@ jobs:
             -g true -a false -b true -c true -d false -e true \
             -f true -h true -j false -n false -S false -t false -u seiun
       - name: Upload directly to draft Release
+        working-directory: rootfs-builder
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

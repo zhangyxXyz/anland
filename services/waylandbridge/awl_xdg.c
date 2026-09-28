@@ -15,18 +15,23 @@
 #include <string.h>
 
 #define AWL_XDG_VERSION 3
+static int32_t phys_to_logical(int32_t v);
 
 /* caller holds s->ev_lock */
 static void send_configure_locked(struct awl_surface* s,
-                                  int32_t w, int32_t h,
-                                  const uint32_t* states, size_t nstates) {
+                                  int32_t w, int32_t h) {
     struct wl_array arr;
     wl_array_init(&arr);
+    uint32_t states[3];
+    size_t nstates = 0;
+    if (s->u.xdg.fullscreen) states[nstates++] = XDG_TOPLEVEL_STATE_FULLSCREEN;
+    if (s->u.xdg.maximized) states[nstates++] = XDG_TOPLEVEL_STATE_MAXIMIZED;
+    if (s->activated) states[nstates++] = XDG_TOPLEVEL_STATE_ACTIVATED;
     if (nstates) {
         uint32_t* p = wl_array_add(&arr, nstates * sizeof(uint32_t));
         if (p) memcpy(p, states, nstates * sizeof(uint32_t));
     }
-    uint32_t serial = wl_display_get_serial(g_srv.display);
+    uint32_t serial = wl_display_next_serial(g_srv.display);
     s->u.xdg.conf_w = w;
     s->u.xdg.conf_h = h;
     s->configured = 1;
@@ -35,15 +40,6 @@ static void send_configure_locked(struct awl_surface* s,
     xdg_surface_send_configure(s->xdg_surface_res, serial);
     LOGD("surface %llu configure %dx%d serial=%u",
             (unsigned long long)s->id, w, h, serial);
-}
-
-/* Event-thread convenience entry (takes the lock itself) */
-static void send_toplevel_configure(struct awl_surface* s,
-                                    int32_t w, int32_t h,
-                                    const uint32_t* states, size_t nstates) {
-    pthread_mutex_lock(&s->ev_lock);
-    send_configure_locked(s, w, h, states, nstates);
-    pthread_mutex_unlock(&s->ev_lock);
 }
 
 /* ---------------- xdg_toplevel ---------------- */
@@ -68,7 +64,28 @@ static void toplevel_set_title(struct wl_client* c, struct wl_resource* res,
 
 static void toplevel_set_app_id(struct wl_client* c, struct wl_resource* res,
                                 const char* app_id) {
-    LOGI("app_id=%s", app_id ? app_id : "");
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (!s) return;
+    pthread_mutex_lock(&s->ev_lock);
+    snprintf(s->u.xdg.app_id, sizeof(s->u.xdg.app_id), "%s", app_id ? app_id : "");
+    pthread_mutex_unlock(&s->ev_lock);
+    if (s->mapped && g_srv.cbs.window_title)
+        g_srv.cbs.window_title(g_srv.cbs.user, s->id, s->title ? s->title : "");
+}
+
+int awl_window_get_app_id(uint64_t id, char* buf, size_t size) {
+    if (!buf || !size) return 0;
+    buf[0] = 0;
+    pthread_rwlock_rdlock(&g_srv.rwl);
+    struct awl_surface* s = awl_surface_by_id(id);
+    if (s) {
+        pthread_mutex_lock(&s->ev_lock);
+        if (s->role == AWL_ROLE_TOPLEVEL)
+            snprintf(buf, size, "%s", s->u.xdg.app_id);
+        pthread_mutex_unlock(&s->ev_lock);
+    }
+    pthread_rwlock_unlock(&g_srv.rwl);
+    return buf[0] != 0;
 }
 
 /* Interactive move / resize / window menu: the Activity IS the frame — Android
@@ -119,31 +136,32 @@ static void toplevel_set_min_size(struct wl_client* c, struct wl_resource* res,
     if (size_bound_ok(res, w, h)) LOGD("set_min_size %dx%d", w, h);
 }
 
-static void toplevel_set_maximized(struct wl_client* c, struct wl_resource* res) {
+static void toplevel_change_state(struct wl_resource* res, int fullscreen, int enabled) {
     struct awl_surface* s = wl_resource_get_user_data(res);
     if (!s) return;
-    /* Placeholder from daemon config (never use conf_w/h — stale after orientation
-     * switch, would crash; physical display values are meaningless in DeX-like
-     * scenarios). The real size is only sent by awl_window_resize triggered by
-     * Activity SURFACE changes. */
-    uint32_t states[] = { XDG_TOPLEVEL_STATE_MAXIMIZED };
-    send_toplevel_configure(s, g_srv.init_conf_w, g_srv.init_conf_h, states, 1);
+    pthread_mutex_lock(&s->ev_lock);
+    if (fullscreen) s->u.xdg.fullscreen = enabled;
+    else s->u.xdg.maximized = enabled;
+    /* Android already owns the full Activity surface. A state-only request
+     * does not trigger surfaceChanged, so never replace its measured size
+     * with the new-window placeholder (nor a stale previous configure). */
+    int32_t w = s->phys_w > 0 ? phys_to_logical(s->phys_w) : g_srv.init_conf_w;
+    int32_t h = s->phys_h > 0 ? phys_to_logical(s->phys_h) : g_srv.init_conf_h;
+    send_configure_locked(s, w, h);
+    pthread_mutex_unlock(&s->ev_lock);
+}
+static void toplevel_set_maximized(struct wl_client* c, struct wl_resource* res) {
+    toplevel_change_state(res, 0, 1);
 }
 static void toplevel_unset_maximized(struct wl_client* c, struct wl_resource* res) {
-    struct awl_surface* s = wl_resource_get_user_data(res);
-    if (s) send_toplevel_configure(s, 0, 0, NULL, 0);
+    toplevel_change_state(res, 0, 0);
 }
 static void toplevel_set_fullscreen(struct wl_client* c, struct wl_resource* res,
                                     struct wl_resource* output) {
-    struct awl_surface* s = wl_resource_get_user_data(res);
-    if (!s) return;
-    /* Same as set_maximized: config placeholder, real size comes from SURFACE-triggered resize */
-    uint32_t states[] = { XDG_TOPLEVEL_STATE_FULLSCREEN };
-    send_toplevel_configure(s, g_srv.init_conf_w, g_srv.init_conf_h, states, 1);
+    toplevel_change_state(res, 1, 1);
 }
 static void toplevel_unset_fullscreen(struct wl_client* c, struct wl_resource* res) {
-    struct awl_surface* s = wl_resource_get_user_data(res);
-    if (s) send_toplevel_configure(s, 0, 0, NULL, 0);
+    toplevel_change_state(res, 1, 0);
 }
 static void toplevel_set_minimized(struct wl_client* c, struct wl_resource* res) {
     /* Window minimize on the Android side is user-driven, ignore */
@@ -479,6 +497,8 @@ static void xdg_surface_get_toplevel(struct wl_client* c,
     AWL_ASSERT(!s->has_pending);
     s->u.xdg.conf_w = s->u.xdg.conf_h = 0;
     s->u.xdg.pend_w = s->u.xdg.pend_h = 0;
+    s->u.xdg.fullscreen = s->u.xdg.maximized = false;
+    s->u.xdg.app_id[0] = 0;
     s->role = AWL_ROLE_TOPLEVEL;
     s->u.xdg.role_res = t;
     s->xdg_surface_res = res;
@@ -489,7 +509,7 @@ static void xdg_surface_get_toplevel(struct wl_client* c,
      * the Activity is unrelated to the physical screen size, physical values
      * would be wrong). Once the Activity surface is ready, surfaceChanged →
      * awl_window_resize forces a configure with the exact window size. */
-    send_configure_locked(s, g_srv.init_conf_w, g_srv.init_conf_h, NULL, 0);
+    send_configure_locked(s, g_srv.init_conf_w, g_srv.init_conf_h);
     pthread_mutex_unlock(&s->ev_lock);
 }
 
@@ -675,7 +695,7 @@ void awl_xdg_setup(void) {
 }
 
 /* ---------------- initial-configure placeholder size (#33, daemon config) ----------------
- * New windows only: the initial configure + maximized/fullscreen placeholders
+ * New windows only: the initial configure + unattached state-change placeholders
  * read these; mapped windows are resized by awl_window_resize (Android owns
  * sizing entirely). Atomics → binder config thread writes, dispatch threads
  * read, same shape as zoom_pct. */
@@ -748,7 +768,7 @@ void awl_window_resize(uint64_t id, int32_t w, int32_t h) {
                 s->has_pending = 1;
             } else if (lw != s->u.xdg.conf_w || lh != s->u.xdg.conf_h) {
                 s->has_pending = 0;   /* exact value arrived, invalidate the cache */
-                send_configure_locked(s, lw, lh, NULL, 0);
+                send_configure_locked(s, lw, lh);
                 wl_client_flush(wl_resource_get_client(s->u.xdg.role_res));
             }   /* same size: prevent loops, no resend */
         }
@@ -784,9 +804,7 @@ void awl_window_set_activated(uint64_t id, int activated) {
         if (s->role == AWL_ROLE_TOPLEVEL &&
             s->u.xdg.role_res && s->mapped && (int)s->activated != !!activated) {
             s->activated = !!activated;
-            uint32_t states[] = { XDG_TOPLEVEL_STATE_ACTIVATED };
-            send_configure_locked(s, s->u.xdg.conf_w, s->u.xdg.conf_h, states,
-                                  s->activated ? 1u : 0u);
+            send_configure_locked(s, s->u.xdg.conf_w, s->u.xdg.conf_h);
             wl_client_flush(wl_resource_get_client(s->u.xdg.role_res));
         }
         pthread_mutex_unlock(&s->ev_lock);
@@ -808,7 +826,7 @@ void awl_xdg_flush_pending(uint64_t id) {
                     (unsigned long long)s->id, s->u.xdg.pend_w, s->u.xdg.pend_h,
                     phys_to_logical(s->u.xdg.pend_w), phys_to_logical(s->u.xdg.pend_h));
             send_configure_locked(s, phys_to_logical(s->u.xdg.pend_w),
-                                  phys_to_logical(s->u.xdg.pend_h), NULL, 0);
+                                  phys_to_logical(s->u.xdg.pend_h));
             wl_client_flush(wl_resource_get_client(s->u.xdg.role_res));
         }
         pthread_mutex_unlock(&s->ev_lock);

@@ -353,6 +353,7 @@ add_executable(waylandbridge
   awl_sc.cpp
   awl_renderer.cpp
   waylandbridge.cpp
+  desktop_metadata.cpp
 )
 target_include_directories(waylandbridge PRIVATE
   ${AWL}/include ${AWL_GENERATED}

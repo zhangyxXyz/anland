@@ -118,6 +118,10 @@ public class AwlWindowActivity extends Activity {
     private boolean finishingByGone;   /* client closed the window / evicted, nothing left to report */
     private boolean deathLinked;       /* daemon death monitoring attached */
     private String taskTitle;          /* last known client title (Recents label) */
+    private String taskDesktopName;
+    private boolean iconFetchRunning, iconFetchPending;
+    private final java.util.concurrent.atomic.AtomicInteger iconRequest =
+            new java.util.concurrent.atomic.AtomicInteger();
     private android.graphics.Bitmap taskIcon;   /* last fetched toplevel icon */
 
     /* ---- Clipboard bridge (static shared = consistent across windows,
@@ -209,8 +213,11 @@ public class AwlWindowActivity extends Activity {
             if (code == C_TITLE) {
                 String t = data.readString();
                 if (t != null && !t.isEmpty()) {
-                    taskTitle = t;
-                    runOnUiThread(() -> applyTaskDescription());
+                    runOnUiThread(() -> {
+                        taskTitle = t;
+                        applyTaskDescription();
+                        applyTaskIconAsync();
+                    });
                 }
                 return true;
             }
@@ -259,8 +266,15 @@ public class AwlWindowActivity extends Activity {
                 return true;
             }
             if (code == C_ICON) {
-                data.readInt();   /* has flag — always re-fetch (reset ⇒ fetch returns none) */
-                applyTaskIconAsync();
+                final boolean has = data.readInt() != 0;
+                runOnUiThread(() -> {
+                    if (!has) {
+                        iconRequest.incrementAndGet(); // cancel an older icon fetch
+                        taskIcon = null;
+                        applyTaskDescription();
+                        applyTaskIconAsync(); // reset may still have a desktop-file fallback
+                    } else applyTaskIconAsync();
+                });
                 return true;
             }
             return super.onTransact(code, data, reply, flags);
@@ -550,21 +564,27 @@ public class AwlWindowActivity extends Activity {
      *  or it is silently dropped. */
     private void applyTaskDescription() {
         if (taskTitle == null && taskIcon == null) return;
+        String label = TaskIdentity.label(taskDesktopName, taskTitle);
         android.app.ActivityManager.TaskDescription td = taskIcon != null
-                ? new android.app.ActivityManager.TaskDescription(taskTitle, taskIcon)
-                : new android.app.ActivityManager.TaskDescription(taskTitle);
+                ? new android.app.ActivityManager.TaskDescription(label, taskIcon)
+                : new android.app.ActivityManager.TaskDescription(label);
         setTaskDescription(td);
     }
 
     /** Pull the daemon's stored toplevel icon (xdg-toplevel-icon-v1 pixels)
      *  off the UI thread, then swap the task description. */
     private void applyTaskIconAsync() {
+        if (iconFetchRunning) { iconFetchPending = true; return; }
+        iconFetchRunning = true;
         final long fid = id;
+        final int request = iconRequest.incrementAndGet();
         new Thread(() -> {
+            final AwlClient.DesktopInfo desktop = AwlClient.desktopInfo(fid);
             int[] wh = new int[2];
             byte[] px = AwlClient.icon(fid, wh);
             android.graphics.Bitmap bmp = null;
-            if (px != null && wh[0] > 0 && wh[1] > 0) {
+            if (px != null && wh[0] > 0 && wh[1] > 0
+                    && (long) wh[0] * wh[1] * 4 == px.length) {
                 try {
                     bmp = android.graphics.Bitmap.createBitmap(
                             wh[0], wh[1], android.graphics.Bitmap.Config.ARGB_8888);
@@ -574,8 +594,43 @@ public class AwlWindowActivity extends Activity {
                     bmp = null;
                 }
             }
+            if (bmp == null && desktop != null && desktop.icon != null && desktop.icon.length > 0) {
+                android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                android.graphics.BitmapFactory.decodeByteArray(desktop.icon, 0, desktop.icon.length, bounds);
+                if (bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth <= 4096 && bounds.outHeight <= 4096) {
+                    bounds.inJustDecodeBounds = false;
+                    bounds.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / 128);
+                    bmp = android.graphics.BitmapFactory.decodeByteArray(desktop.icon, 0, desktop.icon.length, bounds);
+                } else {
+                    // Render desktop SVG icons into a bounded bitmap. Do not
+                    // install an external-file/network resolver for SVG assets.
+                    try {
+                        String xml = new String(desktop.icon, java.nio.charset.StandardCharsets.UTF_8);
+                        if (xml.contains("<svg") && !xml.contains("<!DOCTYPE") && !xml.contains("<!ENTITY")) {
+                            com.caverock.androidsvg.SVG svg = com.caverock.androidsvg.SVG.getFromString(xml);
+                            bmp = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888);
+                            new android.graphics.Canvas(bmp).drawPicture(svg.renderToPicture(128, 128));
+                        }
+                    } catch (Exception e) { Log.w(TAG, "desktop SVG decode failed", e); }
+                }
+            }
             final android.graphics.Bitmap fb = bmp;
-            runOnUiThread(() -> { taskIcon = fb; applyTaskDescription(); });
+            runOnUiThread(() -> {
+                iconFetchRunning = false;
+                if (isFinishing() || isDestroyed()) return;
+                if (request == iconRequest.get()) {
+                    if (desktop != null) taskDesktopName = desktop.name;
+                    // A failed fetch must not erase a valid icon; C_ICON reset
+                    // explicitly clears it. Coalesce rapid title/icon events.
+                    if (fb != null) taskIcon = fb;
+                    applyTaskDescription();
+                }
+                if (iconFetchPending) {
+                    iconFetchPending = false;
+                    applyTaskIconAsync();
+                }
+            });
         }, "awl-icon").start();
     }
 

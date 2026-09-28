@@ -1,6 +1,14 @@
 # customize.sh — sourced by ksud when flashing the zip (env: MODPATH = install
 # staging dir, ZIPFILE)
 
+# Preserve daemon settings when updating the module. Otherwise an upgrade
+# silently resets the selected renderer, zoom and runtime directory.
+OLDMOD="/data/adb/modules/${MODPATH##*/}"
+if [ "$OLDMOD" != "$MODPATH" ] && [ -f "$OLDMOD/config.json" ]; then
+  cp "$OLDMOD/config.json" "$MODPATH/config.json"
+  set_perm "$MODPATH/config.json" 0 0 0644
+fi
+
 # File modes: the installer has just run `set_perm_recursive $MODPATH 0 0 0755
 # 0644` over the whole tree (before sourcing this script) — the zip's modes are
 # gone and every binary is 0644. service.sh chmods again at boot, but the

@@ -1,10 +1,14 @@
 // Third-party client library for the anland daemon ("anland.host" binder
 // service): wayland connection fd over binder, window list/events, and the
-// window-hosting Activity. No external dependencies — the daemon does all
-// rendering. One small native helper (libawlspawn.so) provides the
+// window-hosting Activity. AndroidSVG decodes desktop vector icons; the daemon
+// does window rendering. One small native helper (libawlspawn.so) provides the
 // fork+exec fd handoff Java cannot express.
 plugins {
     id 'com.android.library'
+}
+
+dependencies {
+    implementation 'com.caverock:androidsvg-aar:1.4'
 }
 
 android {

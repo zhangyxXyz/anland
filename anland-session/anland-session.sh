@@ -139,9 +139,9 @@ export PATH="$APP_PATH"
 # via ~/.config/pulse/client.conf (written by setupanlandx.sh); publishing it
 # here covers env-driven clients too. Socket is absent when the host daemon
 # runs without module pulse/.
-if [ -S "$ANLAND_RUNTIME_DIR/pulse.sock" ]; then
-    printf 'PULSE_SERVER=unix:%s\n' "$ANLAND_RUNTIME_DIR/pulse.sock" >> "$ENVF"
-fi
+# Publish the intended endpoint even if the host audio service is still
+# starting. Otherwise this session permanently routes apps to auto_null.
+printf 'PULSE_SERVER=unix:%s\n' "$ANLAND_RUNTIME_DIR/pulse.sock" >> "$ENVF"
 
 # display number handshake: Xwayland writes "N\n" to fd 3 once it listens.
 # Resolved through the session PATH above: the patched ~/.local/bin build

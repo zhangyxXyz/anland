@@ -52,6 +52,7 @@
 #include "awl.h"
 #include "awl_renderer.hpp"
 #include "awl_sc.hpp"
+#include "desktop_metadata.hpp"
 
 #include <android/binder_ibinder.h>
 #include <android/binder_parcel.h>
@@ -173,6 +174,7 @@ enum {
                             client exit (xdg toplevel.close / X WM_DELETE_WINDOW) */
     AWL_T_ICON    = 15,  /* (id:i64) → w:i32 h:i32 bytes[RGBA] — current toplevel icon
                             (xdg-toplevel-icon-v1, best buffer, w=0 = none) */
+    AWL_T_APP_ID = 19,   /* (id:i64 locale:string16) → app_id,name,encoded icon; window-scoped */
     AWL_T_SUBSCRIBE = 16, /* (listener binder) → ok:i32; window lifecycle events
                             * (create/destroy/attach/detach) pushed to the listener
                             * as anland.IEvents oneways. Normal apps receive only
@@ -1563,7 +1565,7 @@ static bool caller_ok(transaction_code_t code) {
         code == AWL_T_CONNECT ||
         code == AWL_T_PAUSE || code == AWL_T_RESIZE || code == AWL_T_FOCUS ||
         code == AWL_T_INPUT || code == AWL_T_IME || code == AWL_T_CLIPBOARD ||
-        code == AWL_T_ICON || code == AWL_T_CLOSE)
+        code == AWL_T_ICON || code == AWL_T_APP_ID || code == AWL_T_CLOSE)
         return true;
 
     uid_t u = AIBinder_getCallingUid();
@@ -1741,6 +1743,21 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         LOGI("SURFACE %llu %dx%d → attached (host=%lld)",
              (unsigned long long)id, w, h, (long long)host);
         AParcel_writeInt32(out, 0);
+        return STATUS_OK;
+    }
+    case AWL_T_APP_ID: {
+        int64_t id64;
+        if (AParcel_readInt64(in, &id64) != STATUS_OK) return STATUS_BAD_VALUE;
+        if (!window_ok((uint64_t)id64)) return STATUS_PERMISSION_DENIED;
+        std::string locale;
+        if (AParcel_readString(in, &locale, wl_str_alloc) != STATUS_OK || locale.size() > 128)
+            return STATUS_BAD_VALUE;
+        char app_id[256];
+        awl_window_get_app_id((uint64_t)id64, app_id, sizeof(app_id));
+        auto metadata = desktop_metadata(awl_window_client_pid((uint64_t)id64), app_id, locale);
+        AParcel_writeString(out, app_id, (int32_t)strlen(app_id));
+        AParcel_writeString(out, metadata.name.c_str(), (int32_t)metadata.name.size());
+        AParcel_writeByteArray(out, (const int8_t*)metadata.icon.data(), (int32_t)metadata.icon.size());
         return STATUS_OK;
     }
     case AWL_T_ICON: {   /* current toplevel icon → RGBA bytes (Recents icon, xdg-toplevel-icon-v1) */

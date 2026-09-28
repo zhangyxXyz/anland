@@ -183,6 +183,8 @@ uid_t awl_window_client_uid(uint64_t id);   /* window id → wayland client uid
  * best available buffer (largest width×scale), swizzled to RGBA bytes
  * (malloc'd, caller frees). w/h = pixel dims. 0 = the window has no icon. */
 int awl_window_get_icon(uint64_t id, void** pixels, int32_t* w, int32_t* h);
+/* Copy the xdg app_id; empty for clients without one. Caller owns buf. */
+int awl_window_get_app_id(uint64_t id, char* buf, size_t size);
 /* Foreground scheduling (awl_sched.c): on = move pid's whole /proc subtree
  * into Android's top-app cgroups, off = back to the root groups. Stateless
  * and synchronous — the adapter calls it on window attach/detach and with

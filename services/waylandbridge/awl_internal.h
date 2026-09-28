@@ -219,6 +219,8 @@ struct awl_surface {
             struct wl_resource* role_res;   /* xdg_toplevel / xdg_popup */
             int32_t conf_w, conf_h;         /* most recent configure contents */
             int32_t pend_w, pend_h;         /* cached when resize precedes map (Android owns sizing entirely) */
+            bool fullscreen, maximized;    /* persist across resize and focus configures */
+            char app_id[256];              /* xdg identity, guarded by ev_lock */
         } xdg;
         struct {                            /* XWAYLAND */
             struct wl_resource* res;        /* xwayland_surface_v1 (#32) */
