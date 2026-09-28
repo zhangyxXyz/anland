@@ -33,8 +33,17 @@ jobs:
           key: anland-shell-signing-v1
           fail-on-cache-miss: true
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/ndk
+            ${{ env.ANDROID_HOME }}/build-tools
+            ${{ env.ANDROID_HOME }}/platforms
+          key: android-29.0.13113456-36.0.0-android-36
       - name: Install pinned Android build tools
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.22.1"'
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.22.1"
       - name: Build and lint both apps
         run: |
           set -euo pipefail
