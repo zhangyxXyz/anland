@@ -49,6 +49,7 @@ object WorkspaceController : Awl.WindowRouter {
         return true
     }
     private fun publish(s:State) {
+        android.util.Log.i("anland-workspace","desktop=${s.desktop} phase=${s.phase} error=${s.error} pending=${pending.keys}")
         mutable.value=s
         app.contentResolver.notifyChange(uri,null)
     }
@@ -80,8 +81,13 @@ object WorkspaceController : Awl.WindowRouter {
         }
     }
     override fun onAttachFailed(id:Long,embedded:Boolean) {
-        if(id in pending)main.post{rollback()}
+        if(id in pending)main.post{
+            if(id !in pending)return@post
+            val live=Awl.getWindows()
+            if(live!=null && live.none{it.id==id})windowGone(id) else rollback()
+        }
     }
+    override fun onWindowDestroyed(id:Long)=windowGone(id)
     fun windowGone(id:Long) {
         pending.remove(id)
         if(moving==id)moving=null

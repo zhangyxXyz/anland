@@ -718,6 +718,7 @@ public final class AwlWindowHost extends android.content.ContextWrapper {
             finishAndDropTask();
             return;
         }
+        LIVE.put(id, this); // re-entering a paused host can reclaim the same id
         if (embedded) listener.onAttached(id);
         Awl.hostAttached(id, embedded);
         applyTaskIconAsync();   /* the daemon may already hold an icon (re-attach / set before map) */
@@ -813,7 +814,7 @@ public final class AwlWindowHost extends android.content.ContextWrapper {
         if (clipMgr != null)
             clipMgr.removePrimaryClipChangedListener(clipListener);
         setPointerCaptureMode(CAPTURE_NONE, 0, 0, 0, 0);   /* release + local mode reset (the daemon mirror survives; re-pushed on re-attach) */
-        if (id >= 0) endPadStream();   /* the touchpad pointer stream may be interrupted by lifecycle: make up leave/button releases */
+        if (id >= 0 && LIVE.get(id) == this) endPadStream();   /* never release a replacement host's pointer stream */
         /* treat as minimize: daemon full detach (rendering resources freed,
          * wayland window kept alive). Clear attached locally too —
          * onResume/surfaceChanged re-attach from there */
@@ -831,7 +832,7 @@ public final class AwlWindowHost extends android.content.ContextWrapper {
             if (imm != null) imm.hideSoftInputFromWindow(hiddenInput.getWindowToken(), 0);
             applyPointerCapture();
         }
-        if (id < 0) return;   /* awaiting: nothing to report focus for */
+        if (id < 0 || LIVE.get(id) != this) return; // old Activity focus loss must not deactivate its replacement pane
         AwlClient.focus(id, hasFocus);   /* focus notifies the wayland client (configure ACTIVATED) */
         if (hasFocus) {
             tryShowIme();        /* C_IME_SHOW may arrive before focus does (input state kept across re-attach) */

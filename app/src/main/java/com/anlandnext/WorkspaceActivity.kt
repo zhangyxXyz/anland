@@ -201,6 +201,7 @@ class WorkspaceActivity:AppCompatActivity() {
     override fun onGenericMotionEvent(event:MotionEvent):Boolean {
         if(confirm!=null)return super.onGenericMotionEvent(event)
         val target=panes.find{it.id==selected && it.host?.hasPointerCapture()==true} ?: paneAt(event)
+        if(event.actionMasked==MotionEvent.ACTION_BUTTON_PRESS)target?.let{focus(it)}
         if(hoverTarget!==target) {
             hoverTarget?.host?.let{host->val exit=MotionEvent.obtain(event);exit.action=MotionEvent.ACTION_HOVER_EXIT;host.onGenericMotionEvent(exit);exit.recycle()}
             hoverTarget=target

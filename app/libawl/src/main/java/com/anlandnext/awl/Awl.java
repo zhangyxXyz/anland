@@ -51,6 +51,7 @@ public final class Awl {
         boolean route(Context context, long id, String title);
         default void onAttached(long id, boolean embedded) {}
         default void onAttachFailed(long id, boolean embedded) {}
+        default void onWindowDestroyed(long id) {}
     }
     private static WindowRouter router;
     public static void setWindowRouter(WindowRouter value) { router = value; }
@@ -180,6 +181,7 @@ public final class Awl {
             }
             if (code == AwlClient.E_DESTROYED)
                 hostGone(id);   /* no host will ever come for it — drop the attach bookkeeping */
+            if (code == AwlClient.E_DESTROYED && router != null) router.onWindowDestroyed(id);
         });
     }
 
