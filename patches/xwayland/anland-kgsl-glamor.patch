@@ -107,3 +107,26 @@
          LogMessageVerb(X_INFO, 3, "glamor: 'wl_drm' not supported and linux-dmabuf v4 not supported\n");
          return FALSE;
      }
+--- a/hw/xwayland/xwayland-input.c
++++ b/hw/xwayland/xwayland-input.c
+@@ -3214,14 +3214,18 @@
+     pointer_crossing = (xwl_seat->pointer_enter_count > 0);
+     master = GetMaster(device, POINTER_OR_FLOAT);
+     if (!master || !master->lastSlave)
+-        return !pointer_crossing;
++        return FALSE;
+ 
+     /* We do want the last active slave, we only check on slave xwayland
+      * devices so we can find out the xwl_seat, but those don't actually own
+      * their sprite, so the match doesn't mean a lot.
+      */
++    /* Touch, tablet and XTEST have their own target/position semantics.
++     * A wl_touch sequence does not require wl_pointer.enter. Treating the
++     * absent pointer crossing as lost focus redirects emulated clicks to
++     * the root window, so controls focus but never activate. */
+     if (master->lastSlave != get_pointer_device(xwl_seat))
+-        return !pointer_crossing;
++        return FALSE;
+ 
+     /* If we left the surface with a button down, it means the wayland compositor
+      * has grabbed the pointer so we will not get button release events from the
