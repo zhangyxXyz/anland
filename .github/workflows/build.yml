@@ -9,10 +9,10 @@
 name: build
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -70,7 +70,7 @@ jobs:
           key: android-${{ env.NDK_VERSION }}-${{ env.BT_VERSION }}-${{ env.PLATFORM_VER }}
 
       - name: SDK components (NDK, build-tools, platform)
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.sdk.outputs.cache-hit != 'true'
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
@@ -94,13 +94,14 @@ jobs:
       - name: Build (native + apk + module)
         run: make
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: anland-build
-          path: |
-            build/anland-wayland.apk
-            build/anland-awllib.aar
-            build/module/anland-awl.zip
-            build/anlandx.tar.gz
-          if-no-files-found: error
+      - name: Upload directly to draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="anland-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          sha256sum build/anland-wayland.apk build/anland-awllib.aar build/module/anland-awl.zip build/anlandx.tar.gz > SHA256SUMS
+          printf 'Anland source: %s\nBuild: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland 6.x $tag" --notes-file release-notes.md
+          gh release upload "$tag" build/anland-wayland.apk build/anland-awllib.aar build/module/anland-awl.zip build/anlandx.tar.gz SHA256SUMS
