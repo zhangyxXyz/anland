@@ -1,41 +1,53 @@
 --- a/src/xfdesktop-icon-view.c
 +++ b/src/xfdesktop-icon-view.c
-@@ -346,6 +346,7 @@
+@@ -346,6 +346,9 @@
      gint ncols;
      ViewItem **grid_layout;
  
 +    GtkGesture *touch_multi_press;
++    ViewItem *touch_pressed_item, *touch_previous_item;
++    guint32 touch_pressed_time, touch_previous_time;
      GtkSelectionMode sel_mode;
      guint maybe_begin_drag:1,
            definitely_dragging:1,
-@@ -434,6 +435,9 @@
+@@ -434,6 +437,15 @@
                                               guint property_id,
                                               GValue *value,
                                               GParamSpec *pspec);
++static void xfdesktop_icon_view_touch_pressed(GtkGestureMultiPress *gesture,
++                                              gint n_press, gdouble x, gdouble y,
++                                              XfdesktopIconView *icon_view);
++static void xfdesktop_icon_view_touch_cancel(GtkGesture *gesture,
++                                             GdkEventSequence *sequence,
++                                             XfdesktopIconView *icon_view);
 +static void xfdesktop_icon_view_touch_released(GtkGestureMultiPress *gesture,
 +                                               gint n_press, gdouble x, gdouble y,
 +                                               XfdesktopIconView *icon_view);
  static void xfdesktop_icon_view_dispose(GObject *obj);
  static void xfdesktop_icon_view_finalize(GObject *obj);
  
-@@ -1087,6 +1091,16 @@
+@@ -1087,6 +1099,20 @@
                            | GDK_LEAVE_NOTIFY_MASK
                            | GDK_POINTER_MOTION_MASK);
  
 +    /* Gtk's drag source installs touch handling; its emulated button events
 +     * do not include GDK_2BUTTON_PRESS. Recognize touch taps explicitly using
-+     * Gtk's configured time/distance thresholds. Mouse clicks keep the existing
++     * Gtk's configured time limit and the same icon target. Mouse clicks keep the existing
 +     * event path, and this observer never claims a sequence from drag handling. */
 +    icon_view->touch_multi_press = gtk_gesture_multi_press_new(GTK_WIDGET(icon_view));
 +    gtk_gesture_single_set_touch_only(GTK_GESTURE_SINGLE(icon_view->touch_multi_press), TRUE);
 +    gtk_event_controller_set_propagation_phase(GTK_EVENT_CONTROLLER(icon_view->touch_multi_press), GTK_PHASE_CAPTURE);
++    g_signal_connect(icon_view->touch_multi_press, "pressed",
++                     G_CALLBACK(xfdesktop_icon_view_touch_pressed), icon_view);
++    g_signal_connect(icon_view->touch_multi_press, "cancel",
++                     G_CALLBACK(xfdesktop_icon_view_touch_cancel), icon_view);
 +    g_signal_connect(icon_view->touch_multi_press, "released",
 +                     G_CALLBACK(xfdesktop_icon_view_touch_released), icon_view);
 +
      context = gtk_widget_get_style_context(GTK_WIDGET(icon_view));
      gtk_style_context_add_class(context, GTK_STYLE_CLASS_VIEW);
  
-@@ -1121,6 +1135,8 @@
+@@ -1121,6 +1147,8 @@
          g_signal_handlers_disconnect_by_data(icon_view->channel, icon_view);
          g_clear_object(&icon_view->channel);
      }
@@ -44,38 +56,81 @@
  
      xfdesktop_icon_view_set_model(icon_view, NULL);  // Call so ->items are freed too
  
-@@ -1694,6 +1710,38 @@
+@@ -1694,6 +1722,81 @@
      }
  
      return FALSE;
++}
++
++/* Touch contacts can land at different points of the same icon. Gtk's mouse
++ * distance threshold (often 5 px) must not split those into unrelated taps.
++ * Keep the configured double-click time, but pair completed taps by target.
++ * Existing drag handling still owns movement and can deny this observer. */
++static ViewItem *
++xfdesktop_icon_view_touch_item(XfdesktopIconView *icon_view, gdouble x, gdouble y) {
++    GdkEventButton hit = { 0 };
++    hit.x = x;
++    hit.y = y;
++    GList *item_l = g_list_find_custom(icon_view->items, &hit,
++                                     (GCompareFunc)xfdesktop_check_icon_clicked);
++    return item_l != NULL ? item_l->data : NULL;
++}
++
++static const GdkEvent *
++xfdesktop_icon_view_touch_event(GtkGestureMultiPress *gesture) {
++    GdkEventSequence *sequence = gtk_gesture_single_get_current_sequence(GTK_GESTURE_SINGLE(gesture));
++    return gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
++}
++
++static void
++xfdesktop_icon_view_touch_cancel(GtkGesture *gesture,
++                                 GdkEventSequence *sequence,
++                                 XfdesktopIconView *icon_view) {
++    icon_view->touch_pressed_item = NULL;
++    icon_view->touch_previous_item = NULL;
++}
++
++static void
++xfdesktop_icon_view_touch_pressed(GtkGestureMultiPress *gesture,
++                                  gint n_press, gdouble x, gdouble y,
++                                  XfdesktopIconView *icon_view) {
++    const GdkEvent *event = xfdesktop_icon_view_touch_event(gesture);
++    icon_view->touch_pressed_item = xfdesktop_icon_view_touch_item(icon_view, x, y);
++    icon_view->touch_pressed_time = event != NULL ? gdk_event_get_time(event) : 0;
++    if (icon_view->touch_pressed_item != icon_view->touch_previous_item)
++        icon_view->touch_previous_item = NULL;
 +}
 +
 +static void
 +xfdesktop_icon_view_touch_released(GtkGestureMultiPress *gesture,
 +                                   gint n_press, gdouble x, gdouble y,
 +                                   XfdesktopIconView *icon_view) {
-+    if (n_press != 2 || icon_view->single_click
-+        || icon_view->definitely_dragging || icon_view->definitely_rubber_banding)
-+        return;
-+
-+    GdkEventSequence *sequence = gtk_gesture_single_get_current_sequence(GTK_GESTURE_SINGLE(gesture));
-+    const GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), sequence);
++    const GdkEvent *event = xfdesktop_icon_view_touch_event(gesture);
 +    GdkModifierType state = 0;
 +    if (event != NULL)
 +        gdk_event_get_state(event, &state);
-+    if ((state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) != 0)
++    guint32 now = event != NULL ? gdk_event_get_time(event) : 0;
++    gint double_click_time = 0;
++    g_object_get(gtk_widget_get_settings(GTK_WIDGET(icon_view)),
++                 "gtk-double-click-time", &double_click_time, NULL);
++    ViewItem *item = xfdesktop_icon_view_touch_item(icon_view, x, y);
++    if (event == NULL || event->type != GDK_TOUCH_END || icon_view->single_click
++        || icon_view->definitely_dragging || icon_view->definitely_rubber_banding
++        || (state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) != 0
++        || item == NULL || item != icon_view->touch_pressed_item || item != icon_view->cursor
++        || (guint32)(now - icon_view->touch_pressed_time) > (guint)double_click_time) {
++        icon_view->touch_previous_item = NULL;
++        icon_view->touch_pressed_item = NULL;
 +        return;
++    }
 +
-+    /* Reuse the same icon hit regions as mouse activation. The cursor must
-+     * still be on the item selected by this tap; an empty-space tap cannot
-+     * launch an earlier selection. Activate only after release, so a drag or
-+     * cancelled touch cannot open an icon. */
-+    GdkEventButton hit = { 0 };
-+    hit.x = x;
-+    hit.y = y;
-+    GList *item_l = g_list_find_custom(icon_view->items, &hit,
-+                                     (GCompareFunc)xfdesktop_check_icon_clicked);
-+    if (item_l != NULL && icon_view->cursor == item_l->data) {
++    gboolean activate = item == icon_view->touch_previous_item
++        && (guint32)(icon_view->touch_pressed_time - icon_view->touch_previous_time) <= (guint)double_click_time;
++    icon_view->touch_previous_item = activate ? NULL : item;
++    icon_view->touch_previous_time = icon_view->touch_pressed_time;
++    icon_view->touch_pressed_item = NULL;
++    if (activate) {
++        /* Clear state before emission: activation can change the model. */
 +        xfdesktop_icon_view_clear_drag_event(icon_view);
 +        g_signal_emit(G_OBJECT(icon_view), __signals[SIG_ICON_ACTIVATED], 0);
 +        xfdesktop_icon_view_unselect_all(icon_view);
@@ -83,3 +138,21 @@
  }
  
  static gboolean
+@@ -4154,6 +4257,8 @@
+                                       GtkTreePath *path,
+                                       XfdesktopIconView *icon_view)
+ {
++    icon_view->touch_pressed_item = NULL;
++    icon_view->touch_previous_item = NULL;
+     GList *item_l = g_list_nth(icon_view->items, gtk_tree_path_get_indices(path)[0]);
+ 
+     if (item_l != NULL) {
+@@ -4183,6 +4288,8 @@
+ {
+     xfdesktop_icon_view_clear_grid_layout(icon_view);
+ 
++    icon_view->touch_pressed_item = NULL;
++    icon_view->touch_previous_item = NULL;
+     icon_view->item_under_pointer = NULL;
+     icon_view->cursor = NULL;
+     icon_view->first_clicked_item = NULL;
