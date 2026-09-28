@@ -4,9 +4,9 @@
 
     <!-- MainActivity -->
     <string name="settings_title">窗口设置</string>
-    <string name="status_daemon_unreachable">daemon 未连接（binder anland.host 不可达）</string>
-    <string name="status_window_count">窗口数: %1$d（daemon 运行中）</string>
-    <string name="status_empty">暂无 wayland 窗口\n（在容器中启动 Wayland 应用）</string>
+    <string name="status_daemon_unreachable">窗口服务尚未连接</string>
+    <string name="status_window_count">%1$d 个窗口 · 服务已连接</string>
+    <string name="status_empty">还没有窗口，先到 Anland Shell 启动一个应用。</string>
     <string name="window_fallback_title">窗口 %1$d</string>
     <string name="menu_close">关闭</string>
     <string name="menu_window_info">窗口信息</string>
@@ -30,8 +30,8 @@
     <string name="init_size_tip">初始窗口尺寸（Android 定尺寸前的首帧占位, 仅对新窗口生效）:</string>
     <string name="init_size_w">宽</string>
     <string name="init_size_h">高</string>
-    <string name="auto_attach_tip">自动 attach（wayland 窗口创建时 daemon 自动拉起宿主窗口; 关 = 窗口等待其应用发来 binder SURFACE）:</string>
-    <string name="auto_attach">自动 attach 新窗口</string>
+    <string name="auto_attach_tip">应用创建新窗口时直接拉起，无需再到窗口列表手动打开。仅对新建窗口生效。</string>
+    <string name="auto_attach">启动应用后自动显示窗口</string>
     <string name="sc_backend_tip">合成后端（开 = SC/HWC: wayland 图层交由 SurfaceFlinger 合成, 允许时零拷贝扫描输出; 关 = 回退逐窗口 GL 渲染。对之后 attach 的窗口生效）:</string>
     <string name="sc_backend">SC 合成后端（HWC）</string>
 </resources>

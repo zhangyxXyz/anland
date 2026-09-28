@@ -134,6 +134,14 @@ jobs:
           persist-credentials: false
       - name: Apply Chrome and audio fixes from this dev commit
         run: python3 anland-fixes/rootfs/apply-builder-fixes.py rootfs-builder
+      - name: Prepare draft Release before building
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "debian-next-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --draft --target "$GITHUB_SHA" --title "Debian 13 Anland Next + Docker" \
+            --notes "Build in progress; source $GITHUB_SHA"
       - name: Build Debian ARM64 with Docker
         working-directory: rootfs-builder
         env:
@@ -167,17 +175,16 @@ jobs:
           (cd release_assets && sha256sum -- *.tar.xz* > ASSETS-SHA256SUMS)
           tag="debian-next-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           printf '%s\n' 'Debian 13 ARM64; Anland Next; Docker enabled; user seiun; Chinese locale; Qualcomm Mesa.' 'RootFS source: ffc712071a04cc50d1aed26aab064f0295b6251d' 'If split: concatenate .part-000, .part-001, ... in order, then check ROOTFS-SHA256SUMS.' > notes.md
-          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Debian 13 Anland Next + Docker" --notes-file notes.md
+          gh release edit "$tag" --draft --notes-file notes.md
           gh release upload "$tag" release_assets/*
 
   shell:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shell-app
     steps:
       - uses: actions/checkout@v4
-        with:
-          repository: SuperTurtleDev/anland-shell
-          ref: 920fcfc8159690f5232e2d9c7c3294d4c1481145
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -187,7 +194,11 @@ jobs:
           path: debug.keystore
           key: anland-shell-signing-v1
       - uses: gradle/actions/setup-gradle@v4
-      - run: make
+      - name: Build Shell with the existing upgrade signing key
+        run: |
+          if [ -f ../debug.keystore ]; then cp ../debug.keystore debug.keystore; fi
+          make
+          cp debug.keystore ../debug.keystore
       - name: Upload directly to draft Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,6 +207,6 @@ jobs:
           set -euo pipefail
           tag="anland-shell-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           sha256sum build/anland-shell.apk > SHA256SUMS
-          printf '%s\n' 'Anland Shell source: 920fcfc8159690f5232e2d9c7c3294d4c1481145' > notes.md
+          printf '%s\n' "Anland Shell + MaterialDesignTmpl migration: $GITHUB_SHA" > notes.md
           gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland Shell $tag" --notes-file notes.md
           gh release upload "$tag" build/anland-shell.apk SHA256SUMS

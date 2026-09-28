@@ -1,0 +1,13 @@
+<resources>
+    <string name="windows_title">窗口</string>
+    <string name="appearance_title">外观</string>
+    <string name="refresh">刷新</string>
+    <string name="launch_behavior">启动行为</string>
+    <string name="setting_write_failed">保存失败，请检查 Anland 服务后重试。</string>
+    <string name="state_visible">窗口已连接</string>
+    <string name="state_background">后台运行 · 点击显示</string>
+    <string name="zoom_title">显示缩放</string>
+    <string name="zoom_help">同时放大文字和控件。高分辨率屏幕可以从 150% 开始调整。</string>
+    <string name="advanced_title">高级</string>
+    <string name="apply">应用</string>
+</resources>

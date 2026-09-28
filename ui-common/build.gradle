@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+// Both APK projects consume these sources; their concurrent builds must not share outputs.
+layout.buildDirectory.set(file("build/${rootProject.name}"))
+android {
+    namespace 'com.anland.design'
+    compileSdk 36
+    defaultConfig { minSdk 28 }
+    buildFeatures { compose true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+}
+dependencies {
+    api platform('androidx.compose:compose-bom:2024.12.01')
+    api 'androidx.activity:activity-compose:1.10.0'
+    api 'androidx.appcompat:appcompat:1.7.0'
+    api 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    api 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
+    api 'androidx.compose.ui:ui'
+    api 'androidx.compose.material3:material3'
+    api 'androidx.compose.material:material-icons-extended'
+    api 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+    implementation 'com.materialkolor:material-kolor:2.0.0'
+    implementation 'io.github.kyant0:backdrop:1.0.0'
+    implementation 'com.mikepenz:multiplatform-markdown-renderer-m3:0.38.0'
+}

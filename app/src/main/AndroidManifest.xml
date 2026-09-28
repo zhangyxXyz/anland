@@ -8,7 +8,7 @@
         android:allowBackup="false">
 
         <!-- Launcher entry: window list (Attached/Detached state) -->
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true" android:theme="@style/Theme.MaterialDesignShell">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -20,7 +20,7 @@
              consumer apps run) -->
 
         <!-- Window behavior settings -->
-        <activity android:name=".WlSettingsActivity" android:exported="false"/>
+        <activity android:name=".WlSettingsActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell"/>
 
         <!-- client closed its own window → daemon notification finishes the Activity -->
         <receiver android:name=".WindowGoneReceiver" android:exported="true">

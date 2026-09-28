@@ -4,9 +4,9 @@
 
     <!-- MainActivity -->
     <string name="settings_title">Window Settings</string>
-    <string name="status_daemon_unreachable">daemon not connected (binder anland.host unreachable)</string>
-    <string name="status_window_count">Windows: %1$d (daemon running)</string>
-    <string name="status_empty">No wayland windows yet\n(start a Wayland app in the container)</string>
+    <string name="status_daemon_unreachable">Window service unavailable</string>
+    <string name="status_window_count">%1$d windows · service connected</string>
+    <string name="status_empty">No windows yet. Start an application from Anland Shell.</string>
     <string name="window_fallback_title">Window %1$d</string>
     <string name="menu_close">Close</string>
     <string name="menu_window_info">Window info</string>
@@ -22,8 +22,8 @@
     <string name="ime_mode_overlay">Overlay (keyboard floats over the window, surface unchanged)</string>
     <string name="zoom_tip">Display zoom (whole wayland window, applies immediately):</string>
     <string name="scale_mode_tip">Window scaling (when a fixed-size window is resized, applies immediately):</string>
-    <string name="auto_attach_tip">Auto attach (daemon launches the host window automatically when a wayland window is created; off = the window waits for a binder SURFACE from its app):</string>
-    <string name="auto_attach">Auto attach new windows</string>
+    <string name="auto_attach_tip">When an app creates a window, bring it to the foreground automatically. Applies to newly created windows.</string>
+    <string name="auto_attach">Show new windows automatically</string>
     <string name="scale_mode_stretch">Stretch (fill the window, aspect may distort)</string>
     <string name="scale_mode_fit">Fit (uniform scale, centered, black bars)</string>
     <string name="scale_mode_center">Original size (1:1, centered, no scaling)</string>

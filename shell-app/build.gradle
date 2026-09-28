@@ -1,8 +1,11 @@
-// Single-module gradle project: root project IS the application. Pure Java
-// APK — all rendering/protocol lives in the root daemon (waylandbridge), so
-// there are no dependencies and no native libs. Signing uses debug.keystore
-// (gitignored; the Makefile bootstraps it with keytool when missing) so
-// release APKs stay installable over previous dev builds.
+// Single-module pure-Java APK: the Anland shell (launcher) for Droidspaces
+// containers. No dependencies, no AndroidX, no native code — all privileged
+// work goes through `su -c` + the droidspaces CLI; window hosting lives in
+// the anland daemon and the com.anlandnext host APK (auto-attach).
+//
+// Signing uses debug.keystore (gitignored; the Makefile bootstraps it with
+// keytool when missing) so release APKs stay installable over previous dev
+// builds — same scheme as the anland repo.
 plugins {
     id 'com.android.application' version '8.7.3'
     id 'com.android.library' version '8.7.3' apply false
@@ -13,13 +16,13 @@ plugins {
 android {
     buildFeatures { compose true }
     kotlinOptions { jvmTarget = '17' }
-    namespace 'com.anlandnext'
+    namespace 'com.anland.shell'
     compileSdk 36
 
     defaultConfig {
-        applicationId 'com.anlandnext'
-        minSdk 29
-        targetSdk 29
+        applicationId 'com.anland.shell'
+        minSdk 28
+        targetSdk 28
         versionCode 1
         versionName '0.1'
     }
@@ -46,17 +49,10 @@ android {
     }
 
     lint {
-        // Sideloaded root tool — never distributed via Google Play; targetSdk 29
-        // is deliberate (legacy surface/popup semantics).
+        // Sideloaded root tool — never distributed via Google Play; targetSdk 28
+        // is deliberate (legacy shortcut/pinning semantics).
         disable 'ExpiredTargetSdkVersion'
     }
-}
-
-dependencies {
-    // Window management (list/events/attach/close) goes through the same
-    // library shipped to third-party apps; the daemon scopes by identity —
-    // this APK is package-authenticated and sees every window.
-    implementation project(':libawl')
 }
 
 dependencies {

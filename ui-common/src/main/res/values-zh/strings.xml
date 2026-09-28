@@ -1,0 +1,10 @@
+<resources>
+    <string name="dialog_ok">确定</string>
+    <string name="appearance">外观</string>
+    <string name="follow_system">跟随系统</string>
+    <string name="light_theme">浅色</string>
+    <string name="dark_theme">深色</string>
+    <string name="dynamic_color">壁纸动态配色</string>
+    <string name="glass_navigation">液态玻璃导航</string>
+    <string name="theme_color">主题色</string>
+</resources>

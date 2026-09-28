@@ -1,0 +1,13 @@
+<resources>
+    <string name="windows_title">Windows</string>
+    <string name="appearance_title">Appearance</string>
+    <string name="refresh">Refresh</string>
+    <string name="launch_behavior">Launch behavior</string>
+    <string name="setting_write_failed">Unable to save. Check the Anland service and try again.</string>
+    <string name="state_visible">Window connected</string>
+    <string name="state_background">In background · tap to show</string>
+    <string name="zoom_title">Display scale</string>
+    <string name="zoom_help">Enlarge text and controls together. 150% is a useful starting point for high resolution displays.</string>
+    <string name="advanced_title">Advanced</string>
+    <string name="apply">Apply</string>
+</resources>

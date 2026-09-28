@@ -1,0 +1,10 @@
+<resources>
+    <string name="dialog_ok">OK</string>
+    <string name="appearance">Appearance</string>
+    <string name="follow_system">System</string>
+    <string name="light_theme">Light</string>
+    <string name="dark_theme">Dark</string>
+    <string name="dynamic_color">Wallpaper colors</string>
+    <string name="glass_navigation">Liquid glass navigation</string>
+    <string name="theme_color">Theme color</string>
+</resources>

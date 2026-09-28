@@ -2,6 +2,7 @@ pluginManagement {
     repositories {
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {
@@ -16,3 +17,6 @@ dependencyResolutionManagement {
 // test harness APK).
 rootProject.name = "anland-wayland"
 include ':libawl'
+
+include ':ui-common'
+project(':ui-common').projectDir = file('../ui-common')
