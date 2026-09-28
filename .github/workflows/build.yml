@@ -46,6 +46,10 @@ jobs:
             services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \
             -o /tmp/desktop-metadata-test
           /tmp/desktop-metadata-test
+          mkdir -p /tmp/anland-java-tests
+          javac -d /tmp/anland-java-tests \
+            app/libawl/src/main/java/com/anlandnext/awl/WindowSafeArea.java tests/WindowSafeAreaTest.java
+          java -cp /tmp/anland-java-tests com.anlandnext.awl.WindowSafeAreaTest
 
       # libffi: overlay the v3.4.6 release tarball (same pin as the
       # submodule) over third_party/libffi — it ships a generated configure,

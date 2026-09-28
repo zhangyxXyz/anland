@@ -208,5 +208,13 @@ start_pulse() {
 
 case "${1:-}" in
   pulse) start_pulse ;;
-  *)     start_daemon; start_pulse ;;
+  *)
+    # Complete audio staging and the real-sink readiness probe before the
+    # Wayland socket becomes available to auto-starting container sessions.
+    # If audio fails, preserve the diagnostic status but keep graphics usable.
+    start_pulse
+    pulse_status=$?
+    start_daemon
+    exit "$pulse_status"
+    ;;
 esac

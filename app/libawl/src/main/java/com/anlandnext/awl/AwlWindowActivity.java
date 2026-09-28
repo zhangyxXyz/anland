@@ -113,12 +113,12 @@ public class AwlWindowActivity extends Activity {
     private InputMethodManager imm;
     private CtrlBinder ctrl;
     private int lastW, lastH;
-    private int lastImeMargin = -1;
     private boolean attached;
     private boolean finishingByGone;   /* client closed the window / evicted, nothing left to report */
     private boolean deathLinked;       /* daemon death monitoring attached */
     private String taskTitle;          /* last known client title (Recents label) */
     private String taskDesktopName;
+    private String taskAppId;
     private boolean iconFetchRunning, iconFetchPending;
     private final java.util.concurrent.atomic.AtomicInteger iconRequest =
             new java.util.concurrent.atomic.AtomicInteger();
@@ -212,7 +212,7 @@ public class AwlWindowActivity extends Activity {
             }
             if (code == C_TITLE) {
                 String t = data.readString();
-                if (t != null && !t.isEmpty()) {
+                if (t != null) {
                     runOnUiThread(() -> {
                         taskTitle = t;
                         applyTaskDescription();
@@ -385,6 +385,11 @@ public class AwlWindowActivity extends Activity {
             attached = false;
         }
         id = newId;
+        iconRequest.incrementAndGet();
+        taskTitle = null;
+        taskDesktopName = null;
+        taskAppId = null;
+        taskIcon = null;
         host = HOST_SEQ.incrementAndGet();
         ctrl = new CtrlBinder();
         /* lastW/H keep the surface size (an Android-window property, not a
@@ -537,8 +542,12 @@ public class AwlWindowActivity extends Activity {
         root.addView(hiddenInput, new FrameLayout.LayoutParams(1, 1));
         /* IME inset: in inset mode the surface yields (client reflows); in overlay mode the keyboard floats above */
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            applyImeInset(insets);
+            applyContentInsets(insets);
             return insets;
+        });
+        root.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+            WindowInsets insets = root.getRootWindowInsets();
+            if (insets != null) applyContentInsets(insets);
         });
         setContentView(root);
 
@@ -619,8 +628,12 @@ public class AwlWindowActivity extends Activity {
             runOnUiThread(() -> {
                 iconFetchRunning = false;
                 if (isFinishing() || isDestroyed()) return;
-                if (request == iconRequest.get()) {
-                    if (desktop != null) taskDesktopName = desktop.name;
+                if (request == iconRequest.get() && fid == id) {
+                    if (desktop != null) {
+                        if (taskAppId != null && !taskAppId.equals(desktop.appId)) taskIcon = null;
+                        taskAppId = desktop.appId;
+                        taskDesktopName = desktop.name;
+                    }
                     // A failed fetch must not erase a valid icon; C_ICON reset
                     // explicitly clears it. Coalesce rapid title/icon events.
                     if (fb != null) taskIcon = fb;
@@ -848,14 +861,34 @@ public class AwlWindowActivity extends Activity {
         return getSharedPreferences("awl", MODE_PRIVATE).getInt("ime_mode", 0) != 0;
     }
 
-    private void applyImeInset(WindowInsets insets) {
-        int imeBottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
-        int margin = imeOverlayMode() ? 0 : imeBottom;
-        if (margin == lastImeMargin) return;
-        lastImeMargin = margin;
+    private void applyContentInsets(WindowInsets insets) {
+        if (root.getWidth() <= 0 || root.getHeight() <= 0) return;
+        android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.displayCutout()
+                | WindowInsets.Type.systemBars());
+        int bottom = safe.bottom;
+        if (!imeOverlayMode()) bottom = Math.max(bottom, insets.getInsets(WindowInsets.Type.ime()).bottom);
+        int[][] corners = new int[4][];
+        WindowInsets windowInsets = root.getRootWindowInsets();
+        if (android.os.Build.VERSION.SDK_INT >= 31 && windowInsets != null) {
+            for (int i = 0; i < 4; i++) {
+                android.view.RoundedCorner c = windowInsets.getRoundedCorner(i);
+                if (c != null) corners[i] = new int[]{c.getCenter().x, c.getCenter().y, c.getRadius()};
+            }
+        }
+        int[] location = new int[2];
+        root.getLocationInWindow(location);
+        int[] margins = WindowSafeArea.margins(location[0], location[1], root.getWidth(), root.getHeight(),
+                new int[]{safe.left, safe.top, safe.right, bottom}, corners);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sv.getLayoutParams();
-        lp.bottomMargin = margin;
-        sv.setLayoutParams(lp);   /* surface resize → configure the client to reflow */
+        if (lp.leftMargin == margins[0] && lp.topMargin == margins[1]
+                && lp.rightMargin == margins[2] && lp.bottomMargin == margins[3]) return;
+        lp.leftMargin = margins[0];
+        lp.topMargin = margins[1];
+        lp.rightMargin = margins[2];
+        lp.bottomMargin = margins[3];
+        // Resize the actual surface: Wayland reflows, and input remains local
+        // to that same surface. Do not merely crop pixels after rendering.
+        sv.setLayoutParams(lp);
     }
 
     private void onImeShow(int hint, int purpose) {

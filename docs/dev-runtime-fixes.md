@@ -7,10 +7,17 @@ display resolution, username or hardcoded list of application names.
   by the current fractional scale. Only an unattached window uses the initial
   placeholder size. Fullscreen/maximized/activated state survives later focus
   and resize events; each configure receives a fresh serial.
+* The host measures Android rounded corners, display cutouts, system bars and
+  the keyboard, then resizes the content surface to its safe rectangle. Insets
+  are recalculated on layout/rotation; input stays in the same surface coordinates.
 * PulseAudio creates its runtime directory before staging its libraries, and
   records copy errors. Session clients receive the host endpoint even when
   PulseAudio starts later. The Debian image also provides a PipeWire PulseAudio
   tunnel with reconnection for clients outside the Anland session.
+  On module startup, audio staging and the Android-sink readiness probe run
+  before the graphical daemon is launched. Reconnection is only recovery from
+  a later connection loss, not the fix for missing runtime directories or
+  incorrect initial routing.
 * Module updates preserve existing renderer, zoom and runtime-directory settings.
 * Recents identity uses xdg app_id and .desktop metadata from the client's own
   filesystem root. XDG data directory precedence, localized Name values and
