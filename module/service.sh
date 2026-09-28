@@ -48,15 +48,29 @@ PULSE_PROBE_TIMEOUT=2
 PULSE_PROBE_POLLS=4
 PULSE_START_RETRIES=2
 
+pulse_pids() {
+  # PulseAudio rewrites argv[0] to "pulseaudio", so matching the original
+  # command line misses it. Match the executable identity instead; never stop
+  # a PulseAudio server belonging to another app (e.g. Termux).
+  for pulse_pid in $(pidof pulseaudio 2>/dev/null); do
+    pulse_exe=$(readlink "/proc/$pulse_pid/exe" 2>/dev/null)
+    case "$pulse_exe" in
+      "$PAR/bin/pulseaudio"|"$PAR/bin/pulseaudio (deleted)") printf '%s\n' "$pulse_pid" ;;
+    esac
+  done
+}
+
 stop_pulse() {
   # The runtime copy is disposable, but the process must be stopped before it
   # is replaced.  Otherwise an old instance can keep the old UID/audio state
   # alive across a module update or an APK reinstall.
-  if pkill -f "$PAR/bin/pulseaudio" 2>/dev/null; then
+  pulse_old_pids=$(pulse_pids)
+  if [ -n "$pulse_old_pids" ]; then
+    for pulse_pid in $pulse_old_pids; do kill "$pulse_pid" 2>/dev/null || true; done
     sleep 1
     # A stuck instance must not survive into the next attempt and race the
     # new server for the socket or AudioFlinger track.
-    pkill -KILL -f "$PAR/bin/pulseaudio" 2>/dev/null || true
+    for pulse_pid in $(pulse_pids); do kill -KILL "$pulse_pid" 2>/dev/null || true; done
   fi
   rm -f "$RT/pulse.sock"
 }

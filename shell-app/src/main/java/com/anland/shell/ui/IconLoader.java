@@ -37,7 +37,8 @@ import java.util.regex.Pattern;
  * directly; otherwise the icon theme dirs are searched (DsCli.findIcons) and
  * the best raster candidate wins — png over webp over other rasters, larger
  * size first (size taken from the hicolor NNxNN path segment). Anything
- * undecodable (SVG/XPM-only entries) falls back to a generated letter tile.
+ * SVG icons are rendered into bounded bitmaps; unsupported/corrupt entries
+ * fall back to a generated letter tile. No application-specific icon table.
  */
 public final class IconLoader {
 
@@ -138,8 +139,7 @@ public final class IconLoader {
         return null;
     }
 
-    /** Best raster candidate: png > webp > other rasters, then size desc.
-     *  Non-raster (svg/xpm) or empty → null. */
+    /** Prefer raster candidates, then SVG; ties use size. Unsupported files → null. */
     private static String pickBest(List<String> candidates) {
         String best = null;
         int bestScore = -1, bestSize = -1;
@@ -153,8 +153,10 @@ public final class IconLoader {
                 score = 2;
             else if ("jpg".equals(ext) || "jpeg".equals(ext) || "bmp".equals(ext) || "gif".equals(ext))
                 score = 1;
+            else if ("svg".equals(ext))
+                score = 0;
             else
-                continue;   /* svg / xpm / unknown: not decodable by BitmapFactory */
+                continue;   /* xpm / unknown: unsupported */
             int size = 0;
             Matcher m = SIZE.matcher(path);
             if (m.find())
@@ -177,9 +179,28 @@ public final class IconLoader {
             return null;
         try {
             byte[] raw = Base64.decode(r.stdout.trim(), Base64.DEFAULT);
-            return BitmapFactory.decodeByteArray(raw, 0, raw.length);
-        } catch (IllegalArgumentException e) {
-            return null;   /* corrupt base64 — try the next candidate */
+            if (raw.length > 1024 * 1024) return null;
+            if (path.toLowerCase(Locale.ROOT).endsWith(".svg")) {
+                String xml = new String(raw, java.nio.charset.StandardCharsets.UTF_8);
+                String upper = xml.toUpperCase(Locale.ROOT);
+                if (upper.contains("<!DOCTYPE") || upper.contains("<!ENTITY")) return null;
+                // No resolver for external files or network assets. Render to a fixed
+                // allocation rather than trusting dimensions supplied by the document.
+                com.caverock.androidsvg.SVG svg = com.caverock.androidsvg.SVG.getFromString(xml);
+                Bitmap bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
+                new Canvas(bitmap).drawPicture(svg.renderToPicture(128, 128));
+                return bitmap;
+            }
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(raw, 0, raw.length, options);
+            if (options.outWidth <= 0 || options.outHeight <= 0 || options.outWidth > 4096 || options.outHeight > 4096) return null;
+            options.inJustDecodeBounds = false;
+            options.inSampleSize = 1;
+            while (Math.max(options.outWidth, options.outHeight) / options.inSampleSize > 256) options.inSampleSize *= 2;
+            return BitmapFactory.decodeByteArray(raw, 0, raw.length, options);
+        } catch (Exception e) {
+            return null;   /* corrupt base64/icon — try the next candidate */
         }
     }
 

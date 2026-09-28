@@ -57,6 +57,7 @@ android {
 
 dependencies {
     implementation project(':ui-common')
+    implementation 'com.caverock:androidsvg-aar:1.4'
 }
 
 // Same Kotlin 2.2 / lint compatibility exclusions as MaterialDesignTmpl.

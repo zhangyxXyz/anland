@@ -17,21 +17,21 @@
     <string name="dialog_ok">确定</string>
 
     <!-- WlSettingsActivity -->
-    <string name="ime_mode_tip">软键盘弹出时 wayland 窗口的显示:</string>
-    <string name="ime_mode_inset">让位（surface 缩到键盘上方, 客户端 reflow）</string>
-    <string name="ime_mode_overlay">覆盖（键盘悬浮在窗口上层, surface 不变）</string>
+    <string name="ime_mode_tip">键盘显示方式</string>
+    <string name="ime_mode_inset">缩小窗口，为键盘留出空间</string>
+    <string name="ime_mode_overlay">键盘覆盖窗口，保持画面大小</string>
     <string name="zoom_tip">显示缩放（wayland 窗口整体, 立即生效）:</string>
-    <string name="scale_mode_tip">窗口缩放方式（固定尺寸窗口被拉伸时, 立即生效）:</string>
-    <string name="scale_mode_stretch">拉伸（填满窗口, 比例可能失真）</string>
-    <string name="scale_mode_fit">等比缩放（完整显示, 居中留黑边）</string>
-    <string name="scale_mode_center">原始大小（1:1 不缩放, 居中）</string>
+    <string name="scale_mode_tip">固定尺寸窗口的缩放方式</string>
+    <string name="scale_mode_stretch">填满窗口，可能改变画面比例</string>
+    <string name="scale_mode_fit">保持比例，完整显示画面</string>
+    <string name="scale_mode_center">原始尺寸，居中显示</string>
     <string name="xwayland_scale_tip">XWayland 窗口跟随显示缩放:</string>
     <string name="xwayland_scale">启用 XWayland 缩放</string>
-    <string name="init_size_tip">初始窗口尺寸（Android 定尺寸前的首帧占位, 仅对新窗口生效）:</string>
+    <string name="init_size_tip">新窗口的初始尺寸。窗口显示后会根据实际可用区域调整，这不是全屏尺寸。</string>
     <string name="init_size_w">宽</string>
     <string name="init_size_h">高</string>
     <string name="auto_attach_tip">应用创建新窗口时直接拉起，无需再到窗口列表手动打开。仅对新建窗口生效。</string>
     <string name="auto_attach">启动应用后自动显示窗口</string>
-    <string name="sc_backend_tip">合成后端（开 = SC/HWC: wayland 图层交由 SurfaceFlinger 合成, 允许时零拷贝扫描输出; 关 = 回退逐窗口 GL 渲染。对之后 attach 的窗口生效）:</string>
-    <string name="sc_backend">SC 合成后端（HWC）</string>
+    <string name="sc_backend_tip">开启时交给 Android 系统合成；关闭时使用逐窗口 OpenGL 渲染，两者都可使用 GPU。仅对之后打开的窗口生效。</string>
+    <string name="sc_backend">SurfaceControl 合成</string>
 </resources>

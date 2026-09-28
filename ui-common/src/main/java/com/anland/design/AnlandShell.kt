@@ -1,6 +1,8 @@
 package com.anland.design
 
 import android.content.Context
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -12,6 +14,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -47,7 +52,24 @@ class Appearance(context: Context) {
 fun WithAnlandTheme(content: @Composable (Appearance) -> Unit) {
     val context=LocalContext.current
     val appearance=remember { Appearance(context) }
-    ShellTheme(appearance.mode, appearance.dynamic, appearance.color, "", false) { content(appearance) }
+    ShellTheme(appearance.mode, appearance.dynamic, appearance.color, "", false) {
+        val surface=MaterialTheme.colorScheme.surface
+        SideEffect {
+            var owner=context
+            while(owner is ContextWrapper && owner !is Activity)owner=owner.baseContext
+            (owner as? Activity)?.window?.let { window ->
+                // Custom theme mode can differ from the system mode: system bar
+                // icons must follow the rendered surface, not the device setting.
+                window.statusBarColor=surface.toArgb()
+                window.navigationBarColor=surface.toArgb()
+                WindowCompat.getInsetsController(window,window.decorView).apply {
+                    isAppearanceLightStatusBars=surface.luminance()>0.5f
+                    isAppearanceLightNavigationBars=surface.luminance()>0.5f
+                }
+            }
+        }
+        content(appearance)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

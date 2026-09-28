@@ -133,6 +133,13 @@ case ":$MGR_PATH:" in
     *":$HOME/.local/bin:"*) APP_PATH=$MGR_PATH ;;
     *)                      APP_PATH="$HOME/.local/bin:$MGR_PATH" ;;
 esac
+# The RootFS package supplies patched compatibility binaries without replacing
+# the distribution's executables. Preserve this search priority when deploying
+# an updated session script; otherwise Xwayland/bwrap silently revert to stock.
+: "${ANLAND_COMPAT_BIN_DIR:=/usr/lib/anland}"
+if [ -d "$ANLAND_COMPAT_BIN_DIR" ]; then
+    APP_PATH="$ANLAND_COMPAT_BIN_DIR:$APP_PATH"
+fi
 printf 'PATH=%s\n' "$APP_PATH" >> "$ENVF"
 export PATH="$APP_PATH"
 # audio: the host PulseAudio socket (module pulse/) — libpulse also reaches it
@@ -184,8 +191,8 @@ if ! systemctl --user set-environment \
         "FD_FORCE_KGSL=$FD_FORCE_KGSL"; then
     echo "anland-session: warning: could not import the session environment (systemctl --user set-environment failed)" >&2
 fi
-[ -S "$ANLAND_RUNTIME_DIR/pulse.sock" ] && \
-    systemctl --user set-environment "PULSE_SERVER=unix:$ANLAND_RUNTIME_DIR/pulse.sock" || true
+# Both published environments must agree even while the host audio is starting.
+systemctl --user set-environment "PULSE_SERVER=unix:$ANLAND_RUNTIME_DIR/pulse.sock" || true
 
 "$MINIWM" &
 WMPID=$!
