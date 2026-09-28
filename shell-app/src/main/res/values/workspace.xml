@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_grid_view">Grid view</string>
+    <string name="design_list_view">List view</string>
+    <string name="design_no_results">No matching applications</string>
+    <string name="desktop_enter">Enter desktop</string>
+    <string name="design_running">Running</string>
+    <string name="design_console_detail">Commands and session output</string>
+    <string name="design_startup_settings">Launch settings</string>
+    <string name="design_selected_container">Selected container</string>
+    <string name="design_copy_output">Copy output</string>
+    <string name="design_console_options">Console options</string>
+    <string name="design_font_larger">Larger text</string>
+    <string name="design_font_smaller">Smaller text</string>
+    <string name="design_session_ready">Connected</string>
+    <string name="design_connecting">Connecting…</string>
+    <string name="design_search_history">Search command history</string>
+    <string name="design_history_hint">Select a command to edit it. Send when ready.</string>
+</resources>

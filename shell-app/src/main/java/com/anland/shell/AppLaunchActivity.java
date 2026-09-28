@@ -2,11 +2,6 @@ package com.anland.shell;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.view.Gravity;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.anland.shell.ds.DsCli;
@@ -25,9 +20,10 @@ import java.util.List;
  */
 public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatActivity {
 
-    private TextView msg;
+    private LaunchUi.Progress msg;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
+        LaunchUi.prepare(this);
         super.onCreate(savedInstanceState);
 
         final String container = getIntent().getStringExtra("container");
@@ -40,24 +36,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
         }
         final String appName = name == null || name.isEmpty() ? exec : name;
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setKeepScreenOn(true);
-
-        ProgressBar bar = new ProgressBar(this);
-        root.addView(bar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        msg = new TextView(this);
-        msg.setText(getString(R.string.launching_fmt, appName));
-        msg.setTextSize(14);
-        msg.setGravity(Gravity.CENTER);
-        msg.setPadding(0, dp(16), 0, 0);
-        root.addView(msg, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        setContentView(root);
+        msg = LaunchUi.progress(this, getString(R.string.launching_fmt, appName));
 
         RootExec.POOL.execute(() -> launch(container, appName, exec, user));
     }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_connected">視窗服務已連線</string>
+    <string name="design_search_windows">搜尋視窗</string>
+    <string name="design_no_results">沒有符合的視窗</string>
+</resources>

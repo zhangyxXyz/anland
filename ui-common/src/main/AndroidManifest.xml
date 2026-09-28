@@ -1,1 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:localeConfig="@xml/anland_locales">
+        <activity android:name="com.anland.design.LanguageActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell" />
+    </application>
+</manifest>

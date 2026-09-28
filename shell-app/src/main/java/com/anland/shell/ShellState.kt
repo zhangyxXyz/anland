@@ -35,6 +35,8 @@ import kotlinx.coroutines.*
 
 /** Business operations remain in DsCli/Prefs/Shortcuts; Compose owns presentation only. */
 class ShellState(app:Application):AndroidViewModel(app) {
+    val icons=IconLoader(app)
+    override fun onCleared(){icons.close();super.onCleared()}
     var containers by mutableStateOf<List<ContainerState>>(emptyList()); private set
     var apps by mutableStateOf<List<AppEntry>>(emptyList()); private set
     var users by mutableStateOf<List<String>>(emptyList()); private set

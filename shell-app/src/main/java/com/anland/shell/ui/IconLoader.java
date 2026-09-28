@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
@@ -35,8 +37,8 @@ import java.util.regex.Pattern;
  *
  * Lookup follows the .desktop icon convention: an absolute path is fetched
  * directly; otherwise the icon theme dirs are searched (DsCli.findIcons) and
- * the best raster candidate wins — png over webp over other rasters, larger
- * size first (size taken from the hicolor NNxNN path segment). Anything
+ * adequate-resolution rasters and scalable vectors beat tiny raster variants.
+ * Transparent padding is normalized without changing the image aspect ratio.
  * SVG icons are rendered into bounded bitmaps; unsupported/corrupt entries
  * fall back to a generated letter tile. No application-specific icon table.
  */
@@ -49,7 +51,7 @@ public final class IconLoader {
     }
 
     private static final int MEM_KB = 4 * 1024;   /* ~4 MiB of bitmaps */
-    private static final int TILE_PX = 96;
+    private static final int TILE_PX = 192;
     private static final Pattern SIZE = Pattern.compile("(\\d+)x\\d+");
 
     private static final int[] TILE_COLORS = {
@@ -74,8 +76,11 @@ public final class IconLoader {
     private final Handler main = new Handler(Looper.getMainLooper());
 
     public IconLoader(Context context) {
-        dir = new File(context.getApplicationContext().getFilesDir(), "icons");
+        // Versioned cache prevents old blank/undersized renders surviving upgrade.
+        dir = new File(context.getApplicationContext().getFilesDir(), "icons-v2");
     }
+
+    public void close() { pool.shutdown(); }
 
     /** Synchronous memory-cache peek (used before pinning a shortcut). */
     public Bitmap peek(AppEntry app) {
@@ -96,7 +101,10 @@ public final class IconLoader {
         pool.execute(() -> {
             Bitmap bmp = null;
             if (!app.icon.isEmpty()) {
-                bmp = decodeFile(new File(dir, hash(key)));
+                File cached = new File(dir, hash(key));
+                // Theme/icon package updates are picked up without clearing app data.
+                if (System.currentTimeMillis() - cached.lastModified() < 24L * 60 * 60 * 1000)
+                    bmp = decodeFile(cached);
                 if (bmp == null)
                     bmp = fetchFromContainer(app, key);
             }
@@ -139,7 +147,7 @@ public final class IconLoader {
         return null;
     }
 
-    /** Prefer raster candidates, then SVG; ties use size. Unsupported files → null. */
+    /** Prefer a sharp app icon; never choose a 16px raster over a scalable vector. */
     private static String pickBest(List<String> candidates) {
         String best = null;
         int bestScore = -1, bestSize = -1;
@@ -164,6 +172,12 @@ public final class IconLoader {
                     size = Integer.parseInt(m.group(1));
                 } catch (NumberFormatException ignored) {
                 }
+            // A vector has no intrinsic raster size. Known application directories
+            // are preferred over unrelated action/category icons with the same name.
+            score += "svg".equals(ext) ? 40 : (size >= 128 ? 50 : size >= 64 ? 35 : size == 0 ? 30 : 10);
+            if (path.contains("/apps/")) score += 100;
+            if (path.contains("/hicolor/")) score += 10;
+            if (path.contains("/symbolic/") || path.contains("-symbolic.")) score -= 20;
             if (score > bestScore || (score == bestScore && size > bestSize)) {
                 best = path;
                 bestScore = score;
@@ -187,9 +201,9 @@ public final class IconLoader {
                 // No resolver for external files or network assets. Render to a fixed
                 // allocation rather than trusting dimensions supplied by the document.
                 com.caverock.androidsvg.SVG svg = com.caverock.androidsvg.SVG.getFromString(xml);
-                Bitmap bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888);
-                new Canvas(bitmap).drawPicture(svg.renderToPicture(128, 128));
-                return bitmap;
+                Bitmap bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888);
+                new Canvas(bitmap).drawPicture(svg.renderToPicture(256, 256));
+                return normalize(bitmap);
             }
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inJustDecodeBounds = true;
@@ -198,10 +212,46 @@ public final class IconLoader {
             options.inJustDecodeBounds = false;
             options.inSampleSize = 1;
             while (Math.max(options.outWidth, options.outHeight) / options.inSampleSize > 256) options.inSampleSize *= 2;
-            return BitmapFactory.decodeByteArray(raw, 0, raw.length, options);
+            return normalize(BitmapFactory.decodeByteArray(raw, 0, raw.length, options));
         } catch (Exception e) {
             return null;   /* corrupt base64/icon — try the next candidate */
         }
+    }
+
+    /** Crop transparent padding, then contain in a shared optical box. Empty
+     * decodes are failures, so the next candidate or generic tile can be used. */
+    static Bitmap normalize(Bitmap source) {
+        if (source == null) return null;
+        int w=source.getWidth(), h=source.getHeight(), left=w, top=h, right=-1, bottom=-1;
+        int[] row=new int[w];
+        for(int y=0;y<h;y++) {
+            source.getPixels(row,0,w,0,y,w,1);
+            for(int x=0;x<w;x++) if(Color.alpha(row[x])>=24) {
+                left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+            }
+        }
+        if(right<left || bottom<top)return null;
+        float scale=(TILE_PX*.9f)/Math.max(right-left+1,bottom-top+1);
+        float dw=(right-left+1)*scale,dh=(bottom-top+1)*scale;
+        Bitmap result=Bitmap.createBitmap(TILE_PX,TILE_PX,Bitmap.Config.ARGB_8888);
+        new Canvas(result).drawBitmap(source,new Rect(left,top,right+1,bottom+1),new RectF((TILE_PX-dw)/2,(TILE_PX-dh)/2,(TILE_PX+dw)/2,(TILE_PX+dh)/2),new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG));
+        return result;
+    }
+
+    /** Flat neutral glyphs need theme contrast; full-color artwork is untouched. */
+    public static boolean isMonochrome(Bitmap image) {
+        int low=255,high=0,count=0;
+        int[] row=new int[image.getWidth()];
+        for(int y=0;y<image.getHeight();y++) {
+            image.getPixels(row,0,row.length,0,y,row.length,1);
+            for(int pixel:row)if(Color.alpha(pixel)>128) {
+                int r=Color.red(pixel),g=Color.green(pixel),b=Color.blue(pixel);
+                if(Math.max(r,Math.max(g,b))-Math.min(r,Math.min(g,b))>8)return false;
+                low=Math.min(low,r);high=Math.max(high,r);count++;
+                if(high-low>20)return false;
+            }
+        }
+        return count>0;
     }
 
     // ------------------------------------------------------------------ disk
@@ -243,18 +293,19 @@ public final class IconLoader {
 
     // ----------------------------------------------------------- letter tile
 
-    /** Generated placeholder: first character on a colored circle. */
+    /** Generated placeholder: Unicode initial on a rounded tile; no app table. */
     public static Bitmap letterTile(String name, int sizePx) {
         Bitmap b = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         int color = TILE_COLORS[Math.abs(name.isEmpty() ? 0 : name.charAt(0)) % TILE_COLORS.length];
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         p.setColor(color);
-        c.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, p);
+        float inset=sizePx*.05f;
+        c.drawRoundRect(inset,inset,sizePx-inset,sizePx-inset,sizePx*.23f,sizePx*.23f,p);
         p.setColor(Color.WHITE);
         p.setTextSize(sizePx * 0.45f);
         p.setTextAlign(Paint.Align.CENTER);
-        String ch = name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT);
+        String ch = name.isEmpty() ? "?" : new String(Character.toChars(name.codePointAt(0))).toUpperCase(Locale.ROOT);
         Paint.FontMetrics fm = p.getFontMetrics();
         c.drawText(ch, sizePx / 2f, sizePx / 2f - (fm.ascent + fm.descent) / 2f, p);
         return b;

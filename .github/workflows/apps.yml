@@ -1,0 +1,62 @@
+name: Android apps
+
+# UI-only releases reuse the exact signing caches from build.yml. No daemon,
+# module or rootfs rebuild, and no Actions artifact storage is required.
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths: ['.github/workflows/apps.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache/restore@v4
+        with:
+          path: app/debug.keystore
+          key: anland-debug-keystore-v1
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v4
+        with:
+          path: debug.keystore
+          key: anland-shell-signing-v1
+          fail-on-cache-miss: true
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install pinned Android build tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;29.0.13113456' 'cmake;3.22.1'
+      - name: Build and lint both apps
+        run: |
+          set -euo pipefail
+          cp debug.keystore shell-app/debug.keystore
+          (cd app && bash gradlew assembleRelease lintRelease --console=plain)
+          (cd shell-app && bash gradlew assembleRelease assembleReleaseAndroidTest lintRelease --console=plain)
+          mkdir release
+          cp app/build/outputs/apk/release/*.apk release/anland-wayland.apk
+          cp shell-app/build/outputs/apk/release/*.apk release/anland-shell.apk
+          cp shell-app/build/outputs/apk/androidTest/release/*.apk release/anland-shell-tests.apk
+      - name: Verify upgrade certificates
+        run: |
+          set -euo pipefail
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$signer" verify --print-certs release/anland-wayland.apk | grep -F '1968c96b5773b7b9b9d3d24adfa52c09103d203db3a22068b8abfeff17d9253e'
+          "$signer" verify --print-certs release/anland-shell.apk | grep -F 'a04e344292b897de1b9cbe013683c42c9d7009dadc770774e6c0a70191051cf6'
+      - name: Upload directly to draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum *.apk > SHA256SUMS)
+          printf 'Shell and Wayland adaptive UI. Source: %s\n' "$GITHUB_SHA" > release-notes.md
+          tag="anland-apps-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland apps $GITHUB_RUN_ID" --notes-file release-notes.md
+          gh release upload "$tag" release/*

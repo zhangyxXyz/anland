@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_grid_view">网格视图</string>
+    <string name="design_list_view">列表视图</string>
+    <string name="design_no_results">没有匹配的应用</string>
+    <string name="desktop_enter">进入桌面</string>
+    <string name="design_running">运行中</string>
+    <string name="design_console_detail">执行命令与查看输出</string>
+    <string name="design_startup_settings">启动设置</string>
+    <string name="design_selected_container">当前选择的容器</string>
+    <string name="design_copy_output">复制输出</string>
+    <string name="design_console_options">控制台选项</string>
+    <string name="design_font_larger">增大字体</string>
+    <string name="design_font_smaller">缩小字体</string>
+    <string name="design_session_ready">会话进行中</string>
+    <string name="design_connecting">正在连接…</string>
+    <string name="design_search_history">查找历史命令</string>
+    <string name="design_history_hint">点击历史只填入输入框，确认后再发送。</string>
+</resources>

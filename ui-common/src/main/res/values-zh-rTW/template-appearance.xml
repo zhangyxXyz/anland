@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <string name="settings_appearance">外观</string>
+  <string name="settings_language">應用語言</string>
+  <string name="settings_theme_mode">主題模式</string>
+  <string name="theme_system">跟隨系統</string>
+  <string name="theme_light">淺色</string>
+  <string name="theme_dark">深色</string>
+  <string name="theme_system_summary">依照系統外觀自動切換</string>
+  <string name="theme_light_summary">始終使用淺色外觀</string>
+  <string name="theme_dark_summary">始終使用深色外觀</string>
+  <string name="settings_dynamic_color">動態顏色</string>
+  <string name="settings_dynamic_color_summary">使用系統 Material You 配色</string>
+  <string name="settings_theme_color">主題颜色</string>
+  <string name="settings_theme_color_summary">關閉動態顏色后使用</string>
+  <string name="settings_custom_theme">自訂配色</string>
+  <string name="settings_custom_theme_summary">自動產生完整 Material 3 色板</string>
+  <string name="language_system">跟隨系統</string>
+  <string name="language_chinese">簡體中文</string>
+  <string name="language_english">English</string>
+  <string name="language_search">搜尋語言</string>
+  <string name="language_suggested">建议的語言</string>
+  <string name="language_all">所有語言</string>
+  <string name="language_system_detected">系统語言：%1$s</string>
+  <string name="settings_liquid_glass">液態玻璃導覽列</string>
+  <string name="settings_liquid_glass_summary">使用悬浮半透明底部導覽列</string>
+  <string name="color_picker_title">選擇顏色</string>
+  <string name="dialog_cancel">取消</string>
+</resources>

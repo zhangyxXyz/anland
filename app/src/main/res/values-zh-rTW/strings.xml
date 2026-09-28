@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Anland Wayland</string>
+
+    <!-- MainActivity -->
+    <string name="settings_title">視窗設定</string>
+    <string name="status_daemon_unreachable">視窗服務尚未連線</string>
+    <string name="status_window_count">%1$d 個視窗 · 服務已連線</string>
+    <string name="status_empty">還沒有視窗，先到 Anland Shell 啟動一個應用。</string>
+    <string name="window_fallback_title">視窗 %1$d</string>
+    <string name="menu_close">關閉</string>
+    <string name="menu_window_info">視窗資訊</string>
+    <string name="window_info_format">視窗 id: %1$d\n標題: %2$s\n狀態: %3$s</string>
+    <string name="title_none">（無）</string>
+    <string name="state_attached_foreground">Attached（前臺）</string>
+    <string name="state_detached_kept">Detached（保活）</string>
+    <string name="dialog_ok">確定</string>
+
+    <!-- WlSettingsActivity -->
+    <string name="ime_mode_tip">鍵盤顯示方式</string>
+    <string name="ime_mode_inset">縮小視窗，為鍵盤留出空間</string>
+    <string name="ime_mode_overlay">鍵盤覆蓋視窗，保持畫面大小</string>
+    <string name="zoom_tip">顯示縮放（wayland 視窗整體, 立即生效）:</string>
+    <string name="scale_mode_tip">固定尺寸視窗的縮放方式</string>
+    <string name="scale_mode_stretch">填滿視窗，可能改變畫面比例</string>
+    <string name="scale_mode_fit">保持比例，完整顯示畫面</string>
+    <string name="scale_mode_center">原始尺寸，居中顯示</string>
+    <string name="xwayland_scale_tip">XWayland 視窗跟隨顯示縮放:</string>
+    <string name="xwayland_scale">啟用 XWayland 縮放</string>
+    <string name="init_size_tip">新視窗的初始尺寸。視窗顯示後會根據實際可用區域調整，這不是全屏尺寸。</string>
+    <string name="init_size_w">寬</string>
+    <string name="init_size_h">高</string>
+    <string name="auto_attach_tip">應用建立新視窗時直接拉起，無需再到視窗列表手動開啟。僅對新建視窗生效。</string>
+    <string name="auto_attach">啟動應用後自動顯示視窗</string>
+    <string name="sc_backend_tip">開啟時交給 Android 系統合成；關閉時使用逐視窗 OpenGL 渲染，兩者都可使用 GPU。僅對之後開啟的視窗生效。</string>
+    <string name="sc_backend">SurfaceControl 合成</string>
+</resources>

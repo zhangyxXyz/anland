@@ -39,10 +39,20 @@ class ShellActivity:AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         setContent { WithAnlandTheme { appearance ->
-            val icons=remember{IconLoader(this)}
+            val icons=state.icons
+            var settingsRoute by rememberSaveable{mutableStateOf<String?>(null)}
             AnlandShell(listOf(Destination(getString(R.string.tab_apps),Icons.Outlined.Apps),Destination(getString(R.string.tab_containers),Icons.Outlined.Storage),Destination(getString(R.string.shell_settings),Icons.Outlined.Settings)),appearance,
-                actions={IconButton(onClick=state::refresh,enabled=!state.busy){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}}) { tab, navigate ->
-                when(tab){0->AppsPage(state,icons);1->ContainersPage(state) { navigate(0) };else->ShellSettings(state,appearance)}
+                brand=getString(R.string.app_name),contextLabel=state.active,
+                secondaryTitle=settingsRoute?.let{getString(if(it=="user")R.string.user_settings else R.string.env_settings)},onSecondaryBack={settingsRoute=null},
+                actions={
+                    var choose by remember{mutableStateOf(false)}
+                    Box {
+                        TextButton(onClick={choose=true},enabled=state.containers.isNotEmpty()&&!state.busy){Text(state.active);Icon(Icons.Outlined.ExpandMore,null)}
+                        DropdownMenu(choose,{choose=false}){state.containers.forEach{container->DropdownMenuItem(text={Text(container.name)},onClick={state.select(container.name);choose=false})}}
+                    }
+                    IconButton(onClick=state::refresh,enabled=!state.busy){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}
+                }) { tab, navigate ->
+                when(tab){0->AppsPage(state,icons);1->ContainersPage(state,onSettings={navigate(2)},onApps={navigate(0)});else->ShellSettings(state,appearance,settingsRoute){settingsRoute=it}}
             }
             state.error?.let { message->AlertDialog(onDismissRequest={state.error=null},title={Text(stringResource(R.string.error_title))},text={Text(message)},confirmButton={TextButton(onClick={state.error=null}){Text(stringResource(R.string.dialog_ok))}}) }
         } }

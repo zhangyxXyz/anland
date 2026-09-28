@@ -16,6 +16,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
@@ -108,7 +112,7 @@ open class MainActivity : AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         setContent { WithAnlandTheme { appearance ->
-            AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.settings_title),Icons.Outlined.Tune),Destination(getString(R.string.appearance_title),Icons.Outlined.Palette)),appearance,initialTab,
+            AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.settings_title),Icons.Outlined.Tune),Destination(getString(R.string.appearance_title),Icons.Outlined.Palette)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
                 actions={IconButton(onClick=state::refresh){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}}) { tab, _ ->
                 when(tab) { 0->WindowsPage(state); 1->WindowSettings(state); else->Page { AppearanceSettings(appearance) } }
             }
@@ -124,7 +128,7 @@ open class MainActivity : AppCompatActivity() {
 
 @Composable
 internal fun AutoLaunch(state:WindowState) {
-    SettingItem(stringResource(R.string.auto_attach),description=stringResource(R.string.auto_attach_tip),enabled=state.connected,
+    SettingItem(stringResource(R.string.auto_attach),description=stringResource(R.string.auto_attach_tip),icon=Icons.Outlined.OpenInNew,descriptionMaxLines=5,enabled=state.connected,
         trailingContent={Switch(state.config["auto_attach"]==1,{state.set("auto_attach",if(it)1 else 0)},enabled=state.connected && !state.writing)})
 }
 
@@ -132,35 +136,48 @@ internal fun AutoLaunch(state:WindowState) {
 @Composable
 private fun WindowsPage(state:WindowState) {
     val context=LocalContext.current
-    var menu by remember { mutableStateOf<Awl.WlWindow?>(null) }
+    var search by rememberSaveable { mutableStateOf("") }
     var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Card(colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer)) {
-            Column(Modifier.fillMaxWidth().padding(24.dp)) {
-                Text(stringResource(R.string.app_name),style=MaterialTheme.typography.labelLarge)
-                Text(if(state.connected)stringResource(R.string.status_window_count,state.windows.size)else stringResource(R.string.status_daemon_unreachable),style=MaterialTheme.typography.headlineSmall)
+    var info by remember { mutableStateOf<Awl.WlWindow?>(null) }
+    val filtered=state.windows.filter{search.isBlank() || it.title.orEmpty().contains(search,true)}
+    Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+        Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)) {
+            Row(Modifier.fillMaxWidth().padding(24.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                SettingLeadingIcon(Icons.Outlined.Window)
+                Text(if(state.connected)stringResource(R.string.status_window_count,state.windows.size)else stringResource(R.string.status_daemon_unreachable),style=MaterialTheme.typography.titleLarge)
             }
-        } }
-        item { SettingGroup(stringResource(R.string.launch_behavior)) { AutoLaunch(state) } }
-        if(state.connected && state.windows.isEmpty()) item { Text(stringResource(R.string.status_empty),Modifier.padding(20.dp),style=MaterialTheme.typography.bodyLarge) }
-        items(state.windows,key={it.id}) { window ->
-            Card(Modifier.combinedClickable(onClick={Awl.attachWindow(context,window.id,window.title)},onLongClick={menu=window})) {
-                Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Window,null,tint=MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f).padding(horizontal=16.dp)) {
-                        Text(window.title?.takeIf { it.isNotBlank() }?:stringResource(R.string.window_fallback_title,window.id),style=MaterialTheme.typography.titleMedium)
-                        Text(stringResource(if(window.attached)R.string.state_visible else R.string.state_background),style=MaterialTheme.typography.bodySmall)
+        }
+        SettingGroup("") { AutoLaunch(state) }
+        WorkspaceSearch(search,{search=it},stringResource(R.string.design_search_windows),Modifier.fillMaxWidth())
+        if(state.connected && filtered.isEmpty())EmptyWorkspace(stringResource(if(search.isEmpty())R.string.status_empty else R.string.design_no_results),Icons.Outlined.Window)
+        LazyVerticalGrid(GridCells.Adaptive(340.dp),Modifier.weight(1f),contentPadding=PaddingValues(bottom=20.dp),verticalArrangement=Arrangement.spacedBy(14.dp),horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+            items(filtered,key={it.id}) { window ->
+                var menu by remember{mutableStateOf(false)}
+                Card(Modifier.combinedClickable(onClick={Awl.attachWindow(context,window.id,window.title)},onLongClick={menu=true}),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            SettingLeadingIcon(Icons.Outlined.Window)
+                            Spacer(Modifier.weight(1f))
+                            Box {
+                                IconButton(onClick={menu=true}){Icon(Icons.Outlined.MoreVert,stringResource(R.string.menu_window_info))}
+                                DropdownMenu(menu,{menu=false}) {
+                                    DropdownMenuItem(text={Text(stringResource(R.string.window_open))},leadingIcon={Icon(Icons.Outlined.OpenInNew,null)},onClick={menu=false;Awl.attachWindow(context,window.id,window.title)})
+                                    DropdownMenuItem(text={Text(stringResource(R.string.window_close))},leadingIcon={Icon(Icons.Outlined.Close,null)},enabled=window.id !in state.closing,onClick={menu=false;confirmClose=window})
+                                    DropdownMenuItem(text={Text(stringResource(R.string.menu_window_info))},leadingIcon={Icon(Icons.Outlined.Info,null)},onClick={menu=false;info=window})
+                                }
+                            }
+                        }
+                        Text(window.title?.takeIf{it.isNotBlank()}?:stringResource(R.string.window_fallback_title,window.id),style=MaterialTheme.typography.titleMedium,maxLines=2,minLines=2,overflow=TextOverflow.Ellipsis)
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+                            StatusPill(stringResource(if(window.attached)R.string.state_visible else R.string.state_background),Modifier.weight(1f,false),window.attached)
+                            FilledTonalIconButton(onClick={Awl.attachWindow(context,window.id,window.title)}){Icon(Icons.Outlined.OpenInNew,stringResource(R.string.window_open))}
+                        }
                     }
-                    IconButton(onClick={menu=window}){Icon(Icons.Outlined.MoreVert,stringResource(R.string.menu_window_info))}
                 }
             }
         }
     }
-    menu?.let { w -> AlertDialog(onDismissRequest={menu=null},title={Text(w.title.orEmpty())},text={Column {
-        Text(stringResource(R.string.window_info_format,w.id,w.title.orEmpty(),stringResource(if(w.attached)R.string.state_visible else R.string.state_background)))
-        NavigationSettingItem(stringResource(R.string.window_open),icon=Icons.Outlined.OpenInNew,onClick={menu=null;Awl.attachWindow(context,w.id,w.title)})
-        NavigationSettingItem(stringResource(R.string.window_close),icon=Icons.Outlined.Close,enabled=w.id !in state.closing,onClick={menu=null;confirmClose=w})
-    }},confirmButton={TextButton(onClick={menu=null}){Text(stringResource(android.R.string.cancel))}}) }
+    info?.let{w->AlertDialog(onDismissRequest={info=null},title={Text(stringResource(R.string.menu_window_info))},text={Text(stringResource(R.string.window_info_format,w.id,w.title.orEmpty(),stringResource(if(w.attached)R.string.state_visible else R.string.state_background)))},confirmButton={TextButton(onClick={info=null}){Text(stringResource(R.string.dialog_ok))}})}
     confirmClose?.let { w -> AlertDialog(onDismissRequest={confirmClose=null},title={Text(stringResource(R.string.window_close))},
         text={Text(stringResource(R.string.window_close_confirm,w.title.orEmpty()))},
         confirmButton={TextButton(onClick={state.close(w.id);confirmClose=null}){Text(stringResource(R.string.window_close))}},

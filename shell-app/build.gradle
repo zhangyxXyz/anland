@@ -25,6 +25,7 @@ android {
         targetSdk 28
         versionCode 1
         versionName '0.1'
+        testInstrumentationRunner 'com.anland.shell.ui.IconInstrumentation'
     }
 
     compileOptions {
@@ -47,6 +48,9 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    // Tests run against the actual signed release on the tablet, with Android's
+    // Bitmap/Canvas and normal application/font initialization.
+    testBuildType 'release'
 
     lint {
         // Sideloaded root tool — never distributed via Google Play; targetSdk 28

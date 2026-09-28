@@ -1,0 +1,13 @@
+<resources>
+    <string name="windows_title">視窗</string>
+    <string name="appearance_title">外觀</string>
+    <string name="refresh">重新整理</string>
+    <string name="launch_behavior">啟動行為</string>
+    <string name="setting_write_failed">儲存失敗，請檢查 Anland 服務後重試。</string>
+    <string name="state_visible">視窗已連線</string>
+    <string name="state_background">後臺執行 · 點選顯示</string>
+    <string name="zoom_title">顯示縮放</string>
+    <string name="zoom_help">同時放大文字和控制元件。高解析度螢幕可以從 150% 開始調整。</string>
+    <string name="advanced_title">高階</string>
+    <string name="apply">應用</string>
+</resources>

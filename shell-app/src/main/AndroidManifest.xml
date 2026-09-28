@@ -19,10 +19,9 @@
             </intent-filter>
         </activity>
 
-        <!-- In-container root shell console. configChanges keeps the
-             persistent `run sh` process alive across rotation. -->
+        <!-- Selected-user console: ViewModel retains `run sh` across rotation. -->
         <activity android:name=".ConsoleActivity" android:exported="false"
-                  android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode"/>
+                  android:theme="@style/Theme.MaterialDesignShell"/>
 
         <!-- Entry point for pinned home-screen shortcuts (explicit intents
              only, so no intent-filter): ensures the container is running,

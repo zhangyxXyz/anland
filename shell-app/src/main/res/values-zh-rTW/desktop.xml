@@ -1,0 +1,9 @@
+<resources>
+    <string name="desktop_legacy_entry">舊版 XFCE 工作階段</string>
+    <string name="desktop_legacy_help">獨立的巢狀桌面，其中的應用程式無法移出成為獨立視窗。</string>
+    <string name="desktop_entry">完整桌面</string>
+    <string name="desktop_entry_help">開啟桌面、面板和檔案管理器。</string>
+    <string name="desktop_not_ready">啟動此容器後可讀取桌面入口。</string>
+    <string name="desktop_missing">此容器尚未安裝完整桌面會話。</string>
+    <string name="host_update_needed">請更新 Anland Wayland，以便直接開啟此視窗。</string>
+</resources>

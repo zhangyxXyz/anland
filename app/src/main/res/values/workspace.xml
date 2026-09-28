@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_connected">Window service connected</string>
+    <string name="design_search_windows">Search windows</string>
+    <string name="design_no_results">No matching windows</string>
+</resources>

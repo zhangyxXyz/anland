@@ -5,7 +5,7 @@
     <string name="host_missing">尚未安装 Anland Wayland。</string>
     <string name="search_apps">搜索应用</string>
     <string name="shell_settings">设置</string>
-    <string name="desktop_mode_help">应用以独立 Android 窗口打开；完整 Linux 桌面需要另外配置桌面会话。</string>
+    <string name="desktop_mode_help">应用以独立 Android 窗口打开，也可通过“完整桌面”进入 Linux 桌面会话。</string>
     <string name="user_settings">启动用户</string>
     <string name="env_settings">启动环境</string>
     <string name="busy_action">操作进行中</string>

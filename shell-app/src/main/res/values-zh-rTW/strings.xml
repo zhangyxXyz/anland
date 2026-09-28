@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Anland Shell</string>
+
+    <!-- ShellActivity -->
+    <string name="tab_apps">應用</string>
+    <string name="tab_apps_no_anlandx">應用 - 未安裝 Anlandx</string>
+    <string name="tab_containers">容器</string>
+    <string name="refresh">重新整理</string>
+    <string name="loading">重新整理中…</string>
+    <string name="enter_console">進入</string>
+    <string name="start">啟動</string>
+    <string name="stop">停止</string>
+    <string name="apps">應用</string>
+    <string name="running_fmt">執行中 · PID %1$d</string>
+    <string name="stopped">已停止</string>
+    <string name="starting_fmt">正在啟動 %1$s…</string>
+    <string name="stopping_fmt">正在停止 %1$s…</string>
+    <string name="stop_confirm_fmt">停止容器 %1$s？其中執行的一切都會被終止。</string>
+    <string name="ds_unavailable_fmt">droidspaces 不可用：%1$s</string>
+    <string name="status_no_containers">沒有已定義的容器（/data/local/Droidspaces/Containers 為空）</string>
+    <string name="status_active_running_fmt">當前容器：%1$s（執行中，PID %2$d）</string>
+    <string name="status_active_stopped_fmt">當前容器:%1$s（已停止）</string>
+    <string name="user_btn_fmt">使用者:%1$s</string>
+    <string name="user_auto">自動</string>
+    <string name="env_btn">環境</string>
+    <string name="env_editor_title_fmt">啟動環境變數 — %1$s</string>
+    <string name="env_defaults_fmt">內建：%1$s</string>
+    <string name="env_editor_hint">每行一個 KEY=VALUE，覆蓋內建值；值為空表示移除該內建變數；# 開頭為註釋</string>
+    <string name="env_save">儲存</string>
+    <string name="env_clear">清空</string>
+    <string name="env_saved">已儲存</string>
+    <string name="env_invalid_line_fmt">無效的行：%1$s</string>
+
+    <!-- AppsView / long-press menu -->
+    <string name="loading_apps_fmt">正在從 %1$s 載入應用…</string>
+    <string name="no_apps">此容器內未發現應用</string>
+    <string name="apps_need_running">容器未執行 — 請先啟動</string>
+    <string name="app_count_fmt">%1$d 個應用</string>
+    <string name="no_container_selected">未選擇容器</string>
+    <string name="load_failed_fmt">失敗:%1$s</string>
+    <string name="pin_shortcut">固定到桌面</string>
+    <string name="app_info">應用資訊</string>
+    <string name="pinned_request">正在請求建立快捷方式…</string>
+    <string name="pinned_fallback">啟動器不支援固定 — 已傳送舊版快捷方式廣播</string>
+
+    <!-- AppLaunchActivity -->
+    <string name="launching_fmt">正在啟動 %1$s…</string>
+    <string name="launch_starting_fmt">正在啟動容器 %1$s…</string>
+    <string name="launch_ok_fmt">已啟動 %1$s</string>
+    <string name="launch_failed_fmt">啟動 %1$s 失敗:%2$s</string>
+    <string name="start_failed_fmt">容器 %1$s 啟動失敗:%2$s</string>
+    <string name="start_timeout_fmt">容器 %1$s 未在時限內啟動</string>
+    <string name="launch_empty_exec">Exec 為空</string>
+
+    <!-- ConsoleActivity -->
+    <string name="console_title_fmt">%1$s — 控制檯</string>
+    <string name="console_title_user_fmt">%1$s — 控制檯（%2$s）</string>
+    <string name="console_send">傳送</string>
+    <string name="console_hint">命令</string>
+    <string name="console_ended">[會話已結束]</string>
+    <string name="console_exit_confirm">結束 shell 會話？</string>
+    <string name="console_env_note">[環境已匯出：%1$s]</string>
+    <string name="history">歷史</string>
+    <string name="history_empty">歷史為空</string>
+    <string name="dialog_ok">確定</string>
+</resources>

@@ -34,28 +34,43 @@ import com.anland.shell.ui.IconLoader
 import kotlinx.coroutines.*
 
 @Composable
-internal fun ShellSettings(state:ShellState,appearance:Appearance) {
+internal fun ShellSettings(state:ShellState,appearance:Appearance,route:String?,navigate:(String?)->Unit) {
     val context=LocalContext.current
-    var userDialog by remember{mutableStateOf(false)}
-    var envDialog by remember{mutableStateOf(false)}
+    if(route=="user") {
+        Page {
+            SettingGroup(stringResource(R.string.user_settings)) {
+                (listOf("")+state.users).distinct().forEach { name->
+                    SettingItem(name.ifBlank{stringResource(R.string.user_auto)},icon=Icons.Outlined.Person,onClick={state.user(name)},trailingContent={RadioButton(state.user==name,{state.user(name)})})
+                }
+            }
+        }
+        return
+    }
+    if(route=="env") {
+        var env by rememberSaveable(state.active){mutableStateOf(Prefs.launchEnv(context,state.active))}
+        val bad=EnvVars.invalidLine(env)
+        Page {
+            SettingGroup(stringResource(R.string.env_settings)) {
+                Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.env_defaults_fmt,EnvVars.format(DsCli.defaultEnvPairs())),style=MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(env,{env=it},Modifier.fillMaxWidth(),label={Text(stringResource(R.string.env_btn))},minLines=6,isError=bad!=null,shape=MaterialTheme.shapes.large)
+                    if(bad!=null)Text(stringResource(R.string.env_invalid_line_fmt,bad),color=MaterialTheme.colorScheme.error)
+                    Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                        FilledTonalButton(onClick={env=""}){Text(stringResource(R.string.env_clear))}
+                        Button(onClick={Prefs.setLaunchEnv(context,state.active,env);navigate(null)},enabled=bad==null){Text(stringResource(R.string.env_save))}
+                    }
+                }
+            }
+        }
+        return
+    }
     Page {
         AppearanceSettings(appearance)
         SettingGroup(state.active.ifBlank{stringResource(R.string.no_container_selected)}) {
-            NavigationSettingItem(stringResource(R.string.windows_entry),description=stringResource(R.string.windows_entry_help),onClick={openWindows(context)})
-            NavigationSettingItem(stringResource(R.string.user_settings),value=state.user.ifBlank{stringResource(R.string.user_auto)},enabled=state.active.isNotBlank(),onClick={userDialog=true})
-            NavigationSettingItem(stringResource(R.string.env_settings),enabled=state.active.isNotBlank(),onClick={envDialog=true})
+            NavigationSettingItem(stringResource(R.string.windows_entry),description=stringResource(R.string.windows_entry_help),icon=Icons.Outlined.Window,onClick={openWindows(context)})
+            NavigationSettingItem(stringResource(R.string.user_settings),value=state.user.ifBlank{stringResource(R.string.user_auto)},icon=Icons.Outlined.Person,enabled=state.active.isNotBlank(),onClick={navigate("user")})
+            NavigationSettingItem(stringResource(R.string.env_settings),icon=Icons.Outlined.Terminal,enabled=state.active.isNotBlank(),onClick={navigate("env")})
         }
         Text(stringResource(R.string.desktop_mode_help),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-    if(userDialog)AlertDialog(onDismissRequest={userDialog=false},title={Text(stringResource(R.string.user_settings))},text={Column{(listOf("")+state.users).distinct().forEach { name -> TextButton(onClick={state.user(name);userDialog=false}){Text(name.ifBlank{stringResource(R.string.user_auto)})} }}},confirmButton={TextButton(onClick={userDialog=false}){Text(stringResource(android.R.string.cancel))}})
-    if(envDialog) {
-        var env by remember{mutableStateOf(Prefs.launchEnv(context,state.active))}
-        val bad=EnvVars.invalidLine(env)
-        AlertDialog(onDismissRequest={envDialog=false},title={Text(stringResource(R.string.env_settings))},text={Column {
-            Text(stringResource(R.string.env_defaults_fmt,EnvVars.format(DsCli.defaultEnvPairs())),style=MaterialTheme.typography.bodySmall)
-            OutlinedTextField(env,{env=it},label={Text(stringResource(R.string.env_btn))},minLines=5,isError=bad!=null)
-            TextButton(onClick={env=""}){Text(stringResource(R.string.env_clear))}
-            if(bad!=null)Text(stringResource(R.string.env_invalid_line_fmt,bad),color=MaterialTheme.colorScheme.error)
-        }},confirmButton={TextButton(onClick={Prefs.setLaunchEnv(context,state.active,env);envDialog=false},enabled=bad==null){Text(stringResource(R.string.env_save))}},dismissButton={TextButton(onClick={envDialog=false}){Text(stringResource(android.R.string.cancel))}})
     }
 }

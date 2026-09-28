@@ -284,10 +284,14 @@ public final class DsCli {
 
     /** Candidate icon files for a themed icon name (name → hicolor/pixmaps paths). */
     public static RootExec.Result findIcons(String name, String icon) {
+        // Desktop entries may include an extension. Follow installed icon symlinks
+        // and keep all matches: traversal order is not a quality ranking.
+        String stem = icon.replaceFirst("(?i)\\.(png|svg|webp|jpg|jpeg|bmp|gif)$", "");
+        String literal = stem.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?").replace("[", "\\[");
         return runSh(name,
-                "find /usr/share/icons /usr/share/pixmaps " +
-                "/root/.local/share/icons /home/*/.local/share/icons -type f " +
-                "-name " + ShellUtils.shQuote(icon + ".*") + " 2>/dev/null | head -20",
+                "find -L /usr/local/share/icons /usr/share/icons /usr/share/pixmaps " +
+                "/root/.icons /root/.local/share/icons /home/*/.icons /home/*/.local/share/icons -type f " +
+                "-name " + ShellUtils.shQuote(literal + ".*") + " 2>/dev/null | sort -u",
                 20_000);
     }
 

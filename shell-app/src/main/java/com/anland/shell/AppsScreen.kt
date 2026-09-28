@@ -23,9 +23,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.anland.design.*
@@ -33,39 +37,56 @@ import com.anland.shell.ds.*
 import com.anland.shell.ui.IconLoader
 import kotlinx.coroutines.*
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun AppsPage(state:ShellState,icons:IconLoader) {
     val context=LocalContext.current
     var search by rememberSaveable { mutableStateOf("") }
+    var listView by rememberSaveable { mutableStateOf(false) }
     var selected by remember {mutableStateOf<AppEntry?>(null)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        SettingGroup(state.active.ifBlank{stringResource(R.string.no_container_selected)}) {
+        Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
+          Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             state.apps.filter{it.desktopSession}.forEach{desktop ->
-                NavigationSettingItem(stringResource(R.string.desktop_entry),description=stringResource(R.string.desktop_entry_help),icon=Icons.Outlined.DesktopWindows,
-                    onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))})
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                    SettingLeadingIcon(Icons.Outlined.DesktopWindows)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.desktop_entry),style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+                FilledTonalButton(onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))}){Icon(Icons.Outlined.DesktopWindows,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.desktop_enter))}
             }
-            NavigationSettingItem(stringResource(R.string.windows_entry),description=stringResource(R.string.windows_entry_help),icon=Icons.Outlined.OpenInNew,onClick={openWindows(context)})
+            TextButton(onClick={openWindows(context)}){Icon(Icons.Outlined.OpenInNew,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.windows_entry))}
+          }
         }
-        OutlinedTextField(search,{search=it},Modifier.fillMaxWidth(),singleLine=true,placeholder={Text(stringResource(R.string.search_apps))},leadingIcon={Icon(Icons.Outlined.Search,null)})
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            WorkspaceSearch(search,{search=it},stringResource(R.string.search_apps),Modifier.weight(1f))
+            IconToggleButton(listView,{listView=it}){Icon(if(listView)Icons.Outlined.GridView else Icons.Outlined.ViewList,stringResource(if(listView)R.string.design_grid_view else R.string.design_list_view))}
+        }
         if(state.anlandxInstalled==false) Text(stringResource(R.string.tab_apps_no_anlandx),color=MaterialTheme.colorScheme.error)
-        Text(stringResource(R.string.app_count_fmt,state.apps.size),style=MaterialTheme.typography.labelLarge)
+        val applications=state.apps.filter{!it.desktopSession}
+        val filtered=applications.filter{it.name.contains(search,true)||it.id.contains(search,true)}
+        Text(stringResource(R.string.app_count_fmt,filtered.size),style=MaterialTheme.typography.labelLarge)
         if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         val active=state.containers.firstOrNull{it.name==state.active}
         if(active!=null && !active.running()) Button(onClick={state.changeRunning(active)},enabled=!state.busy){Text(stringResource(R.string.start))}
-        else if(state.apps.isEmpty()) Text(stringResource(R.string.no_apps),Modifier.padding(16.dp))
-        LazyVerticalGrid(GridCells.Adaptive(132.dp),Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=20.dp)) {
-            items(state.apps.filter{it.name.contains(search,true)||it.id.contains(search,true)},key={it.id}) { app->
+        else if(filtered.isEmpty()&&!state.busy) EmptyWorkspace(stringResource(if(search.isEmpty())R.string.no_apps else R.string.design_no_results),Icons.Outlined.Apps)
+        LazyVerticalGrid(if(listView)GridCells.Adaptive(300.dp) else GridCells.Adaptive(140.dp),Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=20.dp)) {
+            items(filtered,key={it.id}) { app->
                 var bitmap by remember(app.iconKey()){mutableStateOf<Bitmap?>(icons.peek(app))}
                 DisposableEffect(app.iconKey()) {
                     var current=true
                     icons.load(app){_,image->if(current)bitmap=image}
                     onDispose{current=false}
                 }
-                Card(Modifier.combinedClickable(onClick={context.startActivity(Shortcuts.launchIntent(context,app))},onLongClick={selected=app})) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                        if(bitmap!=null)Image(bitmap!!.asImageBitmap(),null,Modifier.size(56.dp))else Icon(Icons.Outlined.Apps,null,Modifier.size(56.dp))
-                        Text(app.name,style=MaterialTheme.typography.labelLarge,maxLines=2,minLines=2)
+                Card(Modifier.combinedClickable(onClick={context.startActivity(Shortcuts.launchIntent(context,app))},onLongClick={selected=app}),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    if(listView) Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                        AppIcon(bitmap,Modifier.size(48.dp))
+                        Text(app.name,Modifier.weight(1f),style=MaterialTheme.typography.titleSmall,maxLines=2,overflow=TextOverflow.Ellipsis)
+                    } else Column(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        AppIcon(bitmap,Modifier.size(68.dp))
+                        Text(app.name,Modifier.fillMaxWidth(),textAlign=TextAlign.Center,style=MaterialTheme.typography.labelLarge,maxLines=2,minLines=2,overflow=TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -78,4 +99,13 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
         icons.load(app){_,bitmap->if(!Shortcuts.pin(context,app,bitmap))Toast.makeText(context,R.string.pinned_fallback,Toast.LENGTH_LONG).show()}
         selected=null
     }){Text(stringResource(R.string.pin_shortcut))}},dismissButton={TextButton(onClick={selected=null}){Text(stringResource(R.string.dialog_ok))}}) }
+}
+
+@Composable
+private fun AppIcon(bitmap:Bitmap?,modifier:Modifier) {
+    val monochrome=remember(bitmap){bitmap?.let{IconLoader.isMonochrome(it)}==true}
+    Box(modifier,contentAlignment=Alignment.Center) {
+        if(bitmap!=null)Image(bitmap.asImageBitmap(),null,Modifier.fillMaxSize(),colorFilter=if(monochrome)ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)else null)
+        else SettingLeadingIcon(Icons.Outlined.Apps)
+    }
 }

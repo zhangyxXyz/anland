@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_grid_view">網格檢視</string>
+    <string name="design_list_view">清單檢視</string>
+    <string name="design_no_results">沒有符合的應用程式</string>
+    <string name="desktop_enter">進入桌面</string>
+    <string name="design_running">執行中</string>
+    <string name="design_console_detail">執行命令與查看輸出</string>
+    <string name="design_startup_settings">啟動設定</string>
+    <string name="design_selected_container">目前選取的容器</string>
+    <string name="design_copy_output">複製輸出</string>
+    <string name="design_console_options">主控台選項</string>
+    <string name="design_font_larger">放大字體</string>
+    <string name="design_font_smaller">縮小字體</string>
+    <string name="design_session_ready">工作階段進行中</string>
+    <string name="design_connecting">正在連線…</string>
+    <string name="design_search_history">搜尋歷史命令</string>
+    <string name="design_history_hint">點選歷史只填入輸入框，確認後再傳送。</string>
+</resources>

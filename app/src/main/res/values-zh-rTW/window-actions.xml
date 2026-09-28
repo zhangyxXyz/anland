@@ -1,0 +1,8 @@
+<resources>
+    <string name="window_open_timeout">未找到對應視窗，請檢查應用會話日誌，或前往視窗列表選擇視窗。</string>
+    <string name="window_open">開啟視窗</string>
+    <string name="window_close">關閉視窗</string>
+    <string name="window_close_confirm">請求關閉“%1$s”？如有未儲存的內容，應用可能會要求確認。</string>
+    <string name="window_close_failed">關閉請求失敗，請檢查視窗服務是否可用。</string>
+    <string name="window_close_waiting">關閉請求已傳送，應用尚未退出。請開啟視窗，檢查是否需要確認儲存內容。</string>
+</resources>

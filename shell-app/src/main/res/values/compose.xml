@@ -5,7 +5,7 @@
     <string name="host_missing">Anland Wayland is not installed.</string>
     <string name="search_apps">Search applications</string>
     <string name="shell_settings">Settings</string>
-    <string name="desktop_mode_help">Apps open as independent Android windows. A full Linux desktop requires a separate desktop session.</string>
+    <string name="desktop_mode_help">Apps open as independent Android windows. Use Full desktop to enter the Linux desktop session.</string>
     <string name="user_settings">Launch user</string>
     <string name="env_settings">Launch environment</string>
     <string name="busy_action">An operation is in progress</string>
