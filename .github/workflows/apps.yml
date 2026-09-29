@@ -1,9 +1,15 @@
 name: Android apps
 
-# UI-only releases reuse the exact signing caches from build.yml. No daemon,
-# module or rootfs rebuild, and no Actions artifact storage is required.
+# Reuse the exact signing caches from build.yml. The optional native build
+# publishes the daemon alongside the apps without rebuilding rootfs/audio.
+# Everything goes directly to a draft Release, without Actions artifacts.
 on:
   workflow_dispatch:
+    inputs:
+      native:
+        description: Also build the native Wayland daemon
+        type: boolean
+        default: false
   push:
     branches: [dev]
     paths: ['.github/workflows/apps.yml']
@@ -44,6 +50,32 @@ jobs:
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.22.1"
+      - name: Prepare native build tools
+        if: inputs.native == true
+        run: |
+          set -euo pipefail
+          git submodule update --init third_party/libffi third_party/wayland
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build pkg-config m4 patch
+          curl -fsSL https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz \
+            | tar xz --strip-components=1 -C third_party/libffi
+          test -x third_party/libffi/configure
+          meson setup /tmp/wl-scanner third_party/wayland \
+            -Dscanner=true -Dlibraries=false -Ddocumentation=false \
+            -Dtests=false -Ddtd_validation=false
+          ninja -C /tmp/wl-scanner
+          sudo install -m755 /tmp/wl-scanner/src/wayland-scanner /usr/local/bin/wayland-scanner
+      - name: Window geometry and desktop metadata regression tests
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/anland-java-tests
+          javac -d /tmp/anland-java-tests \
+            app/libawl/src/main/java/com/anlandnext/awl/WindowSafeArea.java tests/WindowSafeAreaTest.java
+          java -cp /tmp/anland-java-tests com.anlandnext.awl.WindowSafeAreaTest
+          g++ -std=c++17 -Wall -Wextra -Werror -I services/waylandbridge \
+            services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \
+            -o /tmp/anland-metadata-test
+          /tmp/anland-metadata-test
       - name: Build and lint both apps
         run: |
           set -euo pipefail
@@ -54,6 +86,12 @@ jobs:
           cp app/build/outputs/apk/release/*.apk release/anland-wayland.apk
           cp shell-app/build/outputs/apk/release/*.apk release/anland-shell.apk
           cp shell-app/build/outputs/apk/androidTest/release/*.apk release/anland-shell-tests.apk
+      - name: Build native daemon
+        if: inputs.native == true
+        run: |
+          set -euo pipefail
+          make libffi native
+          cp build/waylandbridge release/waylandbridge
       - name: Verify upgrade certificates
         run: |
           set -euo pipefail
@@ -66,7 +104,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          (cd release && sha256sum *.apk > SHA256SUMS)
+          (cd release && sha256sum * > ../SHA256SUMS)
+          mv SHA256SUMS release/SHA256SUMS
           printf 'Shell and Wayland adaptive UI. Source: %s\n' "$GITHUB_SHA" > release-notes.md
           tag="anland-apps-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland apps $GITHUB_RUN_ID" --notes-file release-notes.md

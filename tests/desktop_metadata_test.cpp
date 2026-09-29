@@ -57,6 +57,19 @@ int main(int argc, char** argv) {
     assert(!desktop_metadata_at(fd, "vector", "en", dirs).icon.empty());
     put(root / "usr/share/icons/hicolor/scalable/apps/vector-app.svg", "<!DOCTYPE svg><svg/>");
     assert(desktop_metadata_at(fd, "vector", "en", dirs).icon.empty());
+    // Encoded file size is independent of the Android task icon's display size.
+    // Exercise a normal large PNG, the inclusive 512 KiB bound and rejection.
+    put(system / "large.desktop", "[Desktop Entry]\nType=Application\nName=Large Icon\nIcon=large-icon\n");
+    std::string large_png("\x89PNG\r\n\x1a\n", 8);
+    large_png.resize(216 * 1024, '\0');
+    put(root / "usr/share/pixmaps/large-icon.png", large_png);
+    assert(desktop_metadata_at(fd, "large", "en", dirs).icon.size() == large_png.size());
+    large_png.resize(512 * 1024, '\0');
+    put(root / "usr/share/pixmaps/large-icon.png", large_png);
+    assert(desktop_metadata_at(fd, "large", "en", dirs).icon.size() == large_png.size());
+    large_png.push_back('\0');
+    put(root / "usr/share/pixmaps/large-icon.png", large_png);
+    assert(desktop_metadata_at(fd, "large", "en", dirs).icon.empty());
     close(fd);
     fs::remove_all(root); // only the directory returned by mkdtemp above
     std::cout << "desktop metadata tests passed\n";

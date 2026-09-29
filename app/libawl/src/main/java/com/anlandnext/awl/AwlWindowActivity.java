@@ -639,9 +639,6 @@ public class AwlWindowActivity extends Activity {
                         if (taskAppId != null && !taskAppId.equals(desktop.appId)) taskIcon = null;
                         taskAppId = desktop.appId;
                         taskDesktopName = desktop.name;
-                        // Identity arrives asynchronously. Recompute the surface geometry
-                        // when it resolves, including reused Activities and ID changes.
-                        root.requestApplyInsets();
                     }
                     // A failed fetch must not erase a valid icon; C_ICON reset
                     // explicitly clears it. Coalesce rapid title/icon events.
@@ -875,20 +872,9 @@ public class AwlWindowActivity extends Activity {
         if (root.getWidth() <= 0 || root.getHeight() <= 0) return;
         android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.displayCutout()
                 | WindowInsets.Type.systemBars());
-        int bottom = safe.bottom;
-        if (!imeOverlayMode()) bottom = Math.max(bottom, insets.getInsets(WindowInsets.Type.ime()).bottom);
-        int[][] corners = new int[4][];
-        WindowInsets windowInsets = root.getRootWindowInsets();
-        if (android.os.Build.VERSION.SDK_INT >= 31 && windowInsets != null) {
-            for (int i = 0; i < 4; i++) {
-                android.view.RoundedCorner c = windowInsets.getRoundedCorner(i);
-                if (c != null) corners[i] = new int[]{c.getCenter().x, c.getCenter().y, c.getRadius()};
-            }
-        }
-        int[] location = new int[2];
-        root.getLocationInWindow(location);
-        int[] margins = WindowSafeArea.contentMargins(taskAppId, location[0], location[1], root.getWidth(), root.getHeight(),
-                new int[]{safe.left, safe.top, safe.right, bottom}, corners);
+        int[] margins = WindowSafeArea.contentMargins(
+                new int[]{safe.left, safe.top, safe.right, safe.bottom},
+                insets.getInsets(WindowInsets.Type.ime()).bottom, imeOverlayMode());
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sv.getLayoutParams();
         if (lp.leftMargin == margins[0] && lp.topMargin == margins[1]
                 && lp.rightMargin == margins[2] && lp.bottomMargin == margins[3]) return;
@@ -1666,7 +1652,7 @@ public class AwlWindowActivity extends Activity {
      * passthrough, else (single contact / physical mouse) =
      * handleMouseEvent. */
     /** Activity events are window-local, whereas the compositor consumes
-     * SurfaceView-local pixels. Insets (IME, cutouts and rounded corners)
+     * SurfaceView-local pixels. Insets (IME, cutouts and system bars)
      * move the surface without moving the Activity coordinate origin.
      * Offset a copy so all pointers and historical samples stay consistent;
      * never mutate the event that Android or the superclass will receive. */

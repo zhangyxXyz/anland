@@ -12,6 +12,11 @@
 #include <unistd.h>
 
 namespace {
+// Leave room for metadata and other transactions in Binder's shared buffer.
+// Desktop icon files commonly exceed 128 KiB; Android downsamples the decoded
+// image to the task-icon size, so the encoded file budget is a separate limit.
+constexpr size_t kMaxIconBytes = 512 * 1024;
+
 // Resolve absolute symlinks against the container root, never Android's root.
 // Older kernels without openat2 safely fall back to the window-provided icon/title.
 int open_in_root(int root, const std::string& path, int flags) {
@@ -147,7 +152,7 @@ std::vector<unsigned char> icon(int root, const std::string& value,
         }
     }
     for (const auto& path : paths) {
-        auto bytes = read_file(root, path, 128 * 1024);
+        auto bytes = read_file(root, path, kMaxIconBytes);
         if (raster(bytes) || svg(bytes)) return {bytes.begin(), bytes.end()};
     }
     return {};
