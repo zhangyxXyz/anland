@@ -14,6 +14,10 @@ on:
         description: Build only the native daemon (reuse the already installed APK)
         type: boolean
         default: false
+      native_debug:
+        description: Also publish a separate native daemon with frame tracing
+        type: boolean
+        default: false
   push:
     branches: [dev]
     paths: ['.github/workflows/apps.yml']
@@ -101,6 +105,10 @@ jobs:
           make libffi native
           mkdir -p release
           cp build/waylandbridge release/waylandbridge
+          if [ '${{ inputs.native_debug }}' = 'true' ]; then
+            make native-debug
+            cp build/waylandbridge-debug release/waylandbridge-debug
+          fi
       - name: Verify upgrade certificates
         if: inputs.native_only != true
         run: |

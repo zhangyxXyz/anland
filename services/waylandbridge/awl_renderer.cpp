@@ -341,6 +341,12 @@ static void render_frame(wl_window* w) {
             (float)awl_snap_extent(lay[i].h, xf.sy, rsh),
         };
         float uv[4] = { lay[i].u0, lay[i].v0, lay[i].su, lay[i].sv };
+        LOGD("win %llu frame=%llu layer=%llu seq=%llu buffer=%ux%u logical=%.1fx%.1f dst=%.1f,%.1f %.1fx%.1f drawable=%dx%d requested=%dx%d",
+             (unsigned long long)w->id, (unsigned long long)w->frame_no,
+             (unsigned long long)lay[i].surface_id,
+             (unsigned long long)(b ? b->seq : 0), bw, bh, lay[i].w, lay[i].h,
+             dst[0], dst[1], dst[2], dst[3], vw, vh,
+             ANativeWindow_getWidth(w->nw), ANativeWindow_getHeight(w->nw));
         awl_gl_quad_draw(&w->quad, tex, dst, uv, lay[i].transform);
         drew = true;
 
