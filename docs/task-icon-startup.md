@@ -14,13 +14,16 @@ finishes. Existing per-window launch deduplication and transient-dialog
 classification remain in place. Subsequent icon/title events still update the
 identity; a snapshot cannot replace a title delivered by a newer control event.
 
-Direct daemon launches and process recreation do not pass through this
-prefetch. The window Activity starts excluded from Recents and explicitly
-publishes its card after the first identity load and `setTaskDescription`.
-The surface renders normally during the load. Transient dialogs continue to
-share their parent's task and never publish a separate card. Reopening an
-existing document also clears the pending-launch marker, allowing subsequent
-opens to bring that same task forward.
+The daemon now starts the transparent `OpenWindowActivity` with an exact
+window ID. It uses the same worker-side identity prefetch before creating a
+document task. The tablet's launcher cached a placeholder even for a task
+initially excluded from Recents; merely delaying publication was insufficient.
+Legacy direct launches/process recreation still delay card publication until
+identity is loaded, but new launches use the prefetch path.
+
+Transient dialogs continue to share their parent's task and never publish a
+separate card. Reopening an existing document clears the pending-launch marker,
+allowing subsequent opens to bring that same task forward.
 
 There is no application-name table, focus-triggered retry, timed reload, client
 restart or renderer change. Raster and SVG decoding share the same code for
@@ -60,3 +63,32 @@ host-create callback, before its first focus or surface attachment. This
 distinguishes the initial-identity fix from a successful later refocus.
 Close only the disposable fixture after testing; its temporary files are
 removed when it exits normally.
+
+## Launch handoff
+
+Shell's container/user/session preflight stays intact. Both launch coordinators
+use a transparent, non-dimming theme with no intermediate page animation. A
+compact cancelable status appears only for slower launches. The caller remains
+visible until the target window starts. Multiple matches and timeouts use a
+dialog. Pinned shortcuts use the same entry point.
+
+Before launching the Linux command, Shell snapshots current window IDs and the
+live auto_attach setting from the host provider. Existing windows/auto_attach
+off use explicit activation. New windows with auto_attach on are presented by
+the daemon, without a competing manual document start. The waiter stops when it
+loses the foreground, so a completed native launch or the user's Home action
+cannot be followed by a delayed focus steal. Explicit activation keeps its
+Activity alive until the asynchronous metadata load submits the target start.
+
+The change requires the matching APK and daemon for automatic launches. It does
+not restart Linux applications, toggle auto_attach, or change rendering/input.
+
+## Verification in progress (2026-09-29)
+
+- Old production APK failed the foreground instrumented fixture at its initial
+  unresolved task label; 59da3d0 passed label + bitmap before first focus.
+- The 59da3d0 Java launch path showed the fixture's teal check icon on its first
+  trip to Recents. The legacy direct daemon path still showed the host icon,
+  which motivated routing it through the same prefetch coordinator.
+- Both Android projects passed local debug build and lint before adding the
+  exact-ID daemon handoff. Final matching APK/native deployment remains to test.

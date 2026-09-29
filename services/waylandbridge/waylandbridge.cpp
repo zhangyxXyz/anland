@@ -145,7 +145,6 @@ static bool binder_plat_init(void) {
 
 #define AWL_BINDER_NAME "anland.host"
 #define AWL_PKG  "com.anlandnext"
-#define AWL_WIN_ACT AWL_PKG "/com.anlandnext.awl.AwlWindowActivity"   /* libawl-merged (host APK ships no activity of its own) */
 
 /* binder transaction codes (agreed with the APP BinderProxy)
  * single-attach model: the APK only reports facts; detach/evict/close
@@ -702,17 +701,18 @@ static void attach_activity(uint64_t id, const char* title) {
              (unsigned long long)id, (unsigned long long)presentation.parent);
         return;
     }
-    /* exactly one am start in document mode (a double start creates two
-       instances for the same window, one of which lingers as a placeholder
-       after the window is destroyed):
-       documentLaunchMode="intoExisting" + per-id unique data URI →
-       same id bring-to-fronts the existing task; different ids each get
-       their own instance/task (--activity-new-document is not recognized
-       by this device's am, use -f NEW_TASK|NEW_DOCUMENT=0x90000000) */
-    run_am("am start -n %s -d 'anland://win/%llu' --el id %llu --es title %s "
-           "-f 0x90000000 >/dev/null 2>&1",
-           AWL_WIN_ACT, (unsigned long long)id, (unsigned long long)id, q);
-    LOGI("Attach: am start AwlWindowActivity id=%llu", (unsigned long long)id);
+    /* Resolve the desktop identity before creating a document task. Recents
+       can cache the package icon at task creation, even while excluded from
+       its list. The transparent coordinator retains foreground launch rights
+       and submits exactly one document start after metadata is ready.
+       A cold background broadcast cannot reliably start an Activity on OEM
+       Android, so the privileged daemon starts this coordinator explicitly.
+       NEW_TASK | NO_ANIMATION = 0x10010000. */
+    run_am("am start -n %s/com.anlandnext.OpenWindowActivity "
+           "-d 'anland://activate/%llu' --el id %llu --es app_name %s "
+           "-f 0x10010000 >/dev/null 2>&1",
+           AWL_PKG, (unsigned long long)id, (unsigned long long)id, q);
+    LOGI("Attach: prepare window identity id=%llu", (unsigned long long)id);
 }
 
 /* ---------------- wayland logic-layer callbacks (wayland event thread) ---------------- */

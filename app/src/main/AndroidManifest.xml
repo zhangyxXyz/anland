@@ -21,7 +21,7 @@
 
         <!-- Window behavior settings -->
         <activity android:name=".WlSettingsActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell"/>
-        <activity android:name=".OpenWindowActivity" android:exported="true" android:theme="@style/Theme.MaterialDesignShell" android:excludeFromRecents="true"/>
+        <activity android:name=".OpenWindowActivity" android:exported="true" android:theme="@style/Theme.AnlandLaunch" android:excludeFromRecents="true"/>
         <provider android:name=".SessionWindowsProvider" android:authorities="com.anlandnext.sessions" android:exported="true"/>
 
         <!-- client closed its own window → daemon notification finishes the Activity -->

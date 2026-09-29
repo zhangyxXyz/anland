@@ -6,4 +6,13 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+    <!-- Keep the caller visible while a launch is prepared. This is a real
+         foreground Activity, so Android background-start rules still apply. -->
+    <style name="Theme.AnlandLaunch" parent="Theme.MaterialDesignShell">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

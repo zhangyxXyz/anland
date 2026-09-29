@@ -16,6 +16,8 @@ class SessionWindowsProvider : ContentProvider() {
         val windows = Awl.getWindows() ?: error("Anland daemon unavailable")
         return Bundle().apply {
             putInt("independent", windows.count { Awl.applicationId(it.id) != "org.freedesktop.Xwayland" })
+            putLongArray("window_ids", windows.map { it.id }.toLongArray())
+            putBoolean("auto_attach", WlBinder.configGet("auto_attach") == 1)
         }
     }
     override fun query(u: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor? = null

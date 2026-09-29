@@ -30,7 +30,7 @@
              only, so no intent-filter): ensures the container is running,
              then launches the app detached inside it. -->
         <activity android:name=".AppLaunchActivity" android:exported="true"
-                  android:theme="@style/Theme.MaterialDesignShell"
+                  android:theme="@style/Theme.AnlandLaunch"
                   android:excludeFromRecents="true"
                   android:noHistory="true"/>
     </application>

@@ -309,7 +309,7 @@ public final class Awl {
 
     /* The broadcast receiver holds goAsync until the asynchronous launch has
      * finished, so Android cannot freeze its process between load and start. */
-    static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs, Runnable launched) {
+    public static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs, Runnable launched) {
         if (ctx == null || win == null) { if (launched != null) launched.run(); return; }
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             new android.os.Handler(android.os.Looper.getMainLooper())
@@ -333,6 +333,11 @@ public final class Awl {
             final WindowTaskIdentity identity = loaded;
             MAIN.post(() -> {
                 try {
+                    if (ctx instanceof Activity && (((Activity) ctx).isFinishing()
+                            || ((Activity) ctx).isDestroyed())) {
+                        attachFailed(win.id);
+                        return;
+                    }
                     synchronized (ATTACH_LOCK) {
                         if (!attachPending.contains(win.id)) return; // window died while loading
                     }

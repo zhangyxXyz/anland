@@ -21,10 +21,15 @@ import java.util.List;
 public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatActivity {
 
     private LaunchUi.Progress msg;
+    private boolean foreground;
+
+    @Override protected void onResume() { super.onResume(); foreground = true; }
+    @Override protected void onPause() { foreground = false; super.onPause(); }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         LaunchUi.prepare(this);
         super.onCreate(savedInstanceState);
+        overridePendingTransition(0, 0);
 
         final String container = getIntent().getStringExtra("container");
         final String exec = getIntent().getStringExtra("exec");
@@ -81,8 +86,12 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
             if (!session.ok) throw new IllegalStateException(errText(session));
             org.json.JSONObject state = new org.json.JSONObject(session.stdout.trim());
             final boolean inDesktop = state.getBoolean("active");
+            // Snapshot before launching. Newly mapped windows with auto_attach
+            // enabled belong to the daemon's launch path; do not race it with
+            // another startActivity from the explicit activation path.
+            android.os.Bundle windows = getContentResolver().call(
+                    android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
             if (desktopEntry && !inDesktop) {
-                android.os.Bundle windows = getContentResolver().call(android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
                 if (windows == null) throw new IllegalStateException(getString(R.string.host_update_needed));
                 if (windows.getInt("independent") > 0) {
                     runOnUiThread(() -> LaunchUi.blocked(this, () -> {
@@ -102,16 +111,25 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
                 routed.addAll(argv); argv = routed;
             }
             final boolean showDesktop = desktopEntry || inDesktop;
+            if (isFinishing() || isDestroyed()) return;
             RootExec.Result r = desktopEntry && inDesktop
                     ? session : DsCli.launchApp(container, argv, launchUser, customEnv);
             if (r.ok) {
                 runOnUiThread(() -> {
+                    // A daemon-opened window may already have replaced this
+                    // noHistory Activity while the detached command returned.
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!foreground) { finish(); return; }
                     if (inDesktop && !desktopEntry) Toast.makeText(this, R.string.launched_in_desktop, Toast.LENGTH_LONG).show();
                     String windowAppId = showDesktop ? "org.freedesktop.Xwayland" : getIntent().getStringExtra("window_app_id");
                     if (windowAppId != null && !windowAppId.isEmpty()) {
                         try {
                             startActivity(new android.content.Intent().setClassName("com.anlandnext", "com.anlandnext.OpenWindowActivity")
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
                                     .putExtra("window_app_id",windowAppId)
+                                    .putExtra("app_name",appName)
+                                    .putExtra("window_ids",windows == null ? null : windows.getLongArray("window_ids"))
+                                    .putExtra("auto_attach",windows != null && windows.getBoolean("auto_attach"))
                                     .putExtra("desktop_id",showDesktop ? null : getIntent().getStringExtra("id")));
                         } catch (android.content.ActivityNotFoundException e) {
                             Toast.makeText(this,R.string.host_update_needed,Toast.LENGTH_LONG).show();
@@ -130,12 +148,18 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
         }
     }
 
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
+    }
+
     private void post(final int res, final Object... args) {
-        runOnUiThread(() -> msg.setText(getString(res, args)));
+        runOnUiThread(() -> { if (!isFinishing() && !isDestroyed()) msg.setText(getString(res, args)); });
     }
 
     private void fail(final String text) {
         runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
             Toast.makeText(this, text, Toast.LENGTH_LONG).show();
             finish();
         });

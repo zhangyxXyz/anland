@@ -21,16 +21,9 @@ object LaunchUi {
     @JvmStatic fun progress(activity:AppCompatActivity,initial:String):Progress {
         val state=Progress(initial)
         activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        activity.setContent { WithAnlandTheme { Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.surface) {
-            Box(Modifier.fillMaxSize().padding(24.dp),contentAlignment=Alignment.Center) {
-                Card(Modifier.widthIn(max=480.dp).fillMaxWidth(),shape=RoundedCornerShape(28.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainer)) {
-                    Column(Modifier.fillMaxWidth().padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(24.dp)) {
-                        CircularProgressIndicator()
-                        Text(state.message,style=MaterialTheme.typography.titleMedium)
-                    }
-                }
-            }
-        } } }
+        activity.setContent { WithAnlandTheme {
+            com.anland.design.LaunchStatus(state.message) { activity.finish() }
+        } }
         return state
     }
     @JvmStatic fun blocked(activity: AppCompatActivity, manage: Runnable) {
