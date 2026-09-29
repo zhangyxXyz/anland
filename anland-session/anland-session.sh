@@ -205,7 +205,8 @@ if command -v dbus-update-activation-environment >/dev/null; then
     dbus-update-activation-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR XDG_CURRENT_DESKTOP XDG_SESSION_TYPE || true
 fi
 if command -v xfsettingsd >/dev/null; then
-    xfsettingsd --disable-wm-check &
+    # Its XSettings selection belongs to Xwayland; the Wayland backend cannot serve X11 clients.
+    GDK_BACKEND=x11 xfsettingsd --disable-wm-check &
     SETTINGS_PID=$!
 fi
 if [[ -x /usr/local/bin/anland-desktop-appearance ]]; then

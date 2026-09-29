@@ -43,18 +43,20 @@ esac
         if compat:
             executable(packaged/'Xwayland', 'echo compat >> "$TEST_BINARY_LOG"\nprintf "99\\n" >&3\nsleep 2\n')
         executable(binaries/'miniwm', 'sleep 0.1\n')
+        executable(binaries/'xfsettingsd', 'printf "%s\\n" "${GDK_BACKEND:-unset}" > "$TEST_SETTINGS_BACKEND"\n')
         env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime),
                    ANLAND_RUNTIME_DIR=str(host), WAYLAND_DISPLAY='wayland-0',
                    ANLAND_COMPAT_BIN_DIR=str(packaged), ANLAND_MINIWM=str(binaries/'miniwm'),
                    PATH=str(binaries)+':/usr/bin:/bin', TEST_BASE_PATH=str(binaries)+':/usr/bin:/bin',
                    TEST_LOG=str(base/'manager-env'), TEST_ENV_COPY=str(base/'file-env'),
-                   TEST_BINARY_LOG=str(base/'binary'))
+                   TEST_BINARY_LOG=str(base/'binary'), TEST_SETTINGS_BACKEND=str(base/'settings-backend'))
         result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True, timeout=10)
         assert result.returncode == 1, result.stderr  # miniwm exit deliberately ends the session
         expected = 'PULSE_SERVER=unix:' + str(host/'pulse.sock')
         assert expected in (base/'manager-env').read_text().splitlines(), result.stdout+result.stderr
         assert expected in (base/'file-env').read_text().splitlines(), result.stdout+result.stderr
         assert (base/'binary').read_text().strip() == ('compat' if compat else 'distro')
+        assert (base/'settings-backend').read_text().strip() == 'x11', 'Xwayland clients need an X11 XSettings manager'
         assert not (host/'pulse.sock').exists(), 'test must cover audio not ready yet'
         for sock in sockets:
             sock.close()
