@@ -390,7 +390,7 @@ public class AwlWindowActivity extends Activity {
         if (!firstBind) {   /* switching away from a bound window */
             if (attached) AwlClient.pause(id, host, surfaceGeneration);   /* daemon detaches the old id */
             setPointerCaptureMode(CAPTURE_NONE, 0, 0, 0, 0);   /* the old window's constraint does not carry over */
-            LIVE.remove(id);
+            LIVE.remove(id, this);
             attached = false;
         }
         id = newId;
@@ -410,6 +410,8 @@ public class AwlWindowActivity extends Activity {
          * an unchanged size) */
         surText = ""; surCursor = surAnchor = 0;
         compText = ""; compCursor = 0;
+        markedStart = markedEnd = -1;
+        imeBatchDepth = 0;
         imeWanted = false;
         LIVE.put(id, this);
 
@@ -571,6 +573,17 @@ public class AwlWindowActivity extends Activity {
         AwlClient.Presentation p = AwlClient.presentation(windowId);
         if (!p.dialog) return false;
         redirectingDialog = true;
+        AwlWindowActivity existing = LIVE.get(windowId);
+        if (existing instanceof AwlDialogActivity && !existing.isFinishing()) {
+            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            if (am != null) for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
+                if (task.getTaskInfo().taskId == existing.getTaskId()) {
+                    task.moveToFront();
+                    finish();
+                    return true;
+                }
+            }
+        }
         android.content.Intent next = new android.content.Intent(this, AwlDialogActivity.class)
                 .setData(android.net.Uri.parse("anland://dialog/" + windowId))
                 .putExtra("id", windowId).putExtra("title", getIntent().getStringExtra("title"));
@@ -1997,14 +2010,15 @@ public class AwlWindowActivity extends Activity {
     @Override
     protected void onDestroy() {
         fireHost((cbs, win, act) -> cbs.onHostDestroy(win, act));
-        if (isFinishing() && id >= 0) Awl.hostGone(id);   /* keep the entry across re-creation */
-        LIVE.remove(id);
+        boolean owned = LIVE.remove(id, this);
+        if (owned && isFinishing() && id >= 0 && !redirectingDialog)
+            Awl.hostGone(id);   /* keep the entry across re-creation / dialog re-hosting */
         if (deathLinked) {
             AwlClient.unmonitorDeath(daemonDeath);
             deathLinked = false;
         }
         /* No detach report: swiping away / killing the background always
-         * minimizes and keeps the window alive (onPause already sent PAUSE;
+         * minimizes and keeps the window alive (onStop already sent PAUSE;
          * process death is backstopped by the daemon-side binder death).
          * Closing = Awl.closeWindow (daemon T_CLOSE) → client closes the
          * window → C_CLOSE → finish */
