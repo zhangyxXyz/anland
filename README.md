@@ -4,7 +4,7 @@
 
 # Anland
 
-Run Linux container applications as Android windows on a rooted ARM64 device. Anland provides a Wayland host, an application launcher, a Root module with audio support, and a Debian 13 image with integrated desktop fixes.
+Run Linux container applications as Android windows on a rooted ARM64 device. Anland provides a Wayland host, an application launcher, a Root module with audio support, and ARM64 Linux images with integrated desktop fixes. RootFS builds support Debian 13 (default), Ubuntu 26.04, Fedora 43/44 and Arch Linux ARM.
 
 This repository's `dev` branch contains the application and image build pipeline. Builds produce draft Releases; ordinary branch pushes do not run the release workflow.
 
@@ -16,7 +16,7 @@ This repository's `dev` branch contains the application and image build pipeline
 | Wayland App (`com.anlandnext`) | Window list, activation, scale, rendering and lifecycle settings; hosts Linux windows | `anland-wayland.apk` |
 | Client library | Binder connection and window hosting for Android clients | `anland-awllib.aar` |
 | Root module (`anland-awl`) | Native `waylandbridge`, SELinux setup, PulseAudio, boot service and appearance bridge | `anland-awl.zip`, standalone `waylandbridge` |
-| Debian RootFS | Debian 13 ARM64, Docker, Chinese locale, Anland session and optional full Xfce desktop | `anland-rootfs-debian13-arm64-<version>.tar.xz` |
+| Linux RootFS | Selectable ARM64 distribution, Docker, Chinese locale, Anland session and optional full Xfce desktop | `anland-rootfs-<distribution>-arm64-<version>.tar.xz` |
 
 The two Apps share responsive Material UI, theme preferences and navigation. Linux windows have Android task identities resolved from desktop metadata and icons. Transient dialogs share their parent task; launch coordination activates existing windows and waits for new windows without restarting the Linux application.
 
@@ -31,10 +31,42 @@ Android touch, keyboard and IME events are forwarded to Wayland. X11 application
 1. Download the selected build's assets from [Releases](https://github.com/zhangyxXyz/anland/releases). Drafts are visible to repository collaborators, not a public distribution channel.
 2. Verify downloaded files with `sha256sum -c SHA256SUMS` after downloading all files listed there. Component-specific checksum files are provided for partial downloads.
 3. Install the Root module ZIP through the root manager and reboot. Install both APKs.
-4. Import/extract the Debian RootFS using Droidspaces, then select the container and user in Shell. The image's configured user is `seiun`.
-5. Start the container and launch applications. The Linux Desktop entry opens the full Xfce desktop; individual applications can keep their own Android windows.
+4. Import/extract the selected Linux RootFS using Droidspaces, then select the container and user in Shell. The image's configured user is `seiun`.
+5. Configure the [Droidspaces runtime mount and GPU access](#droidspaces-mounts-and-gpu-access), then start the container and launch applications. The Linux Desktop entry opens the full Xfce desktop; individual applications can keep their own Android windows.
 
 If the image is split, concatenate `.part-000`, `.part-001`, ... in order, then check the reconstructed archive with `ROOTFS-SHA256SUMS`. Test APKs are optional developer tools, not prerequisites for normal use. A build does not deploy files to a device.
+
+## Droidspaces mounts and GPU access
+
+Every container used with Anland needs a **read-write directory bind mount**:
+
+| Android host path | Container path | Contents |
+|---|---|---|
+| `/data/local/tmp/awl` | `/run/anland` | `wayland-0` display socket, `pulse.sock` audio socket, `anland-wm.sock` window control socket and `appearance/` theme state |
+
+In Droidspaces, stop the container and add this mapping to its bind-mount settings. For a file-based configuration, merge the following settings into `/data/local/Droidspaces/Containers/<container-name>/container.config`, then start the container again:
+
+```ini
+bind_mounts=/data/local/tmp/awl:/run/anland
+enable_gpu_mode=1
+```
+
+If `bind_mounts` already contains mappings, keep them and append `,/data/local/tmp/awl:/run/anland` on the same line. Mount the whole directory, without the `:ro` suffix: the session creates its window-control socket there, and daemon restarts recreate the display/audio sockets. The Root module must be running before the container starts. Its default host runtime directory is `/data/local/tmp/awl`; if `runtime_dir` in `/data/adb/modules/anland-awl/config.json` is customized, use that host path while keeping the container destination `/run/anland`.
+
+GPU mode (`enable_gpu_mode=1`, CLI `--gpu`) exposes the device's GPU nodes. The current Qualcomm KGSL path needs `/dev/kgsl-3d0` and a compatible Mesa driver; the desktop user must have access to that node. On Droidspaces versions that assign it to `droidspaces-gpu`, check the user's group membership and log in again after changing groups. Android storage sharing (`enable_android_storage=1`) is optional for Anland. Termux-X11, VirGL and Droidspaces' separate PulseAudio server are not required by this Anland configuration; display and audio use the Anland Root module.
+
+After starting the module, container and Anland session, check **inside the Linux container**:
+
+```sh
+findmnt -T /run/anland
+ls -l /run/anland/wayland-0 /run/anland/pulse.sock
+ls -l /run/anland/anland-wm.sock /run/anland/appearance/night-mode
+# Qualcomm KGSL devices only; run id as the desktop user:
+ls -l /dev/kgsl-3d0
+id
+```
+
+`/run/anland` must be the shared host directory, not an ordinary empty directory. `wayland-0` and `pulse.sock` must be Unix sockets; `anland-wm.sock` appears when the independent-application session is running. Missing display sockets prevent the session from starting, missing audio sockets prevent Android audio output, and missing GPU access prevents the KGSL rendering path from working. Shell expects this mount to be configured; importing a RootFS or selecting a container in Shell does not create it.
 
 ## Release pipeline
 
@@ -59,7 +91,7 @@ flowchart LR
 | Manual run | Shell / Wayland bundle / RootFS checkboxes | `dev-<SHA>-<run_id>` draft |
 | Ordinary branch push or PR | No release build | None |
 
-Manual runs default to both Apps; RootFS is opt-in. Selecting no components fails before creating a draft. The Wayland selection includes its APK, test APK, AAR, daemon and Root module. Shell includes its APK and test APK.
+Manual runs default to both Apps; RootFS is opt-in. When selected, `rootfs_target` chooses one distribution per run and defaults to `Debian-13`. Version tags build all components with the default RootFS target, Debian 13. Selecting no components fails before creating a draft. The Wayland selection includes its APK, test APK, AAR, daemon and Root module. Shell includes its APK and test APK.
 
 Each child uploads directly to one shared draft. Finalization checks the selected jobs, file sizes and GitHub asset SHA256 digests before producing `build-manifest.json` and a unified `SHA256SUMS`. Failed builds remain incomplete drafts. Retries can update the same run's draft; another run cannot overwrite it, and public Releases are never modified by this pipeline. Nothing is automatically published.
 
@@ -145,11 +177,23 @@ The script validates both certificates before uploading Secrets. Missing/mismatc
 
 Native/module builds require a Linux host, JDK, Android SDK/NDK, CMake, Meson, Ninja, pkg-config, m4 and patch. With signing configured, `make libffi` followed by `make native apk module` builds the Android bundle. `make anlandx` remains an optional source installer for manually managed containers; it is not a default Release asset.
 
-`rootfs.yml` uses an ARM64 runner and Docker. It builds Xfdesktop with the touch double-tap patch, Xwayland with GPU/input fixes, and the current `anland-miniwm`. The builder and session base package are locked in [`rootfs/sources.json`](rootfs/sources.json); the xserver source is the repository's pinned submodule. A changed session package checksum stops the build.
+`rootfs.yml` uses an ARM64 runner and Docker. Select a distribution with `rootfs_target` in the manual `build.yml` run:
 
-The final Docker stage installs the patched `.deb` files, places Xwayland at `/usr/lib/anland/Xwayland`, installs the current session and miniwm, and verifies versions, shared-library dependencies and runtime paths. The exported archive is checked again against the recorded binary hashes. The image is ready to use without a separate component replacement step.
+| Selection | Distribution | Archive identifier |
+|---|---|---|
+| `Debian-13` (default) | Debian 13 | `debian13` |
+| `Ubuntu-26` | Ubuntu 26.04 | `ubuntu2604` |
+| `Fedora-43` | Fedora 43 | `fedora43` |
+| `Fedora-44` | Fedora 44 | `fedora44` |
+| `Arch` | Arch Linux ARM (rolling) | `arch` |
 
-Provenance is stored in `/usr/share/anland/rootfs-components.json` and the installed package list in `/usr/share/anland/dpkg-packages.tsv`. The image holds `xfdesktop4`, `xfdesktop4-data` and `anland-session` to preserve the integrated fixes during ordinary APT upgrades. Deliberate replacement requires `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session`. Debian repositories, the base image and other upstream downloads are not fully snapshotted; the image is not claimed to be bit-for-bit reproducible.
+Each target includes Anland Next and the full Xfce desktop launcher. Ubuntu 24.04 and 25.10 are not selectable because the pinned upstream builder does not provide Anland Next for them. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.0.tar.xz`.
+
+A separate Docker build stage derives from the selected runtime image and compiles Xfdesktop with the touch double-tap patch, Xwayland with GPU/input fixes and the current `anland-miniwm`. Xserver uses the repository's pinned submodule. The final stage installs the compiled Xfdesktop files, `/usr/lib/anland/Xwayland`, the session and miniwm, then verifies the distribution, session package version, AArch64 executables, shared-library dependencies and file hashes. Build dependencies remain in the disposable stage. The exported archive is checked against the recorded executable hashes before upload.
+
+Provenance, including the target and compiled Xfdesktop source version, is stored in `/usr/share/anland/rootfs-components.json`; `/usr/share/anland/packages.tsv` lists the native packages. The patched Xfdesktop files overlay the distribution package, so the native package version describes its base package, while the manifest describes the compiled fix. APT holds, DNF exclusions or Pacman `IgnorePkg` protect Xfdesktop and `anland-session` from ordinary upgrades. To deliberately replace them, remove the corresponding protection: `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session` on Debian/Ubuntu, edit `excludepkgs` in `/etc/dnf/dnf.conf` on Fedora, or edit `IgnorePkg` in `/etc/pacman.conf` on Arch. Explicit reinstalls or the upstream TUI's component replacement can overwrite the fixes.
+
+The distribution repositories, base images and other upstream downloads are not fully snapshotted; images are not claimed to be bit-for-bit reproducible. Each selected target must pass its image-build checks; device compatibility also requires runtime validation.
 
 ## Development and validation
 

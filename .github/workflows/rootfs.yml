@@ -1,4 +1,4 @@
-name: Debian RootFS with integrated fixes
+name: ARM64 RootFS with integrated fixes
 on:
   workflow_call:
     inputs:
@@ -10,6 +10,7 @@ permissions:
   contents: write
 
 env:
+  ROOTFS_TARGET: ${{ fromJSON(inputs.build_plan).rootfs_target }}
   BUILD_PLAN: ${{ inputs.build_plan }}
   ANLAND_VERSION_SUFFIX: ${{ fromJSON(inputs.build_plan).suffix }}
 
@@ -23,12 +24,17 @@ jobs:
         id: sources
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, sys
+          sys.path.insert(0, 'scripts/ci')
+          from release import current
+          from rootfs_target import resolve
+          target, config = resolve(current()['rootfs_target'])
           from pathlib import Path
           sources = json.loads(Path('rootfs/sources.json').read_text())
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               print('repository=' + sources['builder_repository'], file=out)
               print('commit=' + sources['builder_commit'], file=out)
+              print('dockerfile=' + config['dockerfile'], file=out)
           PY
       - uses: actions/checkout@v4
         with:
@@ -36,23 +42,21 @@ jobs:
           ref: ${{ steps.sources.outputs.commit }}
           path: build/rootfs-builder
           persist-credentials: false
-      - name: Build patched Xfdesktop, Xwayland and current miniwm
+      - name: Prepare pinned component sources
         run: |
           git submodule update --init third_party/xserver
-          mkdir -p build/rootfs-inputs
-          docker run --rm --platform linux/arm64 \
-            -v "$PWD:/src:ro" -v "$PWD/build/rootfs-inputs:/out" \
-            debian:trixie bash /src/rootfs/build-components.sh
       - name: Pin session package and inject the verified components
         run: |
           python3 rootfs/prepare-inputs.py build/rootfs-inputs
           python3 rootfs/apply-builder-fixes.py build/rootfs-builder
           python3 rootfs/integrate-builder.py build/rootfs-builder build/rootfs-inputs
       - name: Build the ready-to-use image
+        env:
+          ROOTFS_DOCKERFILE: ${{ steps.sources.outputs.dockerfile }}
         working-directory: build/rootfs-builder
         run: |
           bash build_rootfs-native.sh \
-            -i Debian-13.Dockerfile -v anland-ci \
+            -i "$ROOTFS_DOCKERFILE" -v anland-ci \
             -K 'Anland Next' -L true -B anland-wayland -P none \
             -g true -a false -b true -c true -d false -e true \
             -f true -h true -j false -n false -S false -t false -u seiun

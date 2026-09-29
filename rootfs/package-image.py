@@ -1,6 +1,7 @@
 """Verify exported runtime bytes, then name and split the RootFS for Releases."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -9,12 +10,14 @@ import tarfile
 SOURCE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SOURCE / 'scripts/ci'))
 from release import sha256
+from rootfs_target import resolve, archive_name
 from versions import read_versions, version_suffix
 
 RUNTIME = {
     'usr/lib/anland/Xwayland': 'Xwayland',
     'usr/bin/anland-miniwm': 'anland-miniwm',
     'usr/bin/anland-session': 'anland-session',
+    'usr/bin/xfdesktop': 'xfdesktop',
 }
 METADATA = 'usr/share/anland/rootfs-components.json'
 
@@ -57,12 +60,16 @@ def package(builder, directory):
     if manifest['rootfs_version'] != version:
         raise ValueError('Exported image version differs from version.properties')
     # Check provenance against the exact inputs injected before Docker export.
-    expected = json.loads((Path(builder) / 'anland-overrides/rootfs-components.json').read_text())
-    if manifest != expected:
+    expected = json.loads((Path(builder) / 'anland-overrides/rootfs-inputs.json').read_text())
+    inputs = {k: v for k, v in manifest.items() if k not in ('patched_files', 'xfdesktop_files')}
+    if inputs != expected:
         raise ValueError('Exported image has another build manifest')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    name = f'anland-rootfs-debian13-arm64-{version}.tar.xz'
+    target, config = resolve(os.environ.get('ROOTFS_TARGET'))
+    if manifest['target'] != target or manifest['target_config'] != config:
+        raise ValueError('Exported image differs from the selected RootFS target')
+    name = archive_name(versions, version_suffix(), target)
     original_hash = sha256(archives[0])
     (directory / 'ROOTFS-SHA256SUMS').write_text(f'{original_hash}  {name}\n', encoding='utf-8')
     (directory / 'rootfs-components.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')

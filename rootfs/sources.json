@@ -1,10 +1,94 @@
 {
   "builder_repository": "Goldzxcbug/Droidspaces-rootfs-Desktop-builder",
   "builder_commit": "ffc712071a04cc50d1aed26aab064f0295b6251d",
-  "xfdesktop_source_version": "4.20.1-1",
-  "session_package": {
-    "version": "0.1.1",
-    "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-debian13-anland-session_0.1.1_arm64.deb",
-    "sha256": "7086fb4d8f3d22330d286e20000df1930caa8976761dda76150cb3fbdabe36b0"
+  "default_target": "Debian-13",
+  "xfdesktop_source": {
+    "version": "4.20.1",
+    "url": "https://archive.xfce.org/src/xfce/xfdesktop/4.20/xfdesktop-4.20.1.tar.bz2",
+    "sha256": "acccde849265bbf4093925ba847977b7abf70bb2977e4f78216570e887c157b8"
+  },
+  "targets": {
+    "Debian-13": {
+      "slug": "debian13",
+      "dockerfile": "Debian-13.Dockerfile",
+      "base_image": "debian:trixie",
+      "package_manager": "apt",
+      "os_ids": [
+        "debian"
+      ],
+      "os_version": "13",
+      "session_package": {
+        "version": "0.1.1",
+        "filename": "session.deb",
+        "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-debian13-anland-session_0.1.1_arm64.deb",
+        "sha256": "7086fb4d8f3d22330d286e20000df1930caa8976761dda76150cb3fbdabe36b0"
+      }
+    },
+    "Ubuntu-26": {
+      "slug": "ubuntu2604",
+      "dockerfile": "Ubuntu-26.Dockerfile",
+      "base_image": "ubuntu:26.04",
+      "package_manager": "apt",
+      "os_ids": [
+        "ubuntu"
+      ],
+      "os_version": "26.04",
+      "session_package": {
+        "version": "0.1.1",
+        "filename": "session.deb",
+        "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-ubuntu2604-anland-session_0.1.1_arm64.deb",
+        "sha256": "a8f200338ac526b7442310667c344dd5a06e69cb54593c5d643afb869893a3f6"
+      }
+    },
+    "Fedora-43": {
+      "slug": "fedora43",
+      "dockerfile": "Fedora-43.Dockerfile",
+      "base_image": "fedora:43",
+      "package_manager": "dnf",
+      "os_ids": [
+        "fedora"
+      ],
+      "os_version": "43",
+      "session_package": {
+        "version": "0.1.1-1.droidspaces1.fc43",
+        "filename": "session.rpm",
+        "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-fedora43-anland-session-0.1.1-1.droidspaces1.fc43.aarch64.rpm",
+        "sha256": "58326bd16bcd5247c331c40dd0ad4e2c8c5e21775c5750d7117f9ccd4f1fe7ed"
+      }
+    },
+    "Fedora-44": {
+      "slug": "fedora44",
+      "dockerfile": "Fedora-44.Dockerfile",
+      "base_image": "fedora:44",
+      "package_manager": "dnf",
+      "os_ids": [
+        "fedora"
+      ],
+      "os_version": "44",
+      "session_package": {
+        "version": "0.1.1-1.droidspaces1.fc44",
+        "filename": "session.rpm",
+        "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-fedora44-anland-session-0.1.1-1.droidspaces1.fc44.aarch64.rpm",
+        "sha256": "e5c15dd00afab9162bd640144e8a201c9bc8bb146305d73aa0cf5b3286a54666"
+      }
+    },
+    "Arch": {
+      "slug": "arch",
+      "dockerfile": "Arch.Dockerfile",
+      "base_image": "ogarcia/archlinux",
+      "package_manager": "pacman",
+      "os_ids": [
+        "arch",
+        "archarm",
+        "archlinux"
+      ],
+      "os_version": null,
+      "session_package": {
+        "version": "0.1.1-1",
+        "filename": "session.pkg.tar.zst",
+        "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-arch-anland-session-0.1.1-1-aarch64.pkg.tar.zst",
+        "sha256": "72c799f6a37c0d254c617428851ed387079d96a40e4d8913006e876929274f21"
+      }
+    }
   }
 }

@@ -4,7 +4,7 @@
 
 # Anland
 
-在已 root 的 ARM64 Android 设备上，以 Android 窗口运行 Linux 容器应用。Anland 包含 Wayland 宿主、应用启动器、带音频支持的 Root 模块，以及集成桌面修复的 Debian 13 镜像。
+在已 root 的 ARM64 Android 设备上，以 Android 窗口运行 Linux 容器应用。Anland 包含 Wayland 宿主、应用启动器、带音频支持的 Root 模块，以及集成桌面修复的 ARM64 Linux 镜像。RootFS 构建支持 Debian 13（默认）、Ubuntu 26.04、Fedora 43/44 和 Arch Linux ARM。
 
 本仓库 `dev` 分支维护应用与镜像构建流水线。构建产物进入草稿 Release；普通分支推送不会运行发布流水线。
 
@@ -16,7 +16,7 @@
 | Wayland App（`com.anlandnext`） | 窗口列表、激活、缩放、渲染及生命周期设置，承载 Linux 窗口 | `anland-wayland.apk` |
 | 客户端库 | 为 Android 客户端提供 Binder 连接和窗口托管 | `anland-awllib.aar` |
 | Root 模块（`anland-awl`） | 原生 `waylandbridge`、SELinux 配置、PulseAudio、开机服务及外观同步 | `anland-awl.zip`、独立的 `waylandbridge` |
-| Debian RootFS | Debian 13 ARM64、Docker、中文环境、Anland 会话及可选的完整 Xfce 桌面 | `anland-rootfs-debian13-arm64-<版本>.tar.xz` |
+| Linux RootFS | 可选 ARM64 发行版、Docker、中文环境、Anland 会话及可选的完整 Xfce 桌面 | `anland-rootfs-<发行版>-arm64-<版本>.tar.xz` |
 
 两款 App 共用响应式 Material 界面、主题偏好和导航。Linux 窗口根据桌面元数据与图标确定 Android 任务身份；临时对话框共享父任务。启动协调负责激活已有窗口或等待新窗口，不需要重启 Linux 应用。
 
@@ -31,10 +31,42 @@ Android 的触摸、键盘和 IME 事件被转发到 Wayland；X11 应用通过�
 1. 从 [Releases](https://github.com/zhangyxXyz/anland/releases) 下载所需产物。草稿仅对仓库协作者可见，不是公开分发渠道。
 2. 下载校验清单中的所有文件后，执行 `sha256sum -c SHA256SUMS`。只下载部分组件时可使用各组件自己的校验文件。
 3. 在 root 管理器中安装模块 ZIP 并重启，安装两款 APK。
-4. 使用 Droidspaces 导入/解压 Debian RootFS，在 Shell 中选择容器和用户。镜像预设用户为 `seiun`。
-5. 启动容器并打开应用。「Linux 桌面」入口启动完整 Xfce 桌面；独立应用可继续使用各自的 Android 窗口。
+4. 使用 Droidspaces 导入/解压所选 Linux RootFS，在 Shell 中选择容器和用户。镜像预设用户为 `seiun`。
+5. 配置下方的 [Droidspaces 挂载与 GPU](#droidspaces-挂载与-gpu-配置)，再启动容器并打开应用。「Linux 桌面」入口启动完整 Xfce 桌面；独立应用可继续使用各自的 Android 窗口。
 
 如果镜像分卷，按 `.part-000`、`.part-001`……顺序合并，再用 `ROOTFS-SHA256SUMS` 校验还原后的文件。测试 APK 仅供开发验证，正常使用无需安装。构建不会自动部署到设备。
+
+## Droidspaces 挂载与 GPU 配置
+
+每个用于 Anland 的容器都需要配置一条**目录读写绑定挂载**：
+
+| Android 宿主路径 | 容器内路径 | 用途 |
+|---|---|---|
+| `/data/local/tmp/awl` | `/run/anland` | `wayland-0` 显示 socket、`pulse.sock` 音频 socket、`anland-wm.sock` 窗口控制 socket，以及 `appearance/` 外观状态 |
+
+在 Droidspaces 中停止容器，将这条映射添加到容器的绑定挂载设置。使用配置文件时，将以下字段合并到 `/data/local/Droidspaces/Containers/<容器名>/container.config`，保存后重新启动容器：
+
+```ini
+bind_mounts=/data/local/tmp/awl:/run/anland
+enable_gpu_mode=1
+```
+
+如果已有 `bind_mounts`，保留原有映射，在同一行追加 `,/data/local/tmp/awl:/run/anland`。需要挂载整个目录，不添加 `:ro`：会话会在这里创建窗口控制 socket，宿主服务重启也会重新创建显示和音频 socket。启动容器前应先确保 Root 模块服务已运行。模块默认宿主运行目录为 `/data/local/tmp/awl`；若在 `/data/adb/modules/anland-awl/config.json` 中自定义了 `runtime_dir`，挂载源应使用该路径，容器目标仍保持 `/run/anland`。
+
+GPU 模式（`enable_gpu_mode=1`，命令行对应 `--gpu`）负责向容器提供设备的 GPU 节点。当前 Qualcomm KGSL 路径需要 `/dev/kgsl-3d0` 和兼容的 Mesa 驱动，桌面用户也必须有权访问该节点。Droidspaces 将节点分配给 `droidspaces-gpu` 组时，需要检查用户的组成员身份；修改组后重新登录。Android 存储共享（`enable_android_storage=1`）属于可选功能。本套 Anland 配置的显示和音频由 Root 模块提供，无需额外启用 Termux-X11、VirGL 或 Droidspaces 自带的 PulseAudio 服务。
+
+启动模块、容器和 Anland 会话后，**在 Linux 容器内**检查：
+
+```sh
+findmnt -T /run/anland
+ls -l /run/anland/wayland-0 /run/anland/pulse.sock
+ls -l /run/anland/anland-wm.sock /run/anland/appearance/night-mode
+# 以下 GPU 节点仅针对 Qualcomm KGSL 设备；id 应以桌面用户执行：
+ls -l /dev/kgsl-3d0
+id
+```
+
+`/run/anland` 必须指向宿主共享目录，不能只是普通空目录。`wayland-0`、`pulse.sock` 应为 Unix socket；独立应用会话运行后会出现 `anland-wm.sock`。缺少显示 socket 会导致会话无法启动，缺少音频 socket 会导致声音无法输出到 Android，缺少 GPU 访问权限会导致 KGSL 渲染不可用。Shell 依赖这条预先配置的挂载；导入 RootFS 或在 Shell 中选择容器不会自动创建它。
 
 ## 发布流水线
 
@@ -59,7 +91,7 @@ flowchart LR
 | 手动运行 | 勾选 Shell / Wayland 整套组件 / RootFS | `dev-<SHA>-<run_id>` 草稿 |
 | 普通分支推送或 PR | 不执行发布构建 | 无 |
 
-手动运行默认选择两款 App，RootFS 按需选择。全部不选会在创建草稿前失败。Wayland 选项包含 APK、测试 APK、AAR、原生服务和 Root 模块；Shell 包含 APK 和测试 APK。
+手动运行默认选择两款 App，RootFS 按需选择。勾选后通过 `rootfs_target` 选择本次构建的一个发行版，默认 `Debian-13`。版本 Tag 构建全部组件，RootFS 使用默认的 Debian 13。全部不选会在创建草稿前失败。Wayland 选项包含 APK、测试 APK、AAR、原生服务和 Root 模块；Shell 包含 APK 和测试 APK。
 
 子流程直接上传到同一个草稿。汇总阶段核对所选任务、文件大小及 GitHub 附件 SHA256，再生成 `build-manifest.json` 和统一的 `SHA256SUMS`。失败构建保留为未完成草稿。同一运行可重试更新自己的草稿，其他运行不能覆盖它；流水线不会修改已公开的 Release，也不会自动公开发布。
 
@@ -145,11 +177,23 @@ python scripts/ci/signing.py sync --repo zhangyxXyz/anland
 
 原生服务/模块构建需要 Linux 主机、JDK、Android SDK/NDK、CMake、Meson、Ninja、pkg-config、m4 和 patch。配置签名后，先执行 `make libffi`，再执行 `make native apk module` 构建 Android 侧产物。`make anlandx` 仍可生成手工管理容器用的源码安装包，但它不是默认 Release 附件。
 
-`rootfs.yml` 使用 ARM64 runner 和 Docker，编译包含触控双击补丁的 Xfdesktop、包含 GPU/输入修复的 Xwayland，以及当前源码的 `anland-miniwm`。builder 和会话基础包锁定在 [`rootfs/sources.json`](rootfs/sources.json)，xserver 使用仓库固定的 submodule。会话包校验值发生变化时停止构建。
+`rootfs.yml` 使用 ARM64 runner 和 Docker。在手动运行 `build.yml` 时，通过 `rootfs_target` 选择发行版：
 
-最后的 Docker 定制阶段安装修复版 `.deb`，将 Xwayland 放到 `/usr/lib/anland/Xwayland`，安装当前会话脚本和 miniwm，并核对版本、动态库依赖与运行路径。导出的镜像再次校验二进制哈希，安装后无需另行替换这些组件。
+| 选项 | 发行版 | 产物标识 |
+|---|---|---|
+| `Debian-13`（默认） | Debian 13 | `debian13` |
+| `Ubuntu-26` | Ubuntu 26.04 | `ubuntu2604` |
+| `Fedora-43` | Fedora 43 | `fedora43` |
+| `Fedora-44` | Fedora 44 | `fedora44` |
+| `Arch` | Arch Linux ARM（滚动更新） | `arch` |
 
-镜像来源记录位于 `/usr/share/anland/rootfs-components.json`，已安装软件包清单位于 `/usr/share/anland/dpkg-packages.tsv`。镜像对 `xfdesktop4`、`xfdesktop4-data`、`anland-session` 设置 hold，防止普通 APT 升级覆盖集成修复。有意替换时先执行 `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session`。Debian 软件源、基础镜像及其他上游下载没有完整快照固定，因此不承诺镜像逐字节可复现。
+各目标均包含 Anland Next 和完整 Xfce 桌面入口。固定版本的上游 builder 没有为 Ubuntu 24.04、25.10 提供 Anland Next，因此这两个版本不在可选范围。目标定义、默认发行版、builder commit、Xfdesktop 源码及各发行版会话包的校验值统一存放在 [`rootfs/sources.json`](rootfs/sources.json)，workflow 下拉列表与其保持一致。所有发行版共用 [`version.properties`](version.properties) 中的 `ROOTFS_VERSION`，通过文件名中的发行版标识区分，例如 `anland-rootfs-fedora44-arm64-0.1.0.tar.xz`。
+
+独立的 Docker 编译阶段以所选运行镜像为基础，编译包含触控双击补丁的 Xfdesktop、包含 GPU/输入修复的 Xwayland，以及当前源码的 `anland-miniwm`。Xserver 使用仓库固定的 submodule。最终阶段安装编译后的 Xfdesktop 文件、`/usr/lib/anland/Xwayland`、会话脚本和 miniwm，校验发行版、会话包版本、AArch64 可执行文件、动态库依赖和文件哈希。编译依赖保留在临时阶段，导出镜像上传前再次检查可执行文件哈希。
+
+`/usr/share/anland/rootfs-components.json` 记录目标发行版、编译的 Xfdesktop 源码版本等来源信息；`/usr/share/anland/packages.tsv` 列出原生软件包。修复后的 Xfdesktop 文件覆盖发行版包中的对应文件，因此包管理器中的版本表示基础包版本，清单表示实际编译的修复来源。镜像通过 APT hold、DNF 排除项或 Pacman `IgnorePkg` 保护 Xfdesktop 和 `anland-session`，避免普通升级覆盖修复。需要主动替换时，Debian/Ubuntu 执行 `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session`；Fedora 修改 `/etc/dnf/dnf.conf` 的 `excludepkgs`；Arch 修改 `/etc/pacman.conf` 的 `IgnorePkg`。显式重装或上游 TUI 的组件替换仍可能覆盖修复文件。
+
+发行版软件源、基础镜像及其他上游下载没有完整快照固定，因此不承诺镜像逐字节可复现。每个所选目标都需要通过镜像构建检查，设备兼容性还需运行验证。
 
 ## 开发与验证
 

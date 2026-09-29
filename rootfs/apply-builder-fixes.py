@@ -1,10 +1,14 @@
 """Apply reviewed overrides to the pinned upstream RootFS builder, fail on drift."""
 import pathlib
+import os
 import shutil
 import sys
 
 builder = pathlib.Path(sys.argv[1])
 source = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(source / 'scripts/ci'))
+from rootfs_target import resolve
+_, target = resolve(os.environ.get('ROOTFS_TARGET'))
 
 def replace_once(path, old, new):
     text = path.read_text(encoding="utf-8")
@@ -32,7 +36,7 @@ shutil.copyfile(source / "rootfs/configure-anland-audio.sh", builder / "scripts/
 for name in ("configure-anland-desktop.sh", "anland-desktop", "anland-desktop-session", "anland-desktop-inner", "anland-desktop-appearance"):
     shutil.copyfile(source / "rootfs" / name, builder / "scripts" / name)
 shutil.copytree(source / "rootfs/assets", builder / "scripts/assets", dirs_exist_ok=True)
-replace_once(builder / "Debian-13.Dockerfile",
+replace_once(builder / target["dockerfile"],
     "COPY scripts/configure-desktop.sh /usr/local/sbin/configure-desktop\n",
     "COPY scripts/configure-desktop.sh /usr/local/sbin/configure-desktop\n"
     "COPY scripts/configure-anland-audio.sh scripts/anland-session-fixed.sh /usr/local/sbin/\n"

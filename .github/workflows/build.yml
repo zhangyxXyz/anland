@@ -14,9 +14,20 @@ on:
         type: boolean
         default: true
       build_rootfs:
-        description: Build Debian ARM64 with integrated desktop and Xwayland fixes
+        description: Build ARM64 RootFS with integrated desktop and Xwayland fixes
         type: boolean
         default: false
+
+      rootfs_target:
+        description: RootFS distribution (when RootFS is selected)
+        type: choice
+        default: Debian-13
+        options:
+          - Debian-13
+          - Ubuntu-26
+          - Fedora-43
+          - Fedora-44
+          - Arch
 
 # Serialize version-tag uploads. Independent manual runs use separate drafts.
 concurrency:
@@ -30,6 +41,7 @@ env:
   BUILD_SHELL: ${{ inputs.build_shell }}
   BUILD_WAYLAND: ${{ inputs.build_wayland }}
   BUILD_ROOTFS: ${{ inputs.build_rootfs }}
+  ROOTFS_TARGET: ${{ inputs.rootfs_target }}
 
 jobs:
   plan:

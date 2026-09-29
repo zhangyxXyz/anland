@@ -2,15 +2,26 @@
 set -euo pipefail
 rootfs="${1?RootFS prefix required}"
 run_root() { if [[ -n "$rootfs" ]]; then chroot "$rootfs" "$@"; else "$@"; fi; }
-packages=(xfce4-session xfce4-panel xfdesktop4 xfwm4 xfce4-settings thunar xfce4-terminal xauth x11-utils xcompmgr)
-missing=false
-for package in "${packages[@]}"; do
-    [[ $(run_root dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true) == installed ]] || missing=true
-done
-if $missing; then
-    run_root env DEBIAN_FRONTEND=noninteractive apt-get update
-    run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
-fi
+source "$rootfs/etc/os-release"
+case "$ID" in
+    debian|ubuntu)
+        run_root env DEBIAN_FRONTEND=noninteractive apt-get update
+        run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            xfce4-session xfce4-panel xfdesktop4 xfwm4 xfce4-settings thunar xfce4-terminal \
+            xauth x11-utils xcompmgr python3 libdecor-0-0 libnotify4 libgarcon-gtk3-1-0
+        ;;
+    fedora)
+        run_root dnf install -y --setopt=install_weak_deps=False \
+            xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings Thunar xfce4-terminal \
+            xauth xprop xdpyinfo xcompmgr python3 libdecor libnotify garcon
+        ;;
+    arch|archarm|archlinux)
+        run_root pacman -S --noconfirm --needed \
+            xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings thunar xfce4-terminal \
+            xorg-xauth xorg-xprop xorg-xdpyinfo xcompmgr python libdecor libnotify garcon
+        ;;
+    *) echo "Unsupported desktop system: $ID" >&2; exit 1 ;;
+esac
 here=$(dirname "$0")
 install -d "$rootfs/usr/local/bin" "$rootfs/usr/lib/systemd/user" "$rootfs/usr/local/share/applications"
 for file in anland-desktop anland-desktop-session anland-desktop-inner anland-desktop-appearance; do
@@ -48,3 +59,7 @@ X-Anland-WindowAppId=org.freedesktop.Xwayland
 EOF
 chmod 0644 "$rootfs/usr/lib/systemd/user/anland-desktop.service" \
     "$rootfs/usr/local/share/applications/org.freedesktop.Xwayland.desktop"
+
+if [[ "$ID" != debian ]]; then
+    sed -i 's/^Icon=anland-debian$/Icon=computer/' "$rootfs/usr/local/share/applications/org.freedesktop.Xwayland.desktop"
+fi

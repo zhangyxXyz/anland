@@ -7,7 +7,7 @@ python3 -m unittest discover -s tests -p 'test_ci_*.py' -v
 actionlint
 ```
 
-The release tests cover tag/version agreement, component selection, retry identity, draft ownership, partial failures, skipped components, asset verification, split-image completeness, generated module versions and exported RootFS bytes. They do not call GitHub or create Releases.
+The release tests cover tag/version agreement, component and distribution selection, retry identity, draft ownership, partial failures, skipped components, asset verification, split-image completeness, generated module versions and exported RootFS bytes. RootFS integration tests cover each target's native package installer and isolated build/export stages. They do not call GitHub or create Releases.
 
 The local build wrapper and CI both execute `assembleRelease`, `assembleReleaseAndroidTest` and `lintRelease`. Wayland additionally produces the client AAR. Final APKs are checked against public certificate fingerprints and `version.properties`. The module ZIP is checked for its version, boot scripts, audio binary and matching daemon.
 
@@ -20,7 +20,7 @@ python3 tests/desktop_session_probe_test.py
 
 The first exercises session startup with a delayed audio endpoint and checks compatibility-binary precedence. The second checks full-desktop routing, stale state and private session environment selection. CI also runs `WindowSafeAreaTest` and `desktop_metadata_test.cpp` for Wayland builds.
 
-RootFS construction checks installed package versions, AArch64 binaries, dynamic dependencies, the packaged Xwayland path, desktop launchers and icons. Archive verification checks the final exported bytes against the injected manifest. It does not exercise a physical GPU or touchscreen.
+RootFS construction checks the selected distribution, session package version, compiled Xfdesktop files, AArch64 binaries, dynamic dependencies, the packaged Xwayland path, desktop launchers and icons. Archive verification checks the final exported bytes against the build manifest and input provenance. These checks require a successful Docker build of the selected target; the unit tests alone do not confirm an image builds or runs. They do not exercise a physical GPU or touchscreen.
 
 ## Window launch and identity
 

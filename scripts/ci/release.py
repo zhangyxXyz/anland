@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 
 from versions import read_versions
+from rootfs_target import resolve, archive_name
 
 COMPONENTS = ('shell', 'wayland', 'rootfs')
 EXPECTED = {
@@ -39,7 +40,8 @@ def plan(env):
         tag, suffix = f'dev-{sha[:8]}-{run_id}', f'-dev.{number}+{sha[:8]}'
     else:
         raise ValueError('Only version tags and manual builds are supported')
-    return dict(tag=tag, suffix=suffix, selected=selected, source=sha,
+    target, _ = resolve(None if event == 'push' else env.get('ROOTFS_TARGET'))
+    return dict(rootfs_target=target, tag=tag, suffix=suffix, selected=selected, source=sha,
                 run_id=run_id, versions=versions)
 
 
@@ -49,6 +51,7 @@ def current():
         supplied = json.loads(env['BUILD_PLAN'])
         env.update({'BUILD_' + c.upper(): str(c in supplied['selected']).lower()
                     for c in COMPONENTS})
+        env['ROOTFS_TARGET'] = supplied['rootfs_target']
         result = plan(env)
         if supplied != result:
             raise ValueError('Called workflow plan differs from this run/source/version configuration')
@@ -80,6 +83,7 @@ def notes(build, status):
     return (f"{marker(build)}\n\nStatus: **{status}**\n\n"
             f"Source: `{build['source']}`\n\n"
             f"Components: {', '.join(build['selected'])}\n\n"
+            f"RootFS target: `{build['rootfs_target']}`\n\n"
             f"Development suffix: `{build['suffix'] or '(none)'}`\n\n"
             f"[Build log]({server}/{repo}/actions/runs/{build['run_id']})\n\n"
             f"| Version setting | Value |\n|---|---|\n{rows}\n\n"
@@ -121,12 +125,12 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def validate_names(component, names, versions, suffix):
+def validate_names(component, names, versions, suffix, target=None):
     if component in EXPECTED:
         if names != EXPECTED[component]:
             raise ValueError(f'Unexpected {component} assets: {names}')
         return
-    archive = f"anland-rootfs-debian13-arm64-{versions['ROOTFS_VERSION']}{suffix}.tar.xz"
+    archive = archive_name(versions, suffix, target)
     required = {'ROOTFS-SHA256SUMS', 'rootfs-components.json'}
     images = names - required
     if not required <= names:
@@ -146,9 +150,14 @@ def upload(component, directory, build):
     manifest_name, sums_name = f'{component}-manifest.json', f'{component}-SHA256SUMS'
     files = sorted(p for p in directory.iterdir()
                    if p.is_file() and p.name not in {manifest_name, sums_name})
-    validate_names(component, {p.name for p in files}, build['versions'], build['suffix'])
+    validate_names(component, {p.name for p in files}, build['versions'], build['suffix'], build['rootfs_target'])
     manifest = dict(component=component, run_id=build['run_id'], source=build['source'],
                     versions=build['versions'], suffix=build['suffix'], files=[])
+    if component == 'rootfs':
+        provenance = json.loads((directory / 'rootfs-components.json').read_text())
+        if provenance['target'] != build['rootfs_target'] or provenance['source'] != build['source']:
+            raise ValueError('RootFS image differs from selected target/source')
+        manifest['rootfs_target'] = build['rootfs_target']
     for path in files:
         manifest['files'].append(dict(name=path.name, size=path.stat().st_size, sha256=sha256(path)))
     sums = directory / sums_name
@@ -167,12 +176,14 @@ def verify_manifest(manifest, component, build, assets):
             raise ValueError(f'{component} manifest has a different {key}')
     if manifest.get('component') != component:
         raise ValueError('Wrong component manifest')
+    if component == 'rootfs' and manifest.get('rootfs_target') != build['rootfs_target']:
+        raise ValueError('RootFS manifest has a different target')
     files = manifest['files']
     names = [f['name'] for f in files]
     if len(names) != len(set(names)) or f'{component}-SHA256SUMS' not in names:
         raise ValueError('Duplicate assets or missing component checksum file')
     validate_names(component, set(names) - {f'{component}-SHA256SUMS'},
-                   build['versions'], build['suffix'])
+                   build['versions'], build['suffix'], build['rootfs_target'])
     for file in files:
         asset = assets.get(file['name'], {})
         if (asset.get('size') != file['size'] or

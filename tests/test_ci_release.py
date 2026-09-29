@@ -44,6 +44,26 @@ class ReleaseTests(unittest.TestCase):
         result = release.plan(self.env)
         self.assertEqual(result['selected'], list(release.COMPONENTS))
         self.assertEqual(result['suffix'], '')
+        self.env['ROOTFS_TARGET'] = 'Arch'
+        self.assertEqual(release.plan(self.env)['rootfs_target'], 'Debian-13')
+
+    def test_manual_target_survives_called_workflow_and_rejects_wrong_assets(self):
+        self.env.update(BUILD_ROOTFS='true', ROOTFS_TARGET='Fedora-44')
+        build = release.plan(self.env)
+        with patch.dict(os.environ, dict(self.env, BUILD_PLAN=json.dumps(build)), clear=True):
+            self.assertEqual(release.current(), build)
+        base = release.archive_name(build['versions'], build['suffix'], 'Fedora-44')
+        names = {'ROOTFS-SHA256SUMS', 'rootfs-components.json', base}
+        release.validate_names('rootfs', names, build['versions'], build['suffix'], 'Fedora-44')
+        with self.assertRaises(ValueError):
+            release.validate_names('rootfs', names, build['versions'], build['suffix'], 'Debian-13')
+        manifest = dict(component='rootfs', files=[], rootfs_target='Debian-13',
+                        **{k: build[k] for k in ('run_id', 'source', 'versions', 'suffix')})
+        with self.assertRaisesRegex(ValueError, 'different target'):
+            release.verify_manifest(manifest, 'rootfs', build, {})
+        self.env['ROOTFS_TARGET'] = 'Ubuntu-24'
+        with self.assertRaises(ValueError):
+            release.plan(self.env)
 
     def test_wrong_tag_and_empty_selection_fail(self):
         self.env['BUILD_SHELL'] = 'false'
@@ -158,6 +178,35 @@ class ReleaseTests(unittest.TestCase):
                 else:
                     with self.assertRaises(ValueError):
                         image.verify_archive(archive)
+
+    def test_package_uses_selected_target_and_rejects_foreign_image(self):
+        target, config = release.resolve('Arch')
+        v = versions.read_versions()
+        inputs = dict(target=target, target_config=config, rootfs_version=v['ROOTFS_VERSION'])
+        manifest = dict(inputs, xfdesktop_files={}, patched_files={
+            name: release.hashlib.sha256(b'patched').hexdigest() for name in image.RUNTIME.values()})
+        with tempfile.TemporaryDirectory() as temp:
+            builder = Path(temp) / 'builder'
+            (builder / 'anland-overrides').mkdir(parents=True)
+            (builder / 'anland-overrides/rootfs-inputs.json').write_text(json.dumps(inputs))
+            archive = builder / 'upstream.tar.xz'
+            with tarfile.open(archive, 'w:xz') as tar:
+                contents = {path: b'patched' for path in image.RUNTIME}
+                contents[image.METADATA] = json.dumps(manifest).encode()
+                for path, data in contents.items():
+                    entry = tarfile.TarInfo(path)
+                    entry.size = len(data)
+                    tar.addfile(entry, io.BytesIO(data))
+            with patch.dict(os.environ, {'ROOTFS_TARGET': 'Debian-13', 'ANLAND_VERSION_SUFFIX': ''}):
+                with self.assertRaisesRegex(ValueError, 'selected RootFS target'):
+                    image.package(builder, Path(temp) / 'wrong')
+            output = Path(temp) / 'release'
+            with patch.dict(os.environ, {'ROOTFS_TARGET': target, 'ANLAND_VERSION_SUFFIX': ''}):
+                image.package(builder, output)
+            name = release.archive_name(v, '', target)
+            self.assertTrue((output / name).is_file())
+            self.assertEqual((output / 'ROOTFS-SHA256SUMS').read_text(),
+                             f'{release.sha256(output / name)}  {name}\n')
 
 
 if __name__ == '__main__':
