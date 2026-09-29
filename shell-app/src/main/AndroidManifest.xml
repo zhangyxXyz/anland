@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <queries><package android:name="com.anlandnext"/></queries>
     <uses-permission android:name="android.permission.INTERNET"/>
+    <permission android:name="com.anland.permission.CONTROL_APPEARANCE" android:protectionLevel="signature" />
 
     <!-- Legacy fallback for launchers without pin-shortcut support. -->
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT"/>
@@ -11,6 +12,9 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <provider android:name=".AppearanceProvider" android:authorities="com.anland.shell.appearance"
+            android:exported="true" android:permission="com.anland.permission.CONTROL_APPEARANCE" />
 
         <!-- Launcher entry: containers + Linux app grid. -->
         <activity android:name=".ShellActivity" android:exported="true" android:theme="@style/Theme.MaterialDesignShell">

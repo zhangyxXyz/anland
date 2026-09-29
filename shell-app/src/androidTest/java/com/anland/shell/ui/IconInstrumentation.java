@@ -11,7 +11,9 @@ public final class IconInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result=new Bundle();
         try {
-            if ("maintenance".equals(arguments.getString("mode"))) {
+            if ("repository".equals(arguments.getString("mode"))) {
+                result.putString("stream",RepositoryProbe.run(getTargetContext()));
+            } else if ("maintenance".equals(arguments.getString("mode"))) {
                 result.putString("stream",MaintenanceProbe.run(getTargetContext()));
             } else if ("keystore".equals(arguments.getString("mode"))) {
                 result.putString("stream",KeystoreProbe.run());

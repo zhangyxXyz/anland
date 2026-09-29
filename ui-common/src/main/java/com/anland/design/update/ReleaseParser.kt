@@ -9,6 +9,24 @@ internal object ReleaseParser {
     fun eligible(release: JSONObject) = !release.optBoolean("draft", true) && !release.optBoolean("prerelease", true) &&
         release.optString("tag_name").matches(Regex("v[0-9]+\\.[0-9]+\\.[0-9]+"))
 
+    fun historyOnly(release: JSONObject) = AppRelease(release.getString("tag_name"),
+        release.optString("name").ifBlank { release.getString("tag_name") }, release.optString("body"),
+        release.getString("html_url"), release.optString("published_at"), null, "", 0)
+
+    /** Component manifests also carry independent versions and verified APK digests. */
+    fun parseComponent(release: JSONObject, component: JSONObject, config: UpdateServiceConfig): AppRelease? {
+        require(component.getString("component") == config.component) { "Wrong component manifest" }
+        val source = component.getString("source")
+        require(source.matches(Regex("[0-9a-f]{40}")) && component.getString("run_id").matches(Regex("[0-9]+"))) { "Invalid component provenance" }
+        val target = release.optString("target_commitish")
+        require(!target.matches(Regex("[0-9a-f]{40}")) || target == source) { "Release source mismatch" }
+        val bundle = JSONObject().put("tag", release.getString("tag_name"))
+            .put("source", source).put("run_id", component.getString("run_id"))
+            .put("suffix", component.getString("suffix")).put("versions", component.getJSONObject("versions"))
+            .put("selected", JSONArray().put(config.component)).put("components", JSONObject().put(config.component, component))
+        return parse(release, bundle, config)
+    }
+
     fun parse(release: JSONObject, manifest: JSONObject, config: UpdateServiceConfig): AppRelease? {
         if (!eligible(release)) return null
         val component = manifest.optJSONObject("components")?.optJSONObject(config.component) ?: return null

@@ -67,6 +67,8 @@ fun AboutScreen(onOpenDiagnostics: () -> Unit, onOpenReleaseHistory: () -> Unit)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val client = remember { UpdateClient(context) }
+    var licenseLoading by remember { mutableStateOf(false) }
+    var readmeLoading by remember { mutableStateOf(false) }
     val config = client.config
     var updateState by remember { mutableStateOf<UpdateUiState>(UpdateUiState.Idle) }
     var releaseDialog by remember { mutableStateOf<AppRelease?>(null) }
@@ -101,6 +103,22 @@ fun AboutScreen(onOpenDiagnostics: () -> Unit, onOpenReleaseHistory: () -> Unit)
     }
     val downloadBusy = installer.busy
     fun install(release: AppRelease) { installer.install(release) }
+    fun openRepositoryDocument(license: Boolean) {
+        if (if (license) licenseLoading else readmeLoading) return
+        if (license) licenseLoading = true else readmeLoading = true
+        val languageTag = context.resources.configuration.locales[0].toLanguageTag()
+        scope.launch {
+            try {
+                val result = if (license) client.repositoryLicense() else client.readme(languageTag)
+                result.onSuccess {
+                    previewDocument = PreviewDocument(context.getString(if (license)
+                        R.string.maintenance_open_source_license else R.string.maintenance_project_information), it)
+                }.onFailure {
+                    Toast.makeText(context, context.getString(R.string.maintenance_document_failed, it.message.orEmpty()), Toast.LENGTH_LONG).show()
+                }
+            } finally { if (license) licenseLoading = false else readmeLoading = false }
+        }
+    }
     LaunchedEffect(Unit) { checkUpdate() }
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -134,6 +152,8 @@ fun AboutScreen(onOpenDiagnostics: () -> Unit, onOpenReleaseHistory: () -> Unit)
         item {
             AboutProjectPanel(
                 providerName = providerName,
+                informationLoading = readmeLoading,
+                onInformation = { openRepositoryDocument(false) },
                 upstreamRepository = config.upstreamRepositoryLabel,
                 onUpstream = { open(config.upstreamUrl) },
                 onMaintainer = { open(config.projectUrl.substringBeforeLast('/')) },
@@ -147,9 +167,8 @@ fun AboutScreen(onOpenDiagnostics: () -> Unit, onOpenReleaseHistory: () -> Unit)
                 AboutRow(Icons.Outlined.PrivacyTip, stringResource(R.string.maintenance_privacy_policy), stringResource(R.string.maintenance_privacy_policy_summary)) {
                     previewDocument = PreviewDocument(context.getString(R.string.maintenance_privacy_policy), context.getString(R.string.maintenance_privacy_policy_content))
                 }
-                AboutRow(Icons.Outlined.Gavel, stringResource(R.string.maintenance_open_source_license), stringResource(R.string.maintenance_open_source_license_summary)) {
-                    val content = runCatching { context.assets.open("LICENSE.md").bufferedReader().use { it.readText() } }.getOrElse { context.getString(R.string.maintenance_license_content) }
-                    previewDocument = PreviewDocument(context.getString(R.string.maintenance_open_source_license), content)
+                AboutRow(Icons.Outlined.Gavel, stringResource(R.string.maintenance_open_source_license), stringResource(R.string.maintenance_open_source_license_summary), loading = licenseLoading) {
+                    openRepositoryDocument(true)
                 }
                 AboutRow(Icons.AutoMirrored.Outlined.Article, stringResource(R.string.maintenance_disclaimer), stringResource(R.string.maintenance_disclaimer_summary)) {
                     previewDocument = PreviewDocument(context.getString(R.string.maintenance_disclaimer), context.getString(R.string.maintenance_disclaimer_content))
@@ -282,6 +301,8 @@ private fun AboutUpdatePanel(detail: String, loading: Boolean, onCheck: () -> Un
 @Composable
 private fun AboutProjectPanel(
     providerName: String,
+    informationLoading: Boolean,
+    onInformation: () -> Unit,
     upstreamRepository: String,
     onUpstream: () -> Unit,
     onMaintainer: () -> Unit,
@@ -321,6 +342,24 @@ private fun AboutProjectPanel(
                 Column(Modifier.weight(1f)) {
                     Text(upstreamRepository, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("${stringResource(R.string.maintenance_upstream_project)} · $providerName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+                Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            HorizontalDivider(Modifier.padding(horizontal = 18.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                Modifier.fillMaxWidth().clickable(enabled = !informationLoading, onClick = onInformation).padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        if (informationLoading) CircularProgressIndicator(Modifier.size(21.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.AutoMirrored.Outlined.Article, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.maintenance_project_information), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.maintenance_project_information_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
                 Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -87,10 +87,12 @@ WL_LINK=$RT/wayland-anland
 
 cleanup() {
     trap - TERM INT EXIT
+    [ -n "${APPEARANCE_PID:-}" ] && kill "$APPEARANCE_PID" 2>/dev/null
+    [ -n "${SETTINGS_PID:-}" ] && kill "$SETTINGS_PID" 2>/dev/null
     [ -n "${WMPID:-}" ] && kill "$WMPID" 2>/dev/null
     [ -n "${XPID:-}" ] && kill "$XPID" 2>/dev/null
     [ -n "$OUR_DBUS_PID" ] && kill "$OUR_DBUS_PID" 2>/dev/null
-    systemctl --user unset-environment DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE 2>/dev/null || true
+    systemctl --user unset-environment DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP 2>/dev/null || true
     rm -f "$STATE" "$ENVF" "$WL_LINK"
 }
 trap 'cleanup; exit 143' TERM INT
@@ -172,6 +174,9 @@ if [ -z "$N" ]; then
 fi
 
 export DISPLAY=":$N"
+export XDG_CURRENT_DESKTOP=Anland
+export XDG_SESSION_TYPE=wayland
+printf 'XDG_CURRENT_DESKTOP=Anland\nXDG_SESSION_TYPE=wayland\n' >> "$ENVF"
 printf '%s\n' "$DISPLAY" > "$STATE"
 echo "anland-session: Xwayland pid $XPID ($XWL_BIN) on $DISPLAY → $STATE; wm socket $ANLAND_WM_SOCK"
 echo "anland-session: app env → $ENVF (XDG_RUNTIME_DIR=$RT WAYLAND_DISPLAY=$WAYLAND_DISPLAY)"
@@ -185,6 +190,7 @@ if ! systemctl --user set-environment \
         "DISPLAY=$DISPLAY" \
         "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-unix:path=$RT/bus}" \
         "XDG_SESSION_TYPE=wayland" \
+        "XDG_CURRENT_DESKTOP=Anland" \
         "PATH=$APP_PATH" \
         "MESA_LOADER_DRIVER_OVERRIDE=$MESA_LOADER_DRIVER_OVERRIDE" \
         "GALLIUM_DRIVER=$GALLIUM_DRIVER" \
@@ -193,6 +199,19 @@ if ! systemctl --user set-environment \
 fi
 # Both published environments must agree even while the host audio is starting.
 systemctl --user set-environment "PULSE_SERVER=unix:$ANLAND_RUNTIME_DIR/pulse.sock" || true
+
+# D-Bus activated GTK/portal services must see this session's display, not a stale desktop.
+if command -v dbus-update-activation-environment >/dev/null; then
+    dbus-update-activation-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR XDG_CURRENT_DESKTOP XDG_SESSION_TYPE || true
+fi
+if command -v xfsettingsd >/dev/null; then
+    xfsettingsd --disable-wm-check &
+    SETTINGS_PID=$!
+fi
+if [[ -x /usr/local/bin/anland-desktop-appearance ]]; then
+    /usr/local/bin/anland-desktop-appearance standalone &
+    APPEARANCE_PID=$!
+fi
 
 "$MINIWM" &
 WMPID=$!

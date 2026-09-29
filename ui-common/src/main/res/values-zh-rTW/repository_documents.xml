@@ -1,0 +1,5 @@
+<resources>
+    <string name="maintenance_project_information">專案說明</string>
+    <string name="maintenance_project_information_summary">閱讀目前所選語言的倉庫 README</string>
+    <string name="maintenance_document_failed">無法載入文件：%1$s</string>
+</resources>

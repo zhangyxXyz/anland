@@ -18,9 +18,34 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
     .connectTimeout(20, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS).build()) {
     val config = UpdateServiceConfig(context.packageName)
 
+    suspend fun repositoryLicense(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val text = get("${config.apiUrl}/license", 1024*1024, "application/vnd.github.raw+json")
+            require(text.isNotBlank()) { "Repository license is empty" }
+            Result.success(text)
+        } catch (e: CancellationException) { throw e }
+          catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun readme(languageTag: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            for (name in readmeCandidates(languageTag)) {
+                try {
+                    val text = get("${config.apiUrl}/contents/$name", 2*1024*1024, "application/vnd.github.raw+json")
+                    require(text.isNotBlank()) { "Repository README is empty" }
+                    return@withContext Result.success(text)
+                } catch (e: GitHubHttpException) { if (e.code != 404) throw e }
+            }
+            Result.failure(IllegalStateException("README not found"))
+        } catch (e: CancellationException) { throw e }
+          catch (e: Exception) { Result.failure(e) }
+    }
+
     suspend fun latestRelease(): ReleaseResult = when(val result = releases()) {
-        is ReleaseListResult.Success -> result.releases.maxWithOrNull(compareBy<AppRelease> { it.versionCode }.thenBy { it.publishedAt })
-            ?.let(ReleaseResult::Success) ?: ReleaseResult.NoRelease
+        is ReleaseListResult.Success -> result.releases.filter { it.apk != null }
+            .maxWithOrNull(compareBy<AppRelease> { it.versionCode }.thenBy { it.publishedAt })
+            ?.let(ReleaseResult::Success) ?: if (result.releases.isEmpty()) ReleaseResult.NoRelease
+            else ReleaseResult.Failure("Published releases do not contain a verified ${config.component} APK and version manifest; open GitHub Releases")
         ReleaseListResult.AuthorizationRequired -> ReleaseResult.AuthorizationRequired
         is ReleaseListResult.Failure -> ReleaseResult.Failure(result.message)
     }
@@ -32,14 +57,21 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
                 coroutineContext.ensureActive()
                 val array = JSONArray(get("${config.apiUrl}/releases?per_page=100&page=$page", 8*1024*1024))
                 for (entry in ReleaseParser.objects(array).filter(ReleaseParser::eligible)) {
-                    val asset = ReleaseParser.objects(entry.optJSONArray("assets"))
-                        .singleOrNull { it.optString("name") == "build-manifest.json" && it.optString("state") == "uploaded" } ?: continue
-                    // Missing manifests describe older releases. A malformed present manifest is an error,
-                    // never a reason to silently claim an older APK is the newest available version.
-                    val data = get(asset.getString("browser_download_url"), 2*1024*1024)
+                    val assets = ReleaseParser.objects(entry.optJSONArray("assets"))
+                        .filter { it.optString("state") == "uploaded" }
+                    val bundle = assets.singleOrNull { it.optString("name") == "build-manifest.json" }
+                    val asset = bundle ?: assets.singleOrNull { it.optString("name") == "${config.component}-manifest.json" }
+                    if (asset == null) {
+                        releases.add(ReleaseParser.historyOnly(entry))
+                        continue
+                    }
+                    // A present but invalid manifest is an error. Never bypass it using an older format.
+                    val data = get(asset.getString("url"), 2*1024*1024, "application/octet-stream")
                     val digest = asset.optString("digest")
                     if (digest.startsWith("sha256:")) require("sha256:"+sha256(data.toByteArray()) == digest) { "Release manifest checksum mismatch" }
-                    ReleaseParser.parse(entry, JSONObject(data), config)?.let(releases::add)
+                    val parsed = if (bundle != null) ReleaseParser.parse(entry, JSONObject(data), config)
+                        else ReleaseParser.parseComponent(entry, JSONObject(data), config)
+                    releases.add(parsed ?: ReleaseParser.historyOnly(entry))
                 }
                 if (array.length() < 100) return@withContext ReleaseListResult.Success(releases.sortedWith(compareByDescending<AppRelease> { it.versionCode }.thenByDescending { it.publishedAt }))
             }
@@ -55,7 +87,7 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
             target.parentFile?.mkdirs()
             val digest = MessageDigest.getInstance("SHA-256")
             var copied = 0L
-            http.newCall(request(asset.browserUrl, "application/octet-stream")).execute().use { response ->
+            http.newCall(request(asset.apiUrl, "application/octet-stream")).execute().use { response ->
                 check(response.isSuccessful) { "Download HTTP ${response.code}" }
                 val body = response.body ?: error("Empty APK response")
                 progress(0, asset.size)
@@ -79,12 +111,9 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
           catch(e: Exception) { temporary.delete(); Result.failure(e) }
     }
 
-    private fun get(url: String, limit: Int, accept: String = "application/vnd.github+json"): String =
-        http.newCall(request(url, accept)).execute().use { response ->
-            check(response.isSuccessful) {
-                if (response.code == 403 || response.code == 429) "GitHub rate limit or access restriction; try later"
-                else "GitHub HTTP ${response.code}"
-            }
+    private fun get(url: String, limit: Int, accept: String = "application/vnd.github+json"): String {
+        try { return http.newCall(request(url, accept)).apply { timeout().timeout(60, TimeUnit.SECONDS) }.execute().use { response ->
+            if (!response.isSuccessful) throw GitHubHttpException(response.code)
             val body = response.body ?: error("Empty GitHub response")
             body.byteStream().use { input ->
                 val bytes = java.io.ByteArrayOutputStream()
@@ -94,6 +123,11 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
                 bytes.toString("UTF-8")
             }
         }
+        } catch (e: GitHubHttpException) { throw e }
+          catch (e: java.io.IOException) {
+              throw java.io.IOException("${java.net.URI(url).host}: ${e.message ?: "Network request failed"}", e)
+          }
+    }
     private fun request(url: String, accept: String): Request {
         require(url.startsWith("https://")) { "Updates require HTTPS" }
         return Request.Builder().url(url).header("Accept",accept).header("X-GitHub-Api-Version","2022-11-28").build()
@@ -102,4 +136,18 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
         internal fun hex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it) }
         internal fun sha256(bytes: ByteArray) = hex(MessageDigest.getInstance("SHA-256").digest(bytes))
     }
+}
+
+private class GitHubHttpException(val code: Int) : java.io.IOException(
+    if (code == 403 || code == 429) "GitHub rate limit or access restriction; try later" else "GitHub HTTP $code")
+
+internal fun readmeCandidates(languageTag: String): List<String> {
+    val normalized = java.util.Locale.forLanguageTag(languageTag.replace('_', '-')).toLanguageTag()
+    val language = normalized.substringBefore('-').lowercase(java.util.Locale.ROOT)
+    return buildList {
+        if (language != "en" && language != "und") add("README.$normalized.md")
+        if (language != "en" && language != "und" && !normalized.equals(language, true)) add("README.$language.md")
+        if (language == "zh") add("README.zh-CN.md")
+        add("README.md")
+    }.distinct()
 }

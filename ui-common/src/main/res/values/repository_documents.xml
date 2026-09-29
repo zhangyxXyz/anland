@@ -1,0 +1,5 @@
+<resources>
+    <string name="maintenance_project_information">Project information</string>
+    <string name="maintenance_project_information_summary">Read the project README in your selected language</string>
+    <string name="maintenance_document_failed">Could not load the document: %1$s</string>
+</resources>

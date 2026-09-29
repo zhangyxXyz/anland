@@ -1,0 +1,5 @@
+<resources>
+    <string name="maintenance_project_information">项目说明</string>
+    <string name="maintenance_project_information_summary">阅读当前所选语言的仓库 README</string>
+    <string name="maintenance_document_failed">无法加载文档：%1$s</string>
+</resources>

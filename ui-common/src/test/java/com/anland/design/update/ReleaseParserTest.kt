@@ -55,4 +55,35 @@ class ReleaseParserTest {
         assertTrue(result.isNewerThan("0.3.0-dev.2+abcdef01",7));assertFalse(result.isNewerThan("0.3.0",7))
         assertFalse(result.isNewerThan("0.3.0-dev.2+abcdef01",8))
     }
+    @Test fun `published component assets work before a bundle manifest exists`() {
+        for (kind in listOf("shell", "wayland")) {
+            val (release, manifest) = fixture(kind)
+            val config = UpdateServiceConfig(if (kind == "shell") "com.anland.shell" else "com.anlandnext")
+            val part = manifest.getJSONObject("components").getJSONObject(kind)
+            release.put("target_commitish", part.getString("source"))
+            val result = ReleaseParser.parseComponent(release, part, config)!!
+            assertEquals(7L, result.versionCode)
+            assertEquals(config.assetName, result.apk!!.name)
+            release.put("target_commitish", "c".repeat(40))
+            assertThrows(IllegalArgumentException::class.java) { ReleaseParser.parseComponent(release, part, config) }
+        }
+    }
+    @Test fun `component fallback rejects development builds and altered hashes`() {
+        val (release, manifest) = fixture()
+        val part = manifest.getJSONObject("components").getJSONObject("shell")
+        val config = UpdateServiceConfig("com.anland.shell")
+        part.put("suffix", "-dev.1+12345678")
+        assertThrows(IllegalArgumentException::class.java) { ReleaseParser.parseComponent(release, part, config) }
+        part.put("suffix", "")
+        part.getJSONArray("files").getJSONObject(0).put("sha256", "f".repeat(64))
+        assertThrows(IllegalArgumentException::class.java) { ReleaseParser.parseComponent(release, part, config) }
+    }
+    @Test fun `release notes remain visible without an installable APK`() {
+        val (release, _) = fixture()
+        release.put("body", "Release notes")
+        val item = ReleaseParser.historyOnly(release)
+        assertEquals("Release notes", item.body)
+        assertNull(item.apk)
+        assertFalse(item.isNewerThan("0.2.2", 4))
+    }
 }

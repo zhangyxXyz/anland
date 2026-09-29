@@ -46,6 +46,9 @@ if 'ANLAND_COMPAT_BIN_DIR:=/usr/lib/anland' not in session:
     raise SystemExit('Session does not prefer packaged Xwayland')
 for path in ('/usr/local/bin/anland-desktop', '/usr/local/bin/anland-desktop-session',
              '/usr/local/bin/anland-desktop-inner', '/usr/local/bin/anland-desktop-appearance',
+             '/usr/share/xdg-desktop-portal/anland-portals.conf',
+             '/usr/share/xdg-desktop-portal/xfce-portals.conf',
+             '/usr/share/xdg-desktop-portal/portals/gtk.portal',
              '/usr/lib/systemd/user/anland-desktop.service', '/usr/lib/systemd/user/anland-session.service',
              '/usr/local/share/icons/hicolor/128x128/apps/anland-debian.png',
              '/usr/local/share/icons/hicolor/256x256/apps/anland-debian.png'):

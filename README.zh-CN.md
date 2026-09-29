@@ -218,3 +218,13 @@ python scripts/ci/signing.py sync --repo zhangyxXyz/anland
 ## 许可证与依赖
 
 GPL-3.0，随附组件保留各自许可证。共享 UI 的 MIT 许可证位于 [ui-common/LICENSE.MaterialDesignTmpl](ui-common/LICENSE.MaterialDesignTmpl)，Debian 图标署名见 [rootfs/assets/README.md](rootfs/assets/README.md)。主要依赖包括 libwayland、PulseAudio、Xwayland、Xfce、Droidspaces 和 [RootFS builder](https://github.com/Goldzxcbug/Droidspaces-rootfs-Desktop-builder)。
+
+## 外观同步与应用内项目信息
+
+Linux 会话跟随最近切到前台的 Anland Shell 或 Wayland App 的实际主题。选择**跟随系统**时，App 退到后台后仍持续跟随 Android 的自动深浅色变化；选择**浅色**或**深色**时，保持该选择。完整桌面与独立 Linux 应用共用这一会话偏好。Linux 应用自身明确指定的主题保持不变；动态切换取决于应用对 GTK/XSettings 或 Settings portal 的支持。支持此功能的网页通过浏览器接收 `prefers-color-scheme` 变化。
+
+Shell 为两款 App 提供签名权限保护的外观同步入口，Wayland 无需额外申请 Root 权限。运行目录挂载中的 `appearance/app-theme` 保存当前控制 App 与主题策略，`appearance/night-mode` 保存 Android 系统状态。容器需要更新后的 Anland 会话／外观脚本，以及 `xfce4-settings`、`gsettings-desktop-schemas`、`xdg-desktop-portal`、`xdg-desktop-portal-gtk`；仅安装 APK 不会自动补齐这些 Linux 组件。发布的 RootFS 镜像已包含它们。
+
+两款 App 从 `zhangyxXyz/anland` 的公开 Releases 检查更新，按各自组件版本匹配 APK。更新功能校验统一构建清单或组件清单，以及 APK 大小、哈希、包名、版本和签名。没有可安装组件的 Release 仍显示在更新历史中。公开更新检查无需 GitHub App ID 或登录。
+
+**项目说明**在线读取 App 当前所选语言的仓库 README，缺失时回退至可用中文或默认英文文档；**开源许可**直接读取仓库许可原文。两者均在应用内文档面板展示，网络失败后可再次点击入口重试。各组件和依赖自身的许可仍然适用。

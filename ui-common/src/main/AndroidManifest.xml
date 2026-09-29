@@ -1,7 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <application android:usesCleartextTraffic="true" android:localeConfig="@xml/anland_locales">
+    <uses-permission android:name="com.anland.permission.CONTROL_APPEARANCE" />
+    <queries><provider android:authorities="com.anland.shell.appearance" /></queries>
+    <application android:name="com.anland.design.AppearanceApplication" android:usesCleartextTraffic="true" android:localeConfig="@xml/anland_locales">
         <activity android:name="com.anland.design.LanguageActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell" />
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates"
             android:exported="false" android:grantUriPermissions="true">

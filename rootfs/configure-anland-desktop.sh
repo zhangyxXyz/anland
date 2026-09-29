@@ -8,17 +8,17 @@ case "$ID" in
         run_root env DEBIAN_FRONTEND=noninteractive apt-get update
         run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             xfce4-session xfce4-panel xfdesktop4 xfwm4 xfce4-settings thunar xfce4-terminal \
-            xauth x11-utils xcompmgr python3 libdecor-0-0 libnotify4 libgarcon-gtk3-1-0
+            xauth x11-utils xcompmgr python3 libdecor-0-0 libnotify4 libgarcon-gtk3-1-0 xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
         ;;
     fedora)
         run_root dnf install -y --setopt=install_weak_deps=False \
             xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings Thunar xfce4-terminal \
-            xauth xprop xdpyinfo xcompmgr python3 libdecor libnotify garcon
+            xauth xprop xdpyinfo xcompmgr python3 libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
         ;;
     arch|archarm|archlinux)
         run_root pacman -S --noconfirm --needed \
             xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings thunar xfce4-terminal \
-            xorg-xauth xorg-xprop xorg-xdpyinfo xcompmgr python libdecor libnotify garcon
+            xorg-xauth xorg-xprop xorg-xdpyinfo xcompmgr python libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
         ;;
     *) echo "Unsupported desktop system: $ID" >&2; exit 1 ;;
 esac
@@ -63,3 +63,13 @@ chmod 0644 "$rootfs/usr/lib/systemd/user/anland-desktop.service" \
 if [[ "$ID" != debian ]]; then
     sed -i 's/^Icon=anland-debian$/Icon=computer/' "$rootfs/usr/local/share/applications/org.freedesktop.Xwayland.desktop"
 fi
+
+# Use the GTK settings backend for both isolated session buses. Keep other portals available.
+install -d "$rootfs/usr/share/xdg-desktop-portal"
+for desktop in anland xfce; do
+    cat > "$rootfs/usr/share/xdg-desktop-portal/$desktop-portals.conf" <<'EOF'
+[preferred]
+default=gtk
+org.freedesktop.impl.portal.Settings=gtk
+EOF
+done

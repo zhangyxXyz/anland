@@ -1,26 +1,41 @@
 #!/bin/bash
-# Run on the private Xfce session bus, alongside xfsettingsd.
-set -eu
+# Run on either Anland session bus, alongside its own XSettings manager.
+set -u
 state="${ANLAND_RUNTIME_DIR:-/run/anland}/appearance/night-mode"
+# One watcher per display, including hot deployment without restarting applications.
+lock="${XDG_RUNTIME_DIR:-/tmp}/anland-appearance-${DISPLAY//[^a-zA-Z0-9]/_}.lock"
+exec 8>"$lock"
+flock -n 8 || exit 0
 last=
 set_property() {
     xfconf-query -c "$1" -p "$2" -s "$4" 2>/dev/null ||
         xfconf-query -c "$1" -p "$2" -n -t "$3" -s "$4"
 }
 while :; do
-    mode=$(cat "$state" 2>/dev/null || true)
+    policy=$(sed -n '2p' "${state%/*}/app-theme" 2>/dev/null || true)
+    case "$policy" in
+        light|dark) mode=$policy ;;
+        *) mode=$(cat "$state" 2>/dev/null || true) ;;
+    esac
     scale=$(xfconf-query -c xsettings -p /Gdk/WindowScalingFactor 2>/dev/null || echo 1)
     appearance="$mode:$scale"
     if [[ "$appearance" != "$last" && ( "$mode" == dark || "$mode" == light ) ]]; then
         if [[ "$mode" == dark ]]; then dark=true; variant=Dark; else dark=false; variant=Light; fi
-        set_property xfce4-panel /panels/dark-mode bool "$dark"
+        if [[ "${1:-desktop}" == desktop ]]; then
+            set_property xfce4-panel /panels/dark-mode bool "$dark" || true
+        fi
+        applied=true
+        set_property xsettings /Gtk/ApplicationPreferDarkTheme bool "$dark" || applied=false
         # Match an installed theme pair, without replacing unrelated themes.
         current=$(xfconf-query -c xsettings -p /Net/ThemeName 2>/dev/null || true)
         case "$current" in
-            WhiteSur-Light|WhiteSur-Dark)
-                theme="WhiteSur-$variant"
+            WhiteSur-Light|WhiteSur-Dark|Adwaita|Adwaita-dark)
+                case "$current" in
+                    WhiteSur-*) theme="WhiteSur-$variant" ;;
+                    *) if [[ "$mode" == dark ]]; then theme=Adwaita-dark; else theme=Adwaita; fi ;;
+                esac
                 if [[ -d "$HOME/.themes/$theme" || -d "$HOME/.local/share/themes/$theme" || -d "/usr/share/themes/$theme" ]]; then
-                    set_property xsettings /Net/ThemeName string "$theme"
+                    set_property xsettings /Net/ThemeName string "$theme" || applied=false
                     # Xfwm bitmap decorations do not inherit GTK's scale.
                     # WhiteSur ships native 2x assets for these buttons/borders.
                     wm_theme="$theme"
@@ -30,15 +45,21 @@ while :; do
                             wm_theme="$candidate"
                         fi
                     fi
-                    set_property xfwm4 /general/theme string "$wm_theme"
-                    set_property xsettings /Net/IconThemeName string "WhiteSur-$mode"
-                    gsettings set org.gnome.desktop.interface gtk-theme "$theme"
-                    gsettings set org.gnome.desktop.interface icon-theme "WhiteSur-$mode"
+                    if [[ "${1:-desktop}" == desktop && "$theme" == WhiteSur-* ]]; then
+                        set_property xfwm4 /general/theme string "$wm_theme" || applied=false
+                        set_property xsettings /Net/IconThemeName string "WhiteSur-$mode" || applied=false
+                    fi
+                    gsettings set org.gnome.desktop.interface gtk-theme "$theme" || applied=false
+                    if [[ "$theme" == WhiteSur-* ]]; then
+                        gsettings set org.gnome.desktop.interface icon-theme "WhiteSur-$mode" || applied=false
+                    fi
                 fi
                 ;;
         esac
-        gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
-        last=$appearance
+        # xdg-desktop-portal-gtk exports this as org.freedesktop.appearance/color-scheme
+        # and emits SettingChanged for browsers and libadwaita clients.
+        gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode" || applied=false
+        if $applied; then last=$appearance; fi
     fi
     sleep 2
 done

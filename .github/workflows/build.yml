@@ -74,6 +74,8 @@ jobs:
       - name: Session startup regression tests
         if: needs.plan.outputs.wayland == 'true' || needs.plan.outputs.rootfs == 'true'
         run: python3 tests/session_startup_test.py
+      - name: Linux appearance policy regression tests
+        run: python3 tests/appearance_sync_test.py
       - name: Window geometry and desktop metadata regression tests
         if: needs.plan.outputs.wayland == 'true'
         run: |
