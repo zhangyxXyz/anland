@@ -49,3 +49,36 @@ absolute container symlinks, missing IDs, raster/SVG icons), and on-device
 metadata lookups against actual installed applications. Full end-to-end
 fullscreen/rotation/zoom and Recents verification requires installing the new
 host APK and daemon together. Building does not replace the running module.
+
+## IME and transient windows (2026-09-29)
+
+The host restores Wayland keyboard/text-input focus after Android document
+re-entry. Attach generations reject delayed pause/focus reports from obsolete
+surfaces. A parent Activity keeps its render surface while a floating child
+is visible, and releases it when actually stopped.
+
+InputConnection preserves text when finishing composition, treats composing
+regions as metadata until replacement, and sends reconversion as one atomic
+Wayland delete+commit/preedit transaction. Selection/anchor queries use Android
+UTF-16 positions; protocol deletion lengths use UTF-8 bytes.
+
+Native dialogs use xdg parent/size hints and xdg-foreign-v2 imported parent
+relationships, including GTK dialogs exported by another client. The Android
+dialog shares its parent's task, observes available display bounds, and closes
+without removing the parent. It does not classify applications by their name.
+
+Validation on the installed APK/daemon: InputConnection contract probe (11
+cases), 10 real document re-entry rounds, injected stale pause/focus reports,
+native foreign-parent contract checks under UBSan, actual VS Code save-dialog
+size/task/cancel checks, and portrait/landscape rotation. The APK was installed
+with the existing signing identity and the native daemon updated without a
+device reboot or replacing the Debian container.
+
+A separate VS Code 1.139.1 EditContext cache bug polluted surrounding text
+despite a correct visible editor. Its root-cause source patch and guarded,
+reversible installed-package patcher are in `patches/vscode/`. Sogou English
+candidate selection, subsequent input, word recomposition and delete/retype
+were checked against both the real EditContext and Wayland trace. The same
+sequence also passed in GTK Entry. See that directory's README for package
+upgrade and rollback details. This incremental container patch does not
+change the previously downloaded rootfs image.

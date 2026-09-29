@@ -1,0 +1,15 @@
+diff --git a/src/vs/editor/browser/controller/editContext/native/nativeEditContext.ts b/src/vs/editor/browser/controller/editContext/native/nativeEditContext.ts
+--- a/src/vs/editor/browser/controller/editContext/native/nativeEditContext.ts
++++ b/src/vs/editor/browser/controller/editContext/native/nativeEditContext.ts
+@@ -437,6 +437,11 @@ export class NativeEditContext extends AbstractEditContext {
+ 		if (!this._editContext) {
+ 			return;
+ 		}
++		// textupdate is delivered after the browser has changed EditContext.text.
++		// Model listeners may synchronously call _updateEditContext below. Track
++		// that native change first, otherwise replacing the old cached length
++		// leaves a suffix in the IME buffer that is absent from the model.
++		this._previousEditContextText = this._editContext.text;
+ 		const selectionEndOffset = this._previousEditContextSelection.endExclusive;
+ 		const selectionStartOffset = this._previousEditContextSelection.start;
+ 		this._previousEditContextSelection = new OffsetRange(e.selectionStart, e.selectionEnd);
