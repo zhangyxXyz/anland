@@ -1,0 +1,18 @@
+--- a/meson.build
++++ b/meson.build
+@@ -2,6 +2,7 @@
+         default_options: [
+             'buildtype=debugoptimized',
+             'c_std=gnu99',
++            'warning_level=1',
+         ],
+         version: '24.1.10',
+         meson_version: '>= 0.56.0',
+@@ -18,7 +19,6 @@
+ 
+ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+     test_wflags = [
+-        '-Wall',
+         '-Wpointer-arith',
+         '-Wmissing-declarations',
+         '-Wformat=2',

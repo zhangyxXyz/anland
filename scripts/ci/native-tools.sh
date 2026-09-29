@@ -8,7 +8,10 @@ curl -fsSL --retry 3 https://github.com/libffi/libffi/releases/download/v3.4.6/l
     | tar xz --strip-components=1 -C third_party/libffi
 test -x third_party/libffi/configure
 patch -d third_party/libffi -p1 < patches/libffi/compiler-compat.patch
-meson setup /tmp/wl-scanner third_party/wayland \
+mkdir -p build/wayland-scanner-src
+git -C third_party/wayland archive HEAD | tar -x -C build/wayland-scanner-src
+patch -d build/wayland-scanner-src -p1 < patches/wayland/scanner-pkgconfig.patch
+meson setup /tmp/wl-scanner build/wayland-scanner-src \
     -Dscanner=true -Dlibraries=false -Ddocumentation=false -Dtests=false -Ddtd_validation=false
 ninja -C /tmp/wl-scanner
 sudo install -m755 /tmp/wl-scanner/src/wayland-scanner /usr/local/bin/wayland-scanner

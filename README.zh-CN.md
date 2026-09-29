@@ -118,7 +118,7 @@ flowchart LR
 [`version.properties`](version.properties) 是唯一版本配置入口，各组件独立编号：
 
 ```properties
-RELEASE_VERSION=0.5.2
+RELEASE_VERSION=0.5.3
 SHELL_VERSION_NAME=0.2.2
 SHELL_VERSION_CODE=4
 WAYLAND_VERSION_NAME=0.2.2

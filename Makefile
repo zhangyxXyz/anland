@@ -180,18 +180,17 @@ pulse-deps: check-tools
 	  db6ca1b1e8405c6ef92f8294fc123d910abf0a114003b3f0f13fa57a95fd62d0
 	rm -rf build/pulse-deps-src "$(PA_DEPS)"; mkdir -p build/pulse-deps-src "$(PA_DEPS)"
 	for t in "$$DL"/*.tar.*; do tar -C build/pulse-deps-src -xf "$$t"; done
-	# static + PIC: they end up inside libpulsecommon.so; CMAKE_POLICY_VERSION_MINIMUM
-	# keeps cmake ≥ 4 accepting their old cmake_minimum_required
+	patch -d build/pulse-deps-src/libsndfile-1.2.2 -p1 < pulse/libsndfile-cmake.patch
+	patch -d build/pulse-deps-src/soxr-0.1.3 -p1 < pulse/soxr-cmake.patch
+	# Static + PIC: these libraries end up inside libpulsecommon.so.
 	CM="-DCMAKE_TOOLCHAIN_FILE=$(NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a \
 	    -DANDROID_PLATFORM=android-$(PA_API) -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$(PA_DEPS) \
-	    -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+	    -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON"
 	cmake -S build/pulse-deps-src/libsndfile-1.2.2 -B build/pulse-deps-src/sndfile-build $$CM \
 	  -DENABLE_EXTERNAL_LIBS=OFF -DENABLE_MPEG=OFF -DBUILD_PROGRAMS=OFF -DBUILD_EXAMPLES=OFF \
 	  -DBUILD_TESTING=OFF -DBUILD_REGTEST=OFF -DENABLE_CPACK=OFF -DENABLE_PACKAGE_CONFIG=OFF >/dev/null
 	cmake --build build/pulse-deps-src/sndfile-build -j$$(nproc) >/dev/null
 	cmake --install build/pulse-deps-src/sndfile-build >/dev/null
-	# soxr uses stdbool.h; compile its C sources with GNU C99.
-	sed -i s/-std=gnu89/-std=gnu99/g build/pulse-deps-src/soxr-0.1.3/CMakeLists.txt
 	cmake -S build/pulse-deps-src/soxr-0.1.3 -B build/pulse-deps-src/soxr-build $$CM \
 	  -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DWITH_OPENMP=OFF -DWITH_LSR_BINDINGS=OFF >/dev/null
 	cmake --build build/pulse-deps-src/soxr-build -j$$(nproc) >/dev/null
@@ -199,7 +198,7 @@ pulse-deps: check-tools
 	# libltdl uses portable statement-expression and configure-constant macros.
 	cd build/pulse-deps-src/libtool-2.4.7/libltdl
 	CC="$(PA_TC)/aarch64-linux-android$(PA_API)-clang" AR="$(PA_TC)/llvm-ar" RANLIB="$(PA_TC)/llvm-ranlib" \
-	NM="$(PA_TC)/llvm-nm" STRIP="$(PA_TC)/llvm-strip" OBJDUMP="$(PA_TC)/llvm-objdump" \
+	FILECMD="$$(command -v file)" NM="$(PA_TC)/llvm-nm" STRIP="$(PA_TC)/llvm-strip" OBJDUMP="$(PA_TC)/llvm-objdump" \
 	CFLAGS="-O2 -fPIC -Wno-compound-token-split-by-macro -Wno-constant-logical-operand" ./configure --host=aarch64-linux-android --prefix="$(PA_DEPS)" \
 	  --enable-static --disable-shared --enable-ltdl-install >/dev/null
 	make -j$$(nproc) >/dev/null && make install >/dev/null
@@ -331,10 +330,10 @@ libffi: check-tools
 	CC="$$TC/aarch64-linux-android35-clang" \
 	CXX="$$TC/aarch64-linux-android35-clang++" \
 	AR="$$TC/llvm-ar" RANLIB="$$TC/llvm-ranlib" STRIP="$$TC/llvm-strip" \
-	NM="$$TC/llvm-nm" OBJDUMP="$$TC/llvm-objdump" CFLAGS="-O2 -fPIC" \
+	FILECMD="$$(command -v file)" NM="$$TC/llvm-nm" OBJDUMP="$$TC/llvm-objdump" CFLAGS="-O2 -fPIC" \
 	  ../../third_party/libffi/configure --host=aarch64-linux-android \
 	    --prefix="$$PWD/../libffi-android-out" \
-	    --enable-static --disable-shared --disable-docs \
+	    --enable-static --disable-shared --disable-docs --disable-multi-os-directory \
 	    --with-sysroot="$(NDK)/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
 	make -j$$(nproc)
 	make install

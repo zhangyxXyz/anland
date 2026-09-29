@@ -15,7 +15,7 @@ case "$ID" in
             libthunarx-3-dev libnotify-dev libyaml-dev libx11-dev libxcomposite-dev \
             xutils-dev x11proto-dev libpixman-1-dev libxkbfile-dev libxfont-dev \
             libxcvt-dev libwayland-dev wayland-protocols libxshmfence-dev libdrm-dev \
-            libepoxy-dev libgbm-dev libssl-dev libxdmcp-dev libxau-dev libdecor-0-dev
+            libepoxy-dev libgbm-dev libssl-dev libtirpc-dev libxdmcp-dev libxau-dev libdecor-0-dev
         ;;
     fedora)
         dnf install -y --setopt=install_weak_deps=False gcc gcc-c++ make patch meson ninja-build \
@@ -25,7 +25,7 @@ case "$ID" in
             libX11-devel libXcomposite-devel xorg-x11-util-macros xorg-x11-proto-devel \
             xorg-x11-xtrans-devel pixman-devel libxkbfile-devel libXfont2-devel \
             libxcvt-devel wayland-devel wayland-protocols-devel libxshmfence-devel \
-            libdrm-devel libepoxy-devel mesa-libgbm-devel openssl-devel libXdmcp-devel \
+            libdrm-devel libepoxy-devel mesa-libgbm-devel openssl-devel libtirpc-devel libXdmcp-devel \
             libXau-devel libdecor-devel
         ;;
     arch|archarm|archlinux)
@@ -33,7 +33,7 @@ case "$ID" in
             gettext intltool gtk3 libxfce4ui libxfce4util libxfce4windowing xfconf exo \
             garcon thunar libnotify libyaml libx11 libxcomposite xorg-util-macros \
             xorgproto xtrans pixman libxkbfile libxfont2 libxcvt wayland wayland-protocols \
-            libxshmfence libdrm libepoxy mesa openssl libxdmcp libxau libdecor
+            libxshmfence libdrm libepoxy mesa openssl libtirpc libxdmcp libxau libdecor
         ;;
     *) echo "Unsupported build system: $ID" >&2; exit 1 ;;
 esac
