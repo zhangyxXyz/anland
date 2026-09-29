@@ -87,6 +87,17 @@ add_custom_command(
   DEPENDS ${XDG_XML})
 
 # viewporter + fractional-scale v1 protocol codegen (#31 arbitrary-ratio zoom, awl_viewport.c in this dir)
+set(FOREIGN_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/xdg-foreign-unstable-v2.xml)
+add_custom_command(
+  OUTPUT ${AWL_GENERATED}/xdg-foreign-unstable-v2-server-protocol.h
+  COMMAND ${WAYLAND_SCANNER} server-header ${FOREIGN_XML}
+          ${AWL_GENERATED}/xdg-foreign-unstable-v2-server-protocol.h
+  DEPENDS ${FOREIGN_XML})
+add_custom_command(
+  OUTPUT ${AWL_GENERATED}/xdg-foreign-unstable-v2-protocol.c
+  COMMAND ${WAYLAND_SCANNER} private-code ${FOREIGN_XML}
+          ${AWL_GENERATED}/xdg-foreign-unstable-v2-protocol.c
+  DEPENDS ${FOREIGN_XML})
 set(VP_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/viewporter.xml)
 add_custom_command(
   OUTPUT ${AWL_GENERATED}/viewporter-server-protocol.h
@@ -311,6 +322,9 @@ add_executable(waylandbridge
   awl_server.c
   awl_surface.c
   awl_xdg.c
+  awl_foreign.c
+  ${AWL_GENERATED}/xdg-foreign-unstable-v2-protocol.c
+  ${AWL_GENERATED}/xdg-foreign-unstable-v2-server-protocol.h
   awl_dmabuf.c
   awl_input.c
   awl_ime.c

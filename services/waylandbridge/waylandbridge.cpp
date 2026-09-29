@@ -175,6 +175,7 @@ enum {
     AWL_T_ICON    = 15,  /* (id:i64) → w:i32 h:i32 bytes[RGBA] — current toplevel icon
                             (xdg-toplevel-icon-v1, best buffer, w=0 = none) */
     AWL_T_APP_ID = 19,   /* (id:i64 locale:string16) → app_id,name,encoded icon; window-scoped */
+    AWL_T_PRESENTATION = 20, /* (id:i64) -> parent:i64 width,height,dialog:i32 */
     AWL_T_SUBSCRIBE = 16, /* (listener binder) → ok:i32; window lifecycle events
                             * (create/destroy/attach/detach) pushed to the listener
                             * as anland.IEvents oneways. Normal apps receive only
@@ -242,6 +243,7 @@ enum {
                                  re-fetches the pixels (AWL_T_ICON) and re-applies
                                  its task description */
 #define AWL_CTRL_DESC "anland.ICtrl"
+#define AWL_C_PRESENTATION 11 /* parent / size constraints changed: re-query presentation */
 
 /* ---------------- window state table ---------------- */
 
@@ -1134,6 +1136,13 @@ static void cb_window_dirty(void* user, uint64_t id) {
     backend_request_render(id);   /* GL: wake the render thread; SC: vsync kick, returns immediately */
 }
 
+static void cb_window_presentation(void* user, uint64_t id) {
+    AIBinder* ctrl = ctrl_of(id);
+    if (!ctrl) return;
+    ctrl_send_ints(ctrl, AWL_C_PRESENTATION, nullptr, 0);
+    AIBinder_decStrong(ctrl);
+}
+
 /* ---- clipboard bridge (#29; logic-layer data thread callback) ----
  * wl→Android: the owning window's Activity writes the clipboard on its
  * behalf (with no Activity attached, fall back to any live ctrl — writing
@@ -1176,6 +1185,7 @@ static awl_window_callbacks_t k_cbs = {
     .clipboard_text = cb_clipboard_text,
     .pointer_cursor = cb_pointer_cursor,
     .idle_inhibit = cb_idle_inhibit,
+    .window_presentation = cb_window_presentation,
 };
 
 /* ---------------- daemon config (config.json, #31) ----------------
@@ -1575,7 +1585,7 @@ static bool caller_ok(transaction_code_t code) {
         code == AWL_T_CONNECT ||
         code == AWL_T_PAUSE || code == AWL_T_RESIZE || code == AWL_T_FOCUS ||
         code == AWL_T_INPUT || code == AWL_T_IME || code == AWL_T_CLIPBOARD ||
-        code == AWL_T_ICON || code == AWL_T_APP_ID || code == AWL_T_CLOSE)
+        code == AWL_T_ICON || code == AWL_T_APP_ID || code == AWL_T_PRESENTATION || code == AWL_T_CLOSE)
         return true;
 
     uid_t u = AIBinder_getCallingUid();
@@ -1757,6 +1767,18 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         LOGI("SURFACE %llu %dx%d → attached (host=%lld generation=%lld)",
              (unsigned long long)id, w, h, (long long)host, (long long)generation);
         AParcel_writeInt32(out, 0);
+        return STATUS_OK;
+    }
+    case AWL_T_PRESENTATION: {
+        int64_t id64;
+        if (AParcel_readInt64(in, &id64) != STATUS_OK) return STATUS_BAD_VALUE;
+        if (!window_ok((uint64_t)id64)) return STATUS_PERMISSION_DENIED;
+        awl_presentation_t p;
+        awl_window_presentation((uint64_t)id64, &p);
+        AParcel_writeInt64(out, (int64_t)p.parent);
+        AParcel_writeInt32(out, p.width);
+        AParcel_writeInt32(out, p.height);
+        AParcel_writeInt32(out, p.dialog);
         return STATUS_OK;
     }
     case AWL_T_APP_ID: {

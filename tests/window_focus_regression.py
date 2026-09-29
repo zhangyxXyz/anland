@@ -57,7 +57,7 @@ def main():
             all_text = focus(current, 'zwp_text_input_v3')
             restored = (all_keyboard and all_keyboard[-1] == 'enter'
                         and all_text and all_text[-1] == 'enter')
-            if restored and (keyboard or not delta):
+            if restored:
                 time.sleep(0.15)  # also catch a delayed ONEWAY pause
                 stable = trace()
                 if (focus(stable, 'wl_keyboard')[-1] == 'enter'

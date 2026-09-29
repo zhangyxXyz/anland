@@ -647,8 +647,18 @@ void awl_ime_text(uint64_t id, uint32_t op, const char* text, int32_t a, int32_t
         struct awl_surface* ts = obj_surface(o);
         if (!ts) ts = s;
         pthread_mutex_lock(&ts->ev_lock);
+        bool replace = op == AWL_IME_REPLACE || op == AWL_IME_REPLACE_PREEDIT;
+        uint32_t action = op == AWL_IME_REPLACE ? AWL_IME_COMMIT :
+                          op == AWL_IME_REPLACE_PREEDIT ? AWL_IME_PREEDIT : op;
+        int32_t cb = replace ? (int32_t)strlen(text) : a;
+        int32_t ce = replace ? cb : b;
         if (o->ver == 3) {
-            switch (op) {
+            // Re-conversion is one transaction: no intermediate deletion
+            // state may reach the editor/IME and trigger another correction.
+            if (replace)
+                zwp_text_input_v3_send_delete_surrounding_text(o->res,
+                        (uint32_t)(a > 0 ? a : 0), (uint32_t)(b > 0 ? b : 0));
+            switch (action) {
             case AWL_IME_COMMIT:
                 /* commit replaces the composition: no preedit in this done group */
                 if (o->pre_text) o->pre_text[0] = 0;
@@ -659,10 +669,10 @@ void awl_ime_text(uint64_t id, uint32_t op, const char* text, int32_t a, int32_t
             case AWL_IME_PREEDIT: {
                 char* pb = ime_txt(&o->pre_text);
                 if (pb) snprintf(pb, AWL_IME_TEXT_MAX + 1, "%s", text);
-                o->pre_cb = a;
-                o->pre_ce = b;
+                o->pre_cb = cb;
+                o->pre_ce = ce;
                 zwp_text_input_v3_send_preedit_string(
-                        o->res, o->pre_text ? o->pre_text : "", a, b);
+                        o->res, o->pre_text ? o->pre_text : "", cb, ce);
                 zwp_text_input_v3_send_done(o->res, o->serial);
                 break;
             }
@@ -676,12 +686,19 @@ void awl_ime_text(uint64_t id, uint32_t op, const char* text, int32_t a, int32_t
                 break;   /* v3 has no cursor positioning event */
             }
         } else {
-            switch (op) {
+            if (replace) {
+                zwp_text_input_v1_send_delete_surrounding_text(o->res,
+                        -(a > 0 ? a : 0),
+                        (uint32_t)((a > 0 ? a : 0) + (b > 0 ? b : 0)));
+                if (action == AWL_IME_PREEDIT)
+                    zwp_text_input_v1_send_commit_string(o->res, o->serial, "");
+            }
+            switch (action) {
             case AWL_IME_COMMIT:
                 zwp_text_input_v1_send_commit_string(o->res, o->serial, text);
                 break;
             case AWL_IME_PREEDIT:
-                zwp_text_input_v1_send_preedit_cursor(o->res, a);
+                zwp_text_input_v1_send_preedit_cursor(o->res, cb);
                 zwp_text_input_v1_send_preedit_string(o->res, o->serial,
                                                       text, "");
                 break;

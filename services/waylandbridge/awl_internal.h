@@ -226,6 +226,11 @@ struct awl_surface {
             int32_t pend_w, pend_h;         /* cached when resize precedes map (Android owns sizing entirely) */
             bool fullscreen, maximized;    /* persist across resize and focus configures */
             char app_id[256];              /* xdg identity, guarded by ev_lock */
+            uint64_t parent_id;            /* transient relation; rwl then ev_lock */
+            void* parent_owner;            /* foreign import that owns this relation, or NULL */
+            int32_t min_w, min_h, max_w, max_h;
+            int32_t next_min_w, next_min_h, next_max_w, next_max_h;
+            int32_t natural_w, natural_h;   /* first mapped geometry, logical pixels */
         } xdg;
         struct {                            /* XWAYLAND */
             struct wl_resource* res;        /* xwayland_surface_v1 (#32) */
@@ -655,6 +660,10 @@ void awl_ime_set_focus(struct wl_client* c, uint64_t win);   /* tr_kbd_* writes 
  * The three Android → client window commands are sent directly from any
  * thread (rdlock+ev_lock, no marshalling) */
 void awl_xdg_setup(void);
+void awl_foreign_setup(void);
+void awl_foreign_surface_gone(struct awl_surface* s);
+int awl_xdg_set_parent(struct awl_surface* s, uint64_t parent_id, void* owner);
+void awl_xdg_presentation_changed(struct awl_surface* s);
 void awl_xdg_flush_pending(uint64_t id);   /* after map, re-sends the cached resize (dispatch thread) */
 /* popup grab check (press event; caller holds rwl.rd). Returns 1 = the press
  * was consumed by the popup grab (popup_done already sent, event must not be delivered). */

@@ -119,7 +119,17 @@ typedef struct awl_window_callbacks {
      * already matches the protocol's "inhibitor honored on a visible
      * surface" requirement, so no daemon-side visibility state exists. */
     void (*idle_inhibit)(void* user, uint64_t id, int on);
+    void (*window_presentation)(void* user, uint64_t id);
 } awl_window_callbacks_t;
+
+/* Protocol-defined transient parent and preferred physical dialog size.
+ * Independent of app identity; max bounds and geometry are client hints. */
+typedef struct awl_presentation {
+    uint64_t parent;
+    int32_t width, height;
+    int32_t dialog;
+} awl_presentation_t;
+void awl_window_presentation(uint64_t id, awl_presentation_t* out);
 
 typedef struct awl_display_info {
     uint32_t width;        /* wl_output logical size */
@@ -291,6 +301,8 @@ void awl_input_dispatch(const awl_input_ev_t* ev);   /* any thread */
 
 enum {
     AWL_IME_COMMIT = 1,     /* text: committed text (v3 commit_string; v1 same) */
+    AWL_IME_REPLACE = 5,    /* a/b bytes around cursor + commit, atomic done */
+    AWL_IME_REPLACE_PREEDIT = 6, /* a/b bytes around cursor + preedit, atomic done */
     AWL_IME_PREEDIT = 2,    /* text: preedit; a/b = cursor_begin/end (byte offsets into text) */
     AWL_IME_DELETE = 3,     /* a/b = before/after (bytes; the client converts against its cache) */
     AWL_IME_CURSOR = 4,     /* a/b = index/anchor (v1 cursor_position; v3 ignores) */

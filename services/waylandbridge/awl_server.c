@@ -420,6 +420,7 @@ int awl_server_start(int listen_fd, const awl_display_info_t* info,
     awl_surface_setup();      /* wl_compositor / wl_surface / wl_region */
     awl_dmabuf_setup();       /* zwp_linux_dmabuf_v1 */
     awl_xdg_setup();          /* xdg_wm_base */
+    awl_foreign_setup();      /* cross-client native dialogs (xdg-foreign-v2) */
     awl_subsurface_setup();   /* wl_subcompositor (chrome bubbles / GTK4 popovers) */
     awl_input_setup();        /* wl_seat (input object table + passthrough translation) */
     awl_datadev_setup();      /* wl_data_device_manager v3 (selection+DnD) */

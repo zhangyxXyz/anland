@@ -535,6 +535,7 @@ static void surface_destroy_impl(struct wl_resource* res) {
 
     LOGI("surface %llu destroyed (mapped=%d)",
             (unsigned long long)s->id, s->mapped);
+    awl_foreign_surface_gone(s); /* before rwl: revoke cross-client handles */
 
     /* The window this surface created (if the role object did not already
      * take it down — awl_xdg.c toplevel_res_destroy): backend detach (joins
@@ -954,6 +955,17 @@ static void surface_commit(struct wl_client* client, struct wl_resource* res) {
      * below is a callback outside the lock, during which shm_buffer_gone
      * may strip current to NULL (dangling dereference) */
     int32_t map_bw = 0, map_bh = 0;
+    bool presentation_changed = false;
+    if (s->role == AWL_ROLE_TOPLEVEL) {
+        presentation_changed = s->u.xdg.min_w != s->u.xdg.next_min_w ||
+            s->u.xdg.min_h != s->u.xdg.next_min_h ||
+            s->u.xdg.max_w != s->u.xdg.next_max_w ||
+            s->u.xdg.max_h != s->u.xdg.next_max_h;
+        s->u.xdg.min_w = s->u.xdg.next_min_w;
+        s->u.xdg.min_h = s->u.xdg.next_min_h;
+        s->u.xdg.max_w = s->u.xdg.next_max_w;
+        s->u.xdg.max_h = s->u.xdg.next_max_h;
+    }
     if (!s->mapped && s->current_buffer_res) {
         struct wl_shm_buffer* mshm = wl_shm_buffer_get(s->current_buffer_res);
         if (mshm) {
@@ -964,8 +976,13 @@ static void surface_commit(struct wl_client* client, struct wl_resource* res) {
                     wl_resource_get_user_data(s->current_buffer_res);
             if (mb && mb->width) { map_bw = (int32_t)mb->width; map_bh = (int32_t)mb->height; }
         }
+        if (s->role == AWL_ROLE_TOPLEVEL) {
+            s->u.xdg.natural_w = s->geom_valid ? s->geom_w : map_bw / (s->buf_scale > 0 ? s->buf_scale : 1);
+            s->u.xdg.natural_h = s->geom_valid ? s->geom_h : map_bh / (s->buf_scale > 0 ? s->buf_scale : 1);
+        }
     }
     pthread_mutex_unlock(&s->ev_lock);
+    if (presentation_changed) awl_xdg_presentation_changed(s);
 
     /* mailbox: superseded frames the renderer never got to go back to the
      * client right now (trylock — never wait for a frame in flight;

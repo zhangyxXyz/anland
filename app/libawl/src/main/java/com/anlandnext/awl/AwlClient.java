@@ -36,6 +36,30 @@ final class AwlClient {
     static final int T_CLOSE = 14;    /* (id) → ok: ask the client to close the window */
     static final int T_ICON = 15;     /* (id) → w,h,bytes[RGBA] toplevel icon */
     static final int T_APP_ID = 19;
+    static final int T_PRESENTATION = 20;
+
+    static final class Presentation {
+        long parent;
+        int width, height;
+        boolean dialog;
+    }
+
+    static Presentation presentation(long id) {
+        Presentation p = new Presentation();
+        IBinder b = get();
+        if (b == null) return p;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(DESCRIPTOR); d.writeLong(id);
+            if (b.transact(T_PRESENTATION, d, r, 0) && r.dataSize() >= 20) {
+                p.parent = r.readLong(); p.width = r.readInt(); p.height = r.readInt();
+                p.dialog = r.readInt() != 0;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "presentation query failed", e);
+        } finally { d.recycle(); r.recycle(); }
+        return p;
+    }
     static final int T_SUBSCRIBE = 16;   /* (eventBinder) → ok: window lifecycle events */
     static final int T_UNSUBSCRIBE = 17; /* (eventBinder) → ok: stop events */
     static final int T_CONNECT = 18;     /* (fd) → ok: wayland connection over binder */
@@ -51,6 +75,8 @@ final class AwlClient {
     static final int IME_PREEDIT = 2;
     static final int IME_DELETE = 3;
     static final int IME_CURSOR = 4;
+    static final int IME_REPLACE = 5;         /* delete a/b bytes + commit, one done */
+    static final int IME_REPLACE_PREEDIT = 6; /* delete a/b bytes + preedit, one done */
 
     static final class WinInfo {
         long id;

@@ -48,10 +48,10 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Lifecycle (single-attach model: this side only reports facts, all
  * decisions live in the daemon):
- *   onPause → PAUSE(id,host): daemon full detach (minimize: the wayland
+ *   onStop → PAUSE(id,host): daemon full detach (minimize: the wayland
  *   window stays alive); onResume / surfaceChanged → re-send SURFACE to
  *   re-attach (the daemon evicts the previous holder).
- *   Killed-from-recents / swiped away = minimize-and-keep-alive (onPause +
+ *   Killed-from-recents / swiped away = minimize-and-keep-alive (onStop +
  *   binder death already cover it, no onDestroy report).
  *   The window is closed via Awl.closeWindow (daemon T_CLOSE). Client
  *   closed its own window / evicted by a newer instance → daemon ctrl
@@ -108,6 +108,8 @@ public class AwlWindowActivity extends Activity {
     private long id = -1;   /* -1 = unbound (bindWindowId's firstBind test; a plain long would read 0 = "bound to window 0") */
     private long host;
     private long surfaceGeneration;
+    private boolean windowSubscribed;
+    private boolean redirectingDialog;
     private SurfaceView sv;
     private FrameLayout root;
     private EditText hiddenInput;
@@ -209,6 +211,10 @@ public class AwlWindowActivity extends Activity {
                 Log.i(TAG, "win " + id + ": CLOSE via ctrl channel");
                 finishingByGone = true;
                 runOnUiThread(() -> finishAndDropTask());
+                return true;
+            }
+            if (code == 11) { // C_PRESENTATION: protocol parent/size hints changed
+                runOnUiThread(() -> updatePresentation());
                 return true;
             }
             if (code == C_TITLE) {
@@ -314,7 +320,9 @@ public class AwlWindowActivity extends Activity {
      *  root activity removes the task (ActivityClientController:
      *  FINISH_TASK_WITH_ROOT_ACTIVITY → removeTask(REMOVE_FROM_RECENTS)). */
     private void finishAndDropTask() {
-        if (!isFinishing()) finishAndRemoveTask();
+        if (isFinishing()) return;
+        if (this instanceof AwlDialogActivity || !isTaskRoot()) finish();
+        else finishAndRemoveTask();
     }
 
     public static void finishById(long id) {
@@ -484,6 +492,7 @@ public class AwlWindowActivity extends Activity {
          * ctrl channel, so C_CLOSE / WINDOW_GONE could never finish it; the
          * window stayed on its last frame after the client quit). */
         long startId = getIntent().getLongExtra("id", -1);
+        if (startId >= 0 && redirectDialog(startId)) return;
         if (startId >= 0) {
             bindWindowId(startId, getIntent().getStringExtra("title"), null, true);
         } else if (onAwaitWindow()) {
@@ -524,8 +533,7 @@ public class AwlWindowActivity extends Activity {
                 }
             }
             @Override public void surfaceDestroyed(SurfaceHolder holder) {
-                /* the daemon already detached at PAUSE; here we only clear the fact flag */
-                attached = false;
+                detachVisibleSurface();
             }
         });
 
@@ -555,11 +563,70 @@ public class AwlWindowActivity extends Activity {
         setContentView(root);
 
         setupFullscreen();   /* immersive */
+        updatePresentation();
+    }
+
+    private boolean redirectDialog(long windowId) {
+        if (this instanceof AwlDialogActivity || redirectingDialog) return false;
+        AwlClient.Presentation p = AwlClient.presentation(windowId);
+        if (!p.dialog) return false;
+        redirectingDialog = true;
+        android.content.Intent next = new android.content.Intent(this, AwlDialogActivity.class)
+                .setData(android.net.Uri.parse("anland://dialog/" + windowId))
+                .putExtra("id", windowId).putExtra("title", getIntent().getStringExtra("title"));
+        AwlWindowActivity parent = LIVE.get(p.parent);
+        if (parent != null && !parent.isFinishing()) {
+            parent.startActivity(next);
+        } else {
+            boolean launched = false;
+            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            if (am != null && p.parent != 0) {
+                for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
+                    android.content.Intent base = task.getTaskInfo().baseIntent;
+                    if (base != null && base.getLongExtra("id", -1) == p.parent) {
+                        task.startActivity(this, next, null);
+                        launched = true;
+                        break;
+                    }
+                }
+            }
+            if (!launched) startActivity(next);
+        }
+        // The temporary normal host is never bound; the dialog will own the
+        // id and surface. If it was already bound, generation/host fencing
+        // protects the new attachment from this Activity's later onStop.
+        finish();
+        return true;
+    }
+
+    private void updatePresentation() {
+        if (id < 0 || isFinishing() || redirectDialog(id)) return;
+        if (!(this instanceof AwlDialogActivity)) return;
+        AwlClient.Presentation p = AwlClient.presentation(id);
+        android.graphics.Point screen = new android.graphics.Point();
+        getWindowManager().getDefaultDisplay().getSize(screen);
+        int margin = Math.round(16 * getResources().getDisplayMetrics().density);
+        int availableW = Math.max(1, screen.x - margin * 2);
+        int availableH = Math.max(1, screen.y - margin * 2);
+        int w = p.width > 0 ? p.width : availableW;
+        int h = p.height > 0 ? p.height : availableH;
+        double scale = Math.min(1.0, Math.min((double)availableW/w, (double)availableH/h));
+        getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        getWindow().setDimAmount(.25f);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        getWindow().setLayout(Math.max(1, (int)(w*scale)), Math.max(1, (int)(h*scale)));
+        getWindow().setGravity(android.view.Gravity.CENTER);
+    }
+
+    @Override public void onConfigurationChanged(android.content.res.Configuration config) {
+        super.onConfigurationChanged(config);
+        updatePresentation();
     }
 
     /* Immersive fullscreen: hide status bar + navigation bar, swipe-revealed
      * as transient overlays, extend into the display cutout area. */
     private void setupFullscreen() {
+        if (this instanceof AwlDialogActivity) return;
         if (android.os.Build.VERSION.SDK_INT < 30) {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
@@ -580,6 +647,7 @@ public class AwlWindowActivity extends Activity {
      *  TaskDescription is atomic — every label update must re-carry the icon
      *  or it is silently dropped. */
     private void applyTaskDescription() {
+        if (this instanceof AwlDialogActivity) return; // retain the parent's task identity
         if (taskTitle == null && taskIcon == null) return;
         String label = TaskIdentity.label(taskDesktopName, taskTitle);
         android.app.ActivityManager.TaskDescription td = taskIcon != null
@@ -742,6 +810,12 @@ public class AwlWindowActivity extends Activity {
 
     @Override
     protected void onStop() {
+        detachVisibleSurface();
+        if (windowSubscribed) {
+            Awl.release();
+            Awl.unregisterCallback(winEvents);
+            windowSubscribed = false;
+        }
         fireHost((cbs, win, act) -> cbs.onHostStop(win, act));
         super.onStop();
     }
@@ -750,8 +824,11 @@ public class AwlWindowActivity extends Activity {
     protected void onResume() {
         super.onResume();
         setupFullscreen();   /* the system may reset immersive mode */
-        Awl.registerCallback(winEvents);
-        Awl.acquire();   /* process event subscription (sibling windows dying while this one is foreground) */
+        if (!windowSubscribed && !isFinishing()) {
+            Awl.registerCallback(winEvents);
+            Awl.acquire();
+            windowSubscribed = true;
+        }
         if (clipMgr != null)
             clipMgr.addPrimaryClipChangedListener(clipListener);
         /* pause without stop (quick round-trip) → the surface survived and
@@ -761,6 +838,8 @@ public class AwlWindowActivity extends Activity {
                 && sv.getHolder().getSurface() != null
                 && sv.getHolder().getSurface().isValid())
             sendSurface(sv.getHolder(), lastW, lastH);
+        else if (attached)
+            AwlClient.focus(id, hasWindowFocus(), host, surfaceGeneration);
         fireHost((cbs, win, act) -> cbs.onHostResume(win, act));
         Log.i(TAG, "win " + id + " RESUME");
         /* capture state is daemon-owned: the SURFACE re-attach re-pushes
@@ -774,15 +853,18 @@ public class AwlWindowActivity extends Activity {
             clipMgr.removePrimaryClipChangedListener(clipListener);
         setPointerCaptureMode(CAPTURE_NONE, 0, 0, 0, 0);   /* release + local mode reset (the daemon mirror survives; re-pushed on re-attach) */
         if (id >= 0) endPadStream();   /* the touchpad pointer stream may be interrupted by lifecycle: make up leave/button releases */
-        /* treat as minimize: daemon full detach (rendering resources freed,
-         * wayland window kept alive). Clear attached locally too —
-         * onResume/surfaceChanged re-attach from there */
-        AwlClient.pause(id, host, surfaceGeneration);
-        attached = false;
-        Awl.release();
-        Awl.unregisterCallback(winEvents);
+        /* A translucent child dialog pauses its parent without hiding it.
+         * Keep that visible GPU surface alive; onStop is the visibility
+         * boundary. Keyboard focus still leaves immediately. */
+        if (attached) AwlClient.focus(id, false, host, surfaceGeneration);
         Log.i(TAG, "win " + id + " PAUSE");
         super.onPause();
+    }
+
+    private void detachVisibleSurface() {
+        if (!attached) return;
+        AwlClient.pause(id, host, surfaceGeneration);
+        attached = false;
     }
 
     @Override
@@ -810,7 +892,7 @@ public class AwlWindowActivity extends Activity {
                 super.onCreateInputConnection(outAttrs);
                 int sel = editorSelStart();
                 outAttrs.initialSelStart = sel;
-                outAttrs.initialSelEnd = sel;
+                outAttrs.initialSelEnd = editorSelEnd();
                 outAttrs.initialCapsMode = TextUtils.getCapsMode(editorText(), sel,
                         TextUtils.CAP_MODE_SENTENCES | TextUtils.CAP_MODE_WORDS
                         | TextUtils.CAP_MODE_CHARACTERS);
@@ -882,7 +964,8 @@ public class AwlWindowActivity extends Activity {
                 | WindowInsets.Type.systemBars());
         int[] margins = WindowSafeArea.contentMargins(
                 new int[]{safe.left, safe.top, safe.right, safe.bottom},
-                insets.getInsets(WindowInsets.Type.ime()).bottom, imeOverlayMode());
+                this instanceof AwlDialogActivity ? 0 : insets.getInsets(WindowInsets.Type.ime()).bottom,
+                imeOverlayMode());
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) sv.getLayoutParams();
         if (lp.leftMargin == margins[0] && lp.topMargin == margins[1]
                 && lp.rightMargin == margins[2] && lp.bottomMargin == margins[3]) return;
@@ -941,7 +1024,9 @@ public class AwlWindowActivity extends Activity {
     private void onImeState(String text, int curB, int ancB, int hint, int purpose,
                             int cx, int cy, int cw, int ch, int flags) {
         boolean typeChanged = hint != imeHint || purpose != imePurpose;
-        surText = text == null ? "" : text;
+        String nextText = text == null ? "" : text;
+        if (!nextText.equals(surText)) markedStart = markedEnd = -1;
+        surText = nextText;
         surCursor = Math.min(surText.length(), byteToChar(surText, curB));
         surAnchor = Math.min(surText.length(), byteToChar(surText, ancB));
         imeHint = hint;
@@ -950,6 +1035,7 @@ public class AwlWindowActivity extends Activity {
         if ((flags & STATE_RESET) != 0) {
             compText = "";
             compCursor = 0;
+            markedStart = markedEnd = -1;
             if (imm != null) imm.restartInput(hiddenInput);
             return;
         }
@@ -959,7 +1045,7 @@ public class AwlWindowActivity extends Activity {
 
     /** Push selection/composing region/cursor anchor (IME candidate window follows the cursor, context stays in sync) */
     private void notifyImeState() {
-        if (imm == null) return;
+        if (imm == null || imeBatchDepth > 0) return;
         int sel = editorSelStart();
         int candStart = -1, candEnd = -1;
         int compAt = Math.min(surCursor, surText.length());
@@ -967,7 +1053,11 @@ public class AwlWindowActivity extends Activity {
             candStart = compAt;
             candEnd = compAt + compText.length();
         }
-        imm.updateSelection(hiddenInput, sel, sel, candStart, candEnd);
+        if (markedStart >= 0) {
+            candStart = markedStart;
+            candEnd = markedEnd;
+        }
+        imm.updateSelection(hiddenInput, sel, editorSelEnd(), candStart, candEnd);
         if (imeRect[2] > 0 && imeRect[3] > 0 && sv != null) {
             /* Positional parameters require a local→screen matrix
              * (CursorAnchorInfo.Builder.build throws IllegalArgumentException
@@ -985,8 +1075,8 @@ public class AwlWindowActivity extends Activity {
                                                 CursorAnchorInfo.FLAG_HAS_VISIBLE_REGION);
             if (!compText.isEmpty()) {
                 b.setComposingText(compAt, compText);
-                b.setSelectionRange(compCursor, compCursor);
             }
+            b.setSelectionRange(sel, editorSelEnd());
             try {
                 imm.updateCursorAnchorInfo(hiddenInput, b.build());
             } catch (IllegalArgumentException e) {
@@ -998,6 +1088,7 @@ public class AwlWindowActivity extends Activity {
     private void clearComposing() {
         compText = "";
         compCursor = 0;
+        markedStart = markedEnd = -1;
         notifyImeState();
     }
 
@@ -1012,6 +1103,16 @@ public class AwlWindowActivity extends Activity {
     private int editorSelStart() {
         return Math.min(surCursor, surText.length()) + compCursor;
     }
+
+    private int editorSelEnd() {
+        return compText.isEmpty() ? Math.min(surAnchor, surText.length()) : editorSelStart();
+    }
+
+    /* setComposingRegion changes metadata, NOT text or selection. Keep a
+     * marked committed range until the IME actually replaces it. Deleting
+     * it eagerly makes re-segmentation + finishComposingText erase a word. */
+    private int markedStart = -1, markedEnd = -1;
+    private int imeBatchDepth;
 
     /** Editor index → client surrounding index (subtract the composing-length offset) */
     private int toSurroundingIndex(int editorIdx) {
@@ -1048,33 +1149,16 @@ public class AwlWindowActivity extends Activity {
         return chars;
     }
 
-    /** Preedit cursor byte offset (newCp is relative to the end of the composing text, 1 = past the end; counted in code points) */
+    /** Android positions are UTF-16 offsets: positive relative to end - 1,
+     * non-positive relative to start. Wayland wants UTF-8 byte offsets. */
     private static int preeditCursorBytes(String text, int newCp) {
-        int total = text.codePointCount(0, text.length());
-        int pos = Math.max(0, Math.min(total, total + 1 - newCp));
-        int bytes = 0, seen = 0;
-        for (int i = 0; i < text.length() && seen < pos; ) {
-            int cp = text.codePointAt(i);
-            bytes += cp <= 0x7F ? 1 : cp <= 0x7FF ? 2 : cp <= 0xFFFF ? 3 : 4;
-            seen++;
-            i += Character.charCount(cp);
-        }
-        return bytes;
+        return utf8Len(text.substring(0, composingCursorChars(text, newCp)));
     }
 
     /** Preedit cursor char offset (for the local mirror) */
     private static int composingCursorChars(String text, int newCp) {
-        int total = text.codePointCount(0, text.length());
-        int pos = Math.max(0, Math.min(total, total + 1 - newCp));
-        int chars = 0, seen = 0;
-        for (int i = 0; i < text.length() && seen < pos; ) {
-            int cp = text.codePointAt(i);
-            int c = Character.charCount(cp);
-            chars += c;
-            seen++;
-            i += c;
-        }
-        return chars;
+        long pos = newCp > 0 ? (long) text.length() + newCp - 1 : newCp;
+        return snap(text, (int) Math.max(0, Math.min(text.length(), pos)));
     }
 
     /* Step n code points backward / forward from idx (surrogate-pair safe) */
@@ -1150,20 +1234,44 @@ public class AwlWindowActivity extends Activity {
             super(target, false);
         }
 
+        @Override public boolean beginBatchEdit() { imeBatchDepth++; return true; }
+        @Override public boolean endBatchEdit() {
+            if (imeBatchDepth > 0) imeBatchDepth--;
+            if (imeBatchDepth == 0) notifyImeState();
+            return imeBatchDepth > 0;
+        }
+
+        private boolean replaceMarked(String text, boolean preedit) {
+            if (markedStart < 0) return false;
+            int c = Math.min(surCursor, surText.length());
+            int a = Math.min(markedStart, surText.length());
+            int b = Math.min(markedEnd, surText.length());
+            // Text-input-v3 can replace around its cursor, not a disjoint
+            // remote selection. Never claim an unrelated deletion succeeded.
+            if (a > c || b < c) return false;
+            AwlClient.ime(id, preedit ? AwlClient.IME_REPLACE_PREEDIT : AwlClient.IME_REPLACE,
+                    utf8Len(surText.substring(a, c)), utf8Len(surText.substring(c, b)), text);
+            surText = surText.substring(0, a) + surText.substring(b);
+            surCursor = surAnchor = a;
+            markedStart = markedEnd = -1;
+            return true;
+        }
+
         /* --- text output --- */
 
         @Override
         public boolean commitText(CharSequence text, int newCursorPosition) {
             String t = text == null ? "" : text.toString();
-            AwlClient.ime(id, AwlClient.IME_COMMIT, 0, 0, t);
+            boolean marked = markedStart >= 0;
+            if (marked && !replaceMarked(t, false)) return false;
+            if (!marked) AwlClient.ime(id, AwlClient.IME_COMMIT, 0, 0, t);
             /* keep the virtual editor in step: without this a commit-only
              * session (English typing) leaves surText stale and the next
              * backspace converts to a zero-byte delete (client-side no-op) */
-            if (!t.isEmpty()) {
-                int c = Math.min(surCursor, surText.length());
-                surText = surText.substring(0, c) + t + surText.substring(c);
-                surCursor = surAnchor = c + t.length();
-            }
+            int c = Math.min(surCursor, surText.length());
+            int a = Math.min(c, surAnchor), b = Math.max(c, surAnchor);
+            surText = surText.substring(0, a) + t + surText.substring(b);
+            surCursor = surAnchor = a + t.length();
             clearComposing();
             return true;
         }
@@ -1171,8 +1279,11 @@ public class AwlWindowActivity extends Activity {
         @Override
         public boolean setComposingText(CharSequence text, int newCursorPosition) {
             String t = text == null ? "" : text.toString();
+            boolean marked = markedStart >= 0;
+            if (marked && !replaceMarked(t, true)) return false;
             int cb = preeditCursorBytes(t, newCursorPosition);
-            AwlClient.ime(id, AwlClient.IME_PREEDIT, cb, cb, t);
+            if (!marked || cb != utf8Len(t))
+                AwlClient.ime(id, AwlClient.IME_PREEDIT, cb, cb, t);
             compText = t;
             compCursor = composingCursorChars(t, newCursorPosition);
             notifyImeState();
@@ -1181,10 +1292,11 @@ public class AwlWindowActivity extends Activity {
 
         @Override
         public boolean finishComposingText() {
-            if (!compText.isEmpty()) {
-                AwlClient.ime(id, AwlClient.IME_PREEDIT, 0, 0, "");
-                clearComposing();
-            }
+            // finish removes composing spans; it MUST preserve the text.
+            // Empty Wayland preedit cancels it and is not equivalent.
+            if (!compText.isEmpty()) return commitText(compText, 1);
+            markedStart = markedEnd = -1;
+            notifyImeState();
             return true;
         }
 
@@ -1238,32 +1350,16 @@ public class AwlWindowActivity extends Activity {
 
         @Override
         public boolean setComposingRegion(int start, int end) {
-            if (!compText.isEmpty()) {
-                AwlClient.ime(id, AwlClient.IME_PREEDIT, 0, 0, "");
-                compText = "";
-                compCursor = 0;
-            }
-            /* the region becomes preedit (long-press re-segmentation / transform); the deletion is computed around the cursor */
             String et = editorText();
-            int a = snap(et, Math.max(0, Math.min(start, end)));
-            int b = snap(et, Math.min(et.length(), Math.max(start, end)));
-            if (a >= b) return true;
-            String region = et.substring(a, b);
-            int c = Math.min(surCursor, surText.length());
-            AwlClient.ime(id, AwlClient.IME_DELETE,
-                    utf8Len(et.substring(Math.min(a, c), Math.min(b, c))),
-                    utf8Len(et.substring(Math.max(a, c), Math.max(b, c))), "");
-            AwlClient.ime(id, AwlClient.IME_PREEDIT,
-                    utf8Len(region), utf8Len(region), region);
-            /* the field no longer holds the region (deleted above, resent as
-             * preedit) — strip it from the model too, or every query would
-             * report it twice (editorText = surText + compText) and the IME,
-             * seeing the stale copy after commit, re-applies its correction */
-            surText = surText.substring(0, a) + surText.substring(b);
-            surCursor = surAnchor = a;
-            compText = region;
-            compCursor = region.length();
-            notifyImeState();
+            int a = snap(et, Math.max(0, Math.min(et.length(), Math.min(start, end))));
+            int b = snap(et, Math.max(0, Math.min(et.length(), Math.max(start, end))));
+            if (!compText.isEmpty() && a == surCursor && b == a + compText.length())
+                return true;
+            if (!compText.isEmpty()) finishComposingText();
+            markedStart = a < b ? a : -1;
+            markedEnd = a < b ? b : -1;
+            // No updateSelection here: the selection has not moved. Some
+            // keyboards re-segment on every update, producing a feedback loop.
             return true;
         }
 
@@ -1357,8 +1453,8 @@ public class AwlWindowActivity extends Activity {
 
         @Override
         public void closeConnection() {
-            compText = "";
-            compCursor = 0;
+            finishComposingText();
+            imeBatchDepth = 0;
             super.closeConnection();
         }
     }

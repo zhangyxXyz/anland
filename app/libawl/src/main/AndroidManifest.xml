@@ -19,6 +19,13 @@
          with it). A live window whose process was merely killed still
          re-attaches from its card (the ActivityRecord stays, nothing finished). -->
     <application>
+        <!-- A protocol-defined transient shares the parent's task. Closing
+             this Activity must never remove that task or its Linux window. -->
+        <activity android:name="com.anlandnext.awl.AwlDialogActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.Dialog.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <activity android:name="com.anlandnext.awl.AwlWindowActivity"
             android:exported="false"
             android:launchMode="standard"

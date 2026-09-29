@@ -17,6 +17,58 @@
 #define AWL_XDG_VERSION 3
 static int32_t phys_to_logical(int32_t v);
 
+void awl_xdg_presentation_changed(struct awl_surface* s) {
+    if (s->mapped && g_srv.cbs.window_presentation)
+        g_srv.cbs.window_presentation(g_srv.cbs.user, s->id);
+}
+
+int awl_xdg_set_parent(struct awl_surface* s, uint64_t parent_id, void* owner) {
+    int valid = 1;
+    pthread_rwlock_wrlock(&g_srv.rwl);
+    // Relations form a forest; never allow self-parenting or a cycle.
+    struct awl_surface* p = awl_surface_by_id(parent_id);
+    if (parent_id && (!p || p->role != AWL_ROLE_TOPLEVEL)) valid = 0;
+    for (struct awl_surface* q = p; valid && q && q->role == AWL_ROLE_TOPLEVEL;
+         q = awl_surface_by_id(q->u.xdg.parent_id)) {
+        if (q == s) valid = 0;
+    }
+    if (valid) {
+        pthread_mutex_lock(&s->ev_lock);
+        if (s->role == AWL_ROLE_TOPLEVEL) {
+            s->u.xdg.parent_id = parent_id;
+            s->u.xdg.parent_owner = owner;
+        }
+        pthread_mutex_unlock(&s->ev_lock);
+    }
+    pthread_rwlock_unlock(&g_srv.rwl);
+    if (valid) awl_xdg_presentation_changed(s);
+    return valid;
+}
+
+void awl_window_presentation(uint64_t id, awl_presentation_t* out) {
+    memset(out, 0, sizeof(*out));
+    pthread_rwlock_rdlock(&g_srv.rwl);
+    struct awl_surface* s = awl_surface_by_id(id);
+    if (s) {
+        pthread_mutex_lock(&s->ev_lock);
+        if (s->role == AWL_ROLE_TOPLEVEL) {
+            struct awl_surface* p = awl_surface_by_id(s->u.xdg.parent_id);
+            if (p && p->role == AWL_ROLE_TOPLEVEL) out->parent = p->id;
+            int w = s->u.xdg.natural_w, h = s->u.xdg.natural_h;
+            if (s->u.xdg.max_w > 0 && w > s->u.xdg.max_w) w = s->u.xdg.max_w;
+            if (s->u.xdg.max_h > 0 && h > s->u.xdg.max_h) h = s->u.xdg.max_h;
+            if (w < s->u.xdg.min_w) w = s->u.xdg.min_w;
+            if (h < s->u.xdg.min_h) h = s->u.xdg.min_h;
+            double z = awl_zoom_scale();
+            out->width = (int32_t)fmin(INT32_MAX, w * z + .5);
+            out->height = (int32_t)fmin(INT32_MAX, h * z + .5);
+            out->dialog = out->parent != 0 || (s->u.xdg.max_w > 0 && s->u.xdg.max_h > 0);
+        }
+        pthread_mutex_unlock(&s->ev_lock);
+    }
+    pthread_rwlock_unlock(&g_srv.rwl);
+}
+
 /* caller holds s->ev_lock */
 static void send_configure_locked(struct awl_surface* s,
                                   int32_t w, int32_t h) {
@@ -50,7 +102,10 @@ static void toplevel_destroy(struct wl_client* c, struct wl_resource* res) {
 
 static void toplevel_set_parent(struct wl_client* c, struct wl_resource* res,
                                 struct wl_resource* parent) {
-    /* Android task stack manages parent/child relations itself */
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    struct awl_surface* p = parent ? wl_resource_get_user_data(parent) : NULL;
+    if (s && !awl_xdg_set_parent(s, p ? p->id : 0, NULL))
+        wl_resource_post_error(res, XDG_TOPLEVEL_ERROR_INVALID_PARENT, "cyclic or invalid parent");
 }
 
 static void toplevel_set_title(struct wl_client* c, struct wl_resource* res,
@@ -115,10 +170,8 @@ static void toplevel_resize(struct wl_client* c, struct wl_resource* res,
     LOGD("toplevel resize edges=%u ignored (Android owns sizing)", edges);
 }
 
-/* set_min_size / set_max_size: xdg-shell mandates invalid_size for negative
- * values; the bounds themselves have no consumer — the configure size is
- * whatever the Activity surface measures (awl_window_resize), the client
- * clamps on its side like under any compositor that ignores hints. */
+/* Size bounds are double buffered, applied by wl_surface.commit, and used
+ * by the Android dialog host instead of stretching fixed-size content. */
 static int size_bound_ok(struct wl_resource* res, int32_t w, int32_t h) {
     if (w < 0 || h < 0) {
         wl_resource_post_error(res, XDG_TOPLEVEL_ERROR_INVALID_SIZE,
@@ -129,11 +182,19 @@ static int size_bound_ok(struct wl_resource* res, int32_t w, int32_t h) {
 }
 static void toplevel_set_max_size(struct wl_client* c, struct wl_resource* res,
                                   int32_t w, int32_t h) {
-    if (size_bound_ok(res, w, h)) LOGD("set_max_size %dx%d (0 = unbounded)", w, h);
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (!s || !size_bound_ok(res, w, h)) return;
+    pthread_mutex_lock(&s->ev_lock);
+    s->u.xdg.next_max_w = w; s->u.xdg.next_max_h = h;
+    pthread_mutex_unlock(&s->ev_lock);
 }
 static void toplevel_set_min_size(struct wl_client* c, struct wl_resource* res,
                                   int32_t w, int32_t h) {
-    if (size_bound_ok(res, w, h)) LOGD("set_min_size %dx%d", w, h);
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (!s || !size_bound_ok(res, w, h)) return;
+    pthread_mutex_lock(&s->ev_lock);
+    s->u.xdg.next_min_w = w; s->u.xdg.next_min_h = h;
+    pthread_mutex_unlock(&s->ev_lock);
 }
 
 static void toplevel_change_state(struct wl_resource* res, int fullscreen, int enabled) {
@@ -179,6 +240,7 @@ static void toplevel_set_minimized(struct wl_client* c, struct wl_resource* res)
 static void toplevel_res_destroy(struct wl_resource* res) {
     struct awl_surface* s = wl_resource_get_user_data(res);
     if (!s) return;
+    awl_foreign_surface_gone(s);
     pthread_mutex_lock(&s->ev_lock);   /* binder thread reads fields concurrently */
     s->u.xdg.role_res = NULL;
     s->role = AWL_ROLE_NONE;
@@ -499,6 +561,12 @@ static void xdg_surface_get_toplevel(struct wl_client* c,
     s->u.xdg.pend_w = s->u.xdg.pend_h = 0;
     s->u.xdg.fullscreen = s->u.xdg.maximized = false;
     s->u.xdg.app_id[0] = 0;
+    s->u.xdg.parent_id = 0;
+    s->u.xdg.parent_owner = NULL;
+    s->u.xdg.min_w = s->u.xdg.min_h = s->u.xdg.max_w = s->u.xdg.max_h = 0;
+    s->u.xdg.next_min_w = s->u.xdg.next_min_h = 0;
+    s->u.xdg.next_max_w = s->u.xdg.next_max_h = 0;
+    s->u.xdg.natural_w = s->u.xdg.natural_h = 0;
     s->role = AWL_ROLE_TOPLEVEL;
     s->u.xdg.role_res = t;
     s->xdg_surface_res = res;
