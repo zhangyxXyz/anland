@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Resolve pinned builder
         id: sources
         run: |
@@ -36,7 +36,7 @@ jobs:
               print('commit=' + sources['builder_commit'], file=out)
               print('dockerfile=' + config['dockerfile'], file=out)
           PY
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: ${{ steps.sources.outputs.repository }}
           ref: ${{ steps.sources.outputs.commit }}

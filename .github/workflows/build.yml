@@ -52,7 +52,7 @@ jobs:
       rootfs: ${{ steps.plan.outputs.rootfs }}
       build_plan: ${{ steps.plan.outputs.build_plan }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: plan
         run: python3 scripts/ci/release.py plan
 
@@ -60,8 +60,8 @@ jobs:
     needs: plan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         if: needs.plan.outputs.wayland == 'true'
         with:
           distribution: temurin
@@ -109,7 +109,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Prepare the shared draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -156,7 +156,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Verify selected components and finalize the draft
         env:
           GH_TOKEN: ${{ github.token }}
