@@ -156,6 +156,7 @@ void awl_surface_apply_buffer(struct awl_surface* s, struct wl_resource* res,
     /* Snapshot at state application (also used by synchronized subsurfaces),
      * not at resource destruction: destroying wl_buffer is not an unmap. */
     s->content_width = s->content_height = 0;
+    s->content_generation++;
     if (res) {
         struct wl_shm_buffer* shm = wl_shm_buffer_get(res);
         if (shm) {
@@ -217,6 +218,10 @@ void awl_surface_apply_buffer(struct awl_surface* s, struct wl_resource* res,
     e.height = b->height;
     e.stride = b->stride;
     e.format = b->drm_format;
+    e.content_generation = s->content_generation;
+    awl_surface_logical_size(s, &e.logical_w, &e.logical_h);
+    awl_surface_layer_uv(s, &e.u0, &e.v0, &e.su, &e.sv);
+    e.transform = s->buf_transform;
     r->b = awl_buffer_ref(b);
     r->release_res = release_res;
     if (release_res) awl_esync_bind_ref(release_res, r);

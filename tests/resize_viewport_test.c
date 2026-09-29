@@ -12,7 +12,48 @@ static void mapping(struct awl_surface* s, double ex, double ey) {
     assert(ox == 0. && oy == 0.);
 }
 
+static void frame_sampling(void) {
+    struct awl_surface s = {0};
+    s.content_generation = 2;
+    s.content_width = 3264; s.content_height = 1194;
+    s.vp_dst_w = 1632; s.vp_dst_h = 597;
+    struct awl_bq_buffer old = {0};
+    old.content_generation = 1;
+    old.width = 3264; old.height = 2560;
+    old.logical_w = 1632; old.logical_h = 597;
+    old.su = 1; old.sv = 1194.f / 2560.f;
+    awl_layer_info_t layer = { .surface_id = 42, .x = 7, .y = 9 };
+
+    // Chromium trims its oversized resize buffer one second after settling.
+    // The new viewport is whole-image, but its frame is not ready yet. The
+    // previous padded frame must retain its crop, not expose the black tail.
+    frame_view_locked(&s, &old, &layer);
+    assert(layer.w == 1632 && layer.h == 597);
+    assert(fabs(layer.sv * old.height - 1194) < .001);
+    assert(layer.surface_id == 42 && layer.x == 7 && layer.y == 9);
+
+    struct awl_bq_buffer fresh = old;
+    fresh.content_generation = 2; fresh.height = 1194; fresh.sv = 1;
+    frame_view_locked(&s, &fresh, &layer);
+    assert(layer.sv == 1);
+
+    // Legal metadata-only commit updates the current buffer; it must not
+    // rewrite older frame metadata (including transform and logical size).
+    s.vp_dst_h = 300; s.vp_has_src = 1;
+    s.vp_sw = 3264; s.vp_sh = 600; s.buf_transform = 2;
+    frame_view_locked(&s, &fresh, &layer);
+    assert(layer.h == 300 && layer.transform == 2);
+    assert(fabs(layer.sv * fresh.height - 600) < .001);
+    frame_view_locked(&s, &old, &layer);
+    assert(layer.h == 597 && layer.transform == 0);
+    assert(fabs(layer.sv * old.height - 1194) < .001);
+    frame_view_locked(NULL, &old, &layer); // surface died after frame ref
+    assert(layer.h == 597);
+    puts("PASS padded frame/new viewport/metadata-only commit/retired surface sampling");
+}
+
 int main(void) {
+    frame_sampling();
     g_srv.zoom_pct = 200;
     struct awl_surface s = {0};
     s.role = AWL_ROLE_TOPLEVEL; s.geom_valid = true; s.configured = true;

@@ -285,6 +285,7 @@ static void render_frame(wl_window* w) {
         GLuint tex = 0;
         uint32_t bw = 0, bh = 0, fmt = 0;
         if (b && b->dmabuf_fd >= 0) {
+            awl_surface_frame_view(b, &lay[i]);
             /* dmabuf frame → forged AHB → EGLImage texture (cache hit from the second lap on) */
             if (l.shm.texture) awl_gl_shm_release(&l.shm);   /* the surface left wl_shm */
             if (!l.cache) l.cache = awl_ahb_cache_create(awl_gl_tex_payload_destroy);

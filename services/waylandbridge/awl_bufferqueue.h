@@ -73,6 +73,14 @@ struct awl_bq_buffer {
     uint64_t seq;          /* process-wide frame sequence, stamped by push:
                             * identity of a frame that survives the consumer's
                             * put (an element pointer may be recycled) */
+    /* Surface-local commit identity and sampling state travel with the GPU
+     * frame. A newer commit may reset a padded buffer's viewport while its
+     * acquire fence is still pending; applying that reset to the old ready
+     * buffer exposes padding and compresses the visible image. */
+    uint64_t content_generation;
+    float logical_w, logical_h;
+    float u0, v0, su, sv;
+    int32_t transform;
     void* user;            /* producer cookie (opaque to the queue) */
 };
 

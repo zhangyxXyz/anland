@@ -157,6 +157,7 @@ struct awl_surface {
      * displays its uploaded texture / retained dmabuf. Only a new attach
      * changes these dimensions; attach(NULL) clears them. Protected by ev_lock. */
     uint32_t content_width, content_height;
+    uint64_t content_generation; /* changes with each applied buffer */
 
     struct wl_list frame_callbacks;
 

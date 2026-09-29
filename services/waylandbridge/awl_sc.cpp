@@ -900,6 +900,7 @@ static bool sc_render_window(const std::shared_ptr<sc_window>& w, int64_t vsync_
 
         bool latched = false;   /* a new buffer went into this transaction */
         if (head) {
+            awl_surface_frame_view(head, &lay[i]);
             /* ---- dmabuf frame ---- */
             if (L->shm.texture) awl_gl_shm_release(&L->shm);   /* the surface left wl_shm */
             bool scanout = awl_ahb_hwc_scanout_ok(head) && !L->overspeed;

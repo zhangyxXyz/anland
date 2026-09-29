@@ -27,6 +27,7 @@
  *   viewport at the new ratio, the render side adapts to the actual buffer,
  *   no window restart needed. */
 #include "awl_internal.h"
+#include "awl_bufferqueue.h"
 
 #include <viewporter-server-protocol.h>
 #include "fractional-scale-v1-server-protocol.h"
@@ -238,6 +239,34 @@ void awl_surface_layer_uv(struct awl_surface* s, float* u0, float* v0,
     *v0 = s->vp_sy / (float)bh;
     *su = s->vp_sw / (float)bw;
     *sv = s->vp_sh / (float)bh;
+}
+
+/* ev_lock held when s exists. Sample state must belong to the buffer being
+ * read, not whichever newer commit happened before the render thread ran.
+ * The generation comparison also preserves legal viewport-only commits on
+ * the current buffer, without modifying an immutable queued element. */
+static void frame_view_locked(struct awl_surface* s,
+                              const struct awl_bq_buffer* frame,
+                              awl_layer_info_t* layer) {
+    layer->w = frame->logical_w; layer->h = frame->logical_h;
+    layer->u0 = frame->u0; layer->v0 = frame->v0;
+    layer->su = frame->su; layer->sv = frame->sv;
+    layer->transform = frame->transform;
+    if (s && s->content_generation == frame->content_generation) {
+        awl_surface_logical_size(s, &layer->w, &layer->h);
+        awl_surface_layer_uv(s, &layer->u0, &layer->v0, &layer->su, &layer->sv);
+        layer->transform = s->buf_transform;
+    }
+}
+
+void awl_surface_frame_view(const struct awl_bq_buffer* frame, awl_layer_info_t* layer) {
+    if (!frame || frame->dmabuf_fd < 0) return;
+    pthread_rwlock_rdlock(&g_srv.rwl);
+    struct awl_surface* s = awl_surface_by_id(layer->surface_id);
+    if (s) pthread_mutex_lock(&s->ev_lock);
+    frame_view_locked(s, frame, layer);
+    if (s) pthread_mutex_unlock(&s->ev_lock);
+    pthread_rwlock_unlock(&g_srv.rwl);
 }
 
 /* ---------------- wp_viewport ---------------- */

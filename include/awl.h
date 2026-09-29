@@ -401,6 +401,13 @@ typedef struct awl_layer_info {
  * (>0 is enough to render). */
 int  awl_surface_get_layers(uint64_t root_id, awl_layer_info_t* out, int max);
 
+/* Resolve sampling geometry for the selected GPU frame after acquiring it.
+ * Older ready frames retain their committed viewport while a newer frame is
+ * pending. Metadata-only commits may update the current buffer's viewport.
+ * Keeps the caller's stack position and surface id. */
+struct awl_bq_buffer;
+void awl_surface_frame_view(const struct awl_bq_buffer* frame, awl_layer_info_t* layer);
+
 /* Client cursor layer of this window (wl_pointer.set_cursor surface; render
  * thread). Returns 1 and fills *out when the pointer-focused client set a
  * cursor surface for this window: the renderer composites it ABOVE every
