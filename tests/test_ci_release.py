@@ -153,7 +153,8 @@ class ReleaseTests(unittest.TestCase):
             path = Path(temp) / 'versions'
             content = (ROOT / 'version.properties').read_text()
             for bad in (content + '\nRELEASE_VERSION=1.0.0\n',
-                        content.replace('SHELL_VERSION_CODE=2', 'SHELL_VERSION_CODE=0')):
+                        content.replace('SHELL_VERSION_CODE=' + versions.read_versions()['SHELL_VERSION_CODE'],
+                                        'SHELL_VERSION_CODE=0')):
                 path.write_text(bad)
                 with self.assertRaises(ValueError):
                     versions.read_versions(path)

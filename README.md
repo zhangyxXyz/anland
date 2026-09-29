@@ -82,6 +82,8 @@ Downloads are checked against the manifest's SHA256, package name, component ver
 
 ## Release pipeline
 
+The default branch is `dev`. The Actions cleanup workflow runs every Sunday at 08:00 Asia/Shanghai, retaining each workflow’s six newest runs and every run from the last 30 days. Only completed older runs are deleted; manual runs default to a preview.
+
 ```mermaid
 flowchart LR
     trigger["v* tag / manual run"] --> plan

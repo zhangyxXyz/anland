@@ -1,0 +1,43 @@
+name: Delete old workflow runs
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/delete-old-workflow-runs.yml
+      - scripts/cleanup-workflow-runs.py
+      - scripts/tests/test_cleanup_workflow_runs.py
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview eligible runs without deleting them
+        type: boolean
+        default: true
+  schedule:
+    # Sunday 08:00 in Asia/Shanghai (00:00 UTC).
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: cleanup-workflow-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify cleanup retention rules
+        run: python3 -m unittest discover -s scripts/tests -p test_cleanup_workflow_runs.py -v
+      - name: Clean up old workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
+        run: python3 scripts/cleanup-workflow-runs.py
