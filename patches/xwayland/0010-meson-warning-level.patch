@@ -1,13 +1,17 @@
 --- a/meson.build
 +++ b/meson.build
-@@ -2,6 +2,7 @@
+@@ -2,9 +2,10 @@
          default_options: [
              'buildtype=debugoptimized',
              'c_std=gnu99',
 +            'warning_level=1',
          ],
          version: '24.1.10',
-         meson_version: '>= 0.56.0',
+-        meson_version: '>= 0.56.0',
++        meson_version: '>= 0.62.0',
+ )
+ release_date = '2026-04-14'
+ 
 @@ -18,7 +19,6 @@
  
  if cc.get_id() == 'gcc' or cc.get_id() == 'clang'

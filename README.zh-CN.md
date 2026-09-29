@@ -38,7 +38,7 @@ Shell 提供独立的「凭据」页面，可将本地或 SSH 登录凭据绑定
 4. 使用 Droidspaces 导入/解压所选 Linux RootFS，在 Shell 中选择容器和用户。镜像预设用户为 `seiun`。
 5. 配置下方的 [Droidspaces 挂载与 GPU](#droidspaces-挂载与-gpu-配置)，再启动容器并打开应用。「Linux 桌面」入口启动完整 Xfce 桌面；独立应用可继续使用各自的 Android 窗口。
 
-如果镜像分卷，按 `.part-000`、`.part-001`……顺序合并，再用 `ROOTFS-SHA256SUMS` 校验还原后的文件。测试 APK 仅供开发验证，正常使用无需安装。构建不会自动部署到设备。
+如果镜像分卷，按 `.part-000`、`.part-001`……顺序合并，再用 `ROOTFS-ARCHIVE-SHA256SUMS` 校验还原后的文件。测试 APK 仅供开发验证，正常使用无需安装。构建不会自动部署到设备。
 
 ## Droidspaces 挂载与 GPU 配置
 

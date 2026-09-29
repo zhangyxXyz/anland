@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
 
 from versions import read_versions
 from rootfs_target import resolve, archive_name
@@ -59,8 +60,9 @@ def current():
     return plan(env)
 
 
-def gh(*args):
-    return subprocess.check_output(['gh', *args], text=True, encoding='utf-8')
+def gh(*args, capture_errors=False):
+    return subprocess.check_output(['gh', *args], text=True, encoding='utf-8',
+                                   stderr=subprocess.PIPE if capture_errors else None)
 
 
 def view(tag):
@@ -91,7 +93,7 @@ def notes(build, status):
             'not run on a device. Device validation is separate.\n\n'
             'Verify downloaded files with `sha256sum -c SHA256SUMS`. '
             'For a split RootFS, concatenate `.part-000`, `.part-001`, ... in order '
-            'and verify the reconstructed archive with `ROOTFS-SHA256SUMS`.\n')
+            'and verify the reconstructed archive with `ROOTFS-ARCHIVE-SHA256SUMS`.\n')
 
 
 def edit_notes(build, status):
@@ -131,7 +133,7 @@ def validate_names(component, names, versions, suffix, target=None):
             raise ValueError(f'Unexpected {component} assets: {names}')
         return
     archive = archive_name(versions, suffix, target)
-    required = {'ROOTFS-SHA256SUMS', 'rootfs-components.json'}
+    required = {'ROOTFS-ARCHIVE-SHA256SUMS', 'rootfs-components.json'}
     images = names - required
     if not required <= names:
         raise ValueError('Missing RootFS provenance or archive checksum')
@@ -139,6 +141,23 @@ def validate_names(component, names, versions, suffix, target=None):
         return
     if not images or images != {f'{archive}.part-{i:03}' for i in range(len(images))}:
         raise ValueError('Missing or noncontiguous RootFS parts')
+
+
+def upload_asset(path, build):
+    # Upload one file at a time so a small metadata failure cannot cancel an
+    # in-flight image upload. Recheck ownership before every bounded retry.
+    for attempt in range(3):
+        require_owned_draft(build, view(build['tag']))
+        try:
+            gh('release', 'upload', build['tag'], str(path), '--clobber', capture_errors=True)
+            return
+        except subprocess.CalledProcessError as error:
+            message = error.stderr or ''
+            transient = re.search(r'HTTP (404|408|429|5\d\d)\b', message)
+            if not transient or attempt == 2:
+                raise RuntimeError(f'Upload failed for {path.name}: {message.strip()}') from error
+            print(f'Retrying upload of {path.name} after a transient GitHub response', flush=True)
+            time.sleep(2 ** (attempt + 1))
 
 
 def upload(component, directory, build):
@@ -150,6 +169,9 @@ def upload(component, directory, build):
     manifest_name, sums_name = f'{component}-manifest.json', f'{component}-SHA256SUMS'
     files = sorted(p for p in directory.iterdir()
                    if p.is_file() and p.name not in {manifest_name, sums_name})
+    names = [p.name.casefold() for p in files] + [manifest_name.casefold(), sums_name.casefold()]
+    if len(names) != len(set(names)):
+        raise ValueError('Release asset names must be unique even without case sensitivity')
     validate_names(component, {p.name for p in files}, build['versions'], build['suffix'], build['rootfs_target'])
     manifest = dict(component=component, run_id=build['run_id'], source=build['source'],
                     versions=build['versions'], suffix=build['suffix'], files=[])
@@ -166,8 +188,8 @@ def upload(component, directory, build):
     manifest_path = directory / manifest_name
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     # Manifest is the completion marker and must be uploaded last.
-    gh('release', 'upload', build['tag'], *map(str, files), str(sums), '--clobber')
-    gh('release', 'upload', build['tag'], str(manifest_path), '--clobber')
+    for path in [*files, sums, manifest_path]:
+        upload_asset(path, build)
 
 
 def verify_manifest(manifest, component, build, assets):

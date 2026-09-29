@@ -1,0 +1,16 @@
+--- a/os/xstrans.c
++++ b/os/xstrans.c
+@@ -14,4 +14,13 @@
+ #define TRANS_REOPEN
+ #define TRANS_SERVER
+ #define XSERV_t
++/* Xtrans GetHostname copies a bounded prefix, then explicitly writes NUL.
++ * GCC diagnoses the intermediate strncpy before seeing that terminator. */
++#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 8
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wstringop-truncation"
++#endif
+ #include <X11/Xtrans/transport.c>
++#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 8
++#pragma GCC diagnostic pop
++#endif

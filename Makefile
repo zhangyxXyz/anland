@@ -198,7 +198,7 @@ pulse-deps: check-tools
 	# libltdl uses portable statement-expression and configure-constant macros.
 	cd build/pulse-deps-src/libtool-2.4.7/libltdl
 	CC="$(PA_TC)/aarch64-linux-android$(PA_API)-clang" AR="$(PA_TC)/llvm-ar" RANLIB="$(PA_TC)/llvm-ranlib" \
-	FILECMD="$$(command -v file)" NM="$(PA_TC)/llvm-nm" STRIP="$(PA_TC)/llvm-strip" OBJDUMP="$(PA_TC)/llvm-objdump" \
+	MT=true FILECMD="$$(command -v file)" NM="$(PA_TC)/llvm-nm" STRIP="$(PA_TC)/llvm-strip" OBJDUMP="$(PA_TC)/llvm-objdump" \
 	CFLAGS="-O2 -fPIC -Wno-compound-token-split-by-macro -Wno-constant-logical-operand" ./configure --host=aarch64-linux-android --prefix="$(PA_DEPS)" \
 	  --enable-static --disable-shared --enable-ltdl-install >/dev/null
 	make -j$$(nproc) >/dev/null && make install >/dev/null
@@ -330,7 +330,7 @@ libffi: check-tools
 	CC="$$TC/aarch64-linux-android35-clang" \
 	CXX="$$TC/aarch64-linux-android35-clang++" \
 	AR="$$TC/llvm-ar" RANLIB="$$TC/llvm-ranlib" STRIP="$$TC/llvm-strip" \
-	FILECMD="$$(command -v file)" NM="$$TC/llvm-nm" OBJDUMP="$$TC/llvm-objdump" CFLAGS="-O2 -fPIC" \
+	MT=true FILECMD="$$(command -v file)" NM="$$TC/llvm-nm" OBJDUMP="$$TC/llvm-objdump" CFLAGS="-O2 -fPIC" \
 	  ../../third_party/libffi/configure --host=aarch64-linux-android \
 	    --prefix="$$PWD/../libffi-android-out" \
 	    --enable-static --disable-shared --disable-docs --disable-multi-os-directory \

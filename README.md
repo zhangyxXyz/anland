@@ -38,7 +38,7 @@ Shell provides a dedicated Credentials tab. A saved local or SSH login can be bo
 4. Import/extract the selected Linux RootFS using Droidspaces, then select the container and user in Shell. The image's configured user is `seiun`.
 5. Configure the [Droidspaces runtime mount and GPU access](#droidspaces-mounts-and-gpu-access), then start the container and launch applications. The Linux Desktop entry opens the full Xfce desktop; individual applications can keep their own Android windows.
 
-If the image is split, concatenate `.part-000`, `.part-001`, ... in order, then check the reconstructed archive with `ROOTFS-SHA256SUMS`. Test APKs are optional developer tools, not prerequisites for normal use. A build does not deploy files to a device.
+If the image is split, concatenate `.part-000`, `.part-001`, ... in order, then check the reconstructed archive with `ROOTFS-ARCHIVE-SHA256SUMS`. Test APKs are optional developer tools, not prerequisites for normal use. A build does not deploy files to a device.
 
 ## Droidspaces mounts and GPU access
 

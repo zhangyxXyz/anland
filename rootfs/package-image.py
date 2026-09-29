@@ -71,7 +71,7 @@ def package(builder, directory):
         raise ValueError('Exported image differs from the selected RootFS target')
     name = archive_name(versions, version_suffix(), target)
     original_hash = sha256(archives[0])
-    (directory / 'ROOTFS-SHA256SUMS').write_text(f'{original_hash}  {name}\n', encoding='utf-8')
+    (directory / 'ROOTFS-ARCHIVE-SHA256SUMS').write_text(f'{original_hash}  {name}\n', encoding='utf-8')
     (directory / 'rootfs-components.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     if archives[0].stat().st_size < 2_000_000_000:
         shutil.move(str(archives[0]), directory / name)

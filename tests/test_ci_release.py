@@ -53,7 +53,7 @@ class ReleaseTests(unittest.TestCase):
         with patch.dict(os.environ, dict(self.env, BUILD_PLAN=json.dumps(build)), clear=True):
             self.assertEqual(release.current(), build)
         base = release.archive_name(build['versions'], build['suffix'], 'Fedora-44')
-        names = {'ROOTFS-SHA256SUMS', 'rootfs-components.json', base}
+        names = {'ROOTFS-ARCHIVE-SHA256SUMS', 'rootfs-components.json', base}
         release.validate_names('rootfs', names, build['versions'], build['suffix'], 'Fedora-44')
         with self.assertRaises(ValueError):
             release.validate_names('rootfs', names, build['versions'], build['suffix'], 'Debian-13')
@@ -104,11 +104,81 @@ class ReleaseTests(unittest.TestCase):
     def test_split_rootfs_requires_every_part(self):
         v = versions.read_versions()
         base = f"anland-rootfs-debian13-arm64-{v['ROOTFS_VERSION']}.tar.xz"
-        names = {'ROOTFS-SHA256SUMS', 'rootfs-components.json', base + '.part-000', base + '.part-001'}
+        names = {'ROOTFS-ARCHIVE-SHA256SUMS', 'rootfs-components.json', base + '.part-000', base + '.part-001'}
         release.validate_names('rootfs', names, v, '')
         names.remove(base + '.part-000')
         with self.assertRaises(ValueError):
             release.validate_names('rootfs', names, v, '')
+
+    def test_rootfs_upload_preserves_archive_checksum_and_uploads_manifest_last(self):
+        self.env['BUILD_ROOTFS'] = 'true'
+        build = release.plan(self.env)
+        draft = dict(isDraft=True, body=release.marker(build))
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            archive = release.archive_name(build['versions'], build['suffix'], build['rootfs_target'])
+            (directory / archive).write_bytes(b'image')
+            checksum = f'{release.sha256(directory / archive)}  {archive}\n'
+            (directory / 'ROOTFS-ARCHIVE-SHA256SUMS').write_text(checksum)
+            (directory / 'rootfs-components.json').write_text(json.dumps({
+                'source': build['source'], 'target': build['rootfs_target']}))
+            with patch.object(release, 'view', return_value=draft), \
+                 patch.object(release, 'upload_asset') as send:
+                release.upload('rootfs', directory, build)
+            names = [call.args[0].name for call in send.call_args_list]
+            self.assertEqual(len(names), len({name.casefold() for name in names}))
+            self.assertEqual(names[-1], 'rootfs-manifest.json')
+            self.assertEqual((directory / 'ROOTFS-ARCHIVE-SHA256SUMS').read_text(), checksum)
+            self.assertIn('ROOTFS-ARCHIVE-SHA256SUMS', (directory / 'rootfs-SHA256SUMS').read_text())
+
+    def test_upload_retries_transient_errors_but_never_completes_after_failure(self):
+        build = release.plan(self.env)
+        draft = dict(isDraft=True, body=release.marker(build))
+        error = release.subprocess.CalledProcessError(1, ['gh'], stderr='HTTP 404: Not Found')
+        with patch.object(release, 'view', return_value=draft) as view, \
+             patch.object(release, 'gh', side_effect=[error, '']) as gh, \
+             patch.object(release.time, 'sleep'):
+            release.upload_asset(Path('asset.apk'), build)
+            self.assertEqual(gh.call_count, 2)
+            self.assertEqual(view.call_count, 2)
+        with patch.object(release, 'view', return_value=draft), \
+             patch.object(release, 'gh', side_effect=error) as gh, \
+             patch.object(release.time, 'sleep'):
+            with self.assertRaisesRegex(RuntimeError, 'asset.apk'):
+                release.upload_asset(Path('asset.apk'), build)
+            self.assertEqual(gh.call_count, 3)
+        error.stderr = 'HTTP 403: Forbidden'
+        with patch.object(release, 'view', return_value=draft), \
+             patch.object(release, 'gh', side_effect=error) as gh:
+            with self.assertRaises(RuntimeError):
+                release.upload_asset(Path('asset.apk'), build)
+            self.assertEqual(gh.call_count, 1)
+
+    def test_upload_retry_rechecks_draft_ownership(self):
+        build = release.plan(self.env)
+        draft = dict(isDraft=True, body=release.marker(build))
+        error = release.subprocess.CalledProcessError(1, ['gh'], stderr='HTTP 503: unavailable')
+        with patch.object(release, 'view', side_effect=[draft, dict(isDraft=False, body='')]), \
+             patch.object(release, 'gh', side_effect=error) as gh, \
+             patch.object(release.time, 'sleep'):
+            with self.assertRaisesRegex(ValueError, 'public release'):
+                release.upload_asset(Path('asset.apk'), build)
+            self.assertEqual(gh.call_count, 1)
+
+    def test_upload_rejects_case_only_checksum_collision_before_writing(self):
+        self.env['BUILD_ROOTFS'] = 'true'
+        build = release.plan(self.env)
+        draft = dict(isDraft=True, body=release.marker(build))
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            original = directory / 'ROOTFS-SHA256SUMS'
+            original.write_text('archive checksum')
+            with patch.object(release, 'view', return_value=draft), \
+                 patch.object(release, 'upload_asset') as send:
+                with self.assertRaisesRegex(ValueError, 'case sensitivity'):
+                    release.upload('rootfs', directory, build)
+                send.assert_not_called()
+            self.assertEqual(original.read_text(), 'archive checksum')
 
     def test_failed_selected_job_marks_draft_incomplete(self):
         build = release.plan(self.env)
@@ -206,7 +276,7 @@ class ReleaseTests(unittest.TestCase):
                 image.package(builder, output)
             name = release.archive_name(v, '', target)
             self.assertTrue((output / name).is_file())
-            self.assertEqual((output / 'ROOTFS-SHA256SUMS').read_text(),
+            self.assertEqual((output / 'ROOTFS-ARCHIVE-SHA256SUMS').read_text(),
                              f'{release.sha256(output / name)}  {name}\n')
 
 
