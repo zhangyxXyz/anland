@@ -534,7 +534,10 @@ public class AwlWindowActivity extends Activity {
          * death token, no LIVE entry, host=0 → SURFACE attached without a
          * ctrl channel, so C_CLOSE / WINDOW_GONE could never finish it; the
          * window stayed on its last frame after the client quit). */
-        long startId = getIntent().getLongExtra("id", -1);
+        // Android can recreate a retained document from its base Intent after
+        // an APK upgrade with extras stripped. The document URI is the stable
+        // window identity; restore it before waiting for any newer Intent.
+        long startId = getIntent().getLongExtra("id", WindowTaskService.windowId(getIntent()));
         if (startId >= 0 && redirectDialog(startId)) return;
         if (startId >= 0) {
             bindWindowId(startId, getIntent().getStringExtra("title"), null, true);
