@@ -15,16 +15,75 @@ import java.util.List;
  * Translucent trampoline used by both grid taps and pinned home-screen
  * shortcuts: make sure the container is running (boot + poll if not), then
  * launch the app detached inside it (DsCli.launchApp — nohup, returns
- * immediately, survives this process) and finish. noHistory +
- * excludeFromRecents keep it invisible in the flow.
+ * immediately, survives this process) and finish. excludeFromRecents and
+ * explicit lifecycle cleanup keep it invisible in the flow while permitting
+ * a foreground preflight result when a vendor blocks provider cold starts.
  */
 public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatActivity {
 
     private LaunchUi.Progress msg;
     private boolean foreground;
+    private static final int SESSION_PREFLIGHT = 1;
+    private volatile java.util.concurrent.CompletableFuture<Bundle> sessionPreflight;
 
     @Override protected void onResume() { super.onResume(); foreground = true; }
     @Override protected void onPause() { foreground = false; super.onPause(); }
+    @Override protected void onStop() {
+        super.onStop();
+        // Retain only our own foreground preflight. Home, a native-opened
+        // window or the final activation handoff cancels this coordinator.
+        if (sessionPreflight == null && !isChangingConfigurations()) finish();
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != SESSION_PREFLIGHT) return;
+        java.util.concurrent.CompletableFuture<Bundle> pending = sessionPreflight;
+        sessionPreflight = null;
+        if (pending == null) return;
+        if (resultCode == RESULT_OK && data != null && data.hasExtra("window_ids")) {
+            pending.complete(data.getExtras());
+        } else {
+            String error = data == null ? null : data.getStringExtra("error");
+            pending.completeExceptionally(new IllegalStateException(error == null ? getString(R.string.host_update_needed) : error));
+        }
+    }
+
+    @Override protected void onDestroy() {
+        java.util.concurrent.CompletableFuture<Bundle> pending = sessionPreflight;
+        sessionPreflight = null;
+        if (pending != null) pending.cancel(false);
+        super.onDestroy();
+    }
+
+    private Bundle sessionWindows() throws Exception {
+        try {
+            Bundle snapshot = getContentResolver().call(
+                    android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
+            if (snapshot != null) return snapshot;
+        } catch (IllegalArgumentException unavailable) {
+            // HyperOS can report "Unknown authority" for an installed provider
+            // when its owner is not running. Never infer an empty desktop here.
+            android.util.Log.w("AnlandLaunch", "Session provider unavailable; requesting foreground preflight", unavailable);
+        }
+        java.util.concurrent.CompletableFuture<Bundle> pending = new java.util.concurrent.CompletableFuture<>();
+        sessionPreflight = pending;
+        runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed() || !foreground) { pending.cancel(false); return; }
+            try {
+                startActivityForResult(new android.content.Intent()
+                        .setClassName("com.anlandnext", "com.anlandnext.SessionPreflightActivity")
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION), SESSION_PREFLIGHT);
+            } catch (android.content.ActivityNotFoundException e) {
+                pending.completeExceptionally(new IllegalStateException(getString(R.string.host_update_needed), e));
+            }
+        });
+        try {
+            return pending.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            sessionPreflight = null;
+        }
+    }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         LaunchUi.prepare(this);
@@ -89,8 +148,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
             // Snapshot before launching. Newly mapped windows with auto_attach
             // enabled belong to the daemon's launch path; do not race it with
             // another startActivity from the explicit activation path.
-            android.os.Bundle windows = getContentResolver().call(
-                    android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
+            android.os.Bundle windows = sessionWindows();
             if (desktopEntry && !inDesktop) {
                 if (windows == null) throw new IllegalStateException(getString(R.string.host_update_needed));
                 if (windows.getInt("independent") > 0) {

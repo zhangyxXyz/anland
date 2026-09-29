@@ -28,6 +28,8 @@
                   android:taskAffinity="${applicationId}.launch"
                   android:excludeFromRecents="true"/>
         <provider android:name=".SessionWindowsProvider" android:authorities="com.anlandnext.sessions" android:exported="true"/>
+        <activity android:name=".SessionPreflightActivity" android:exported="true"
+                  android:theme="@style/Theme.AnlandLaunch" android:excludeFromRecents="true"/>
 
         <!-- client closed its own window → daemon notification finishes the Activity -->
         <receiver android:name=".WindowGoneReceiver" android:exported="true">
