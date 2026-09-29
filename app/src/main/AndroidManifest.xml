@@ -21,7 +21,12 @@
 
         <!-- Window behavior settings -->
         <activity android:name=".WlSettingsActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell"/>
-        <activity android:name=".OpenWindowActivity" android:exported="true" android:theme="@style/Theme.AnlandLaunch" android:excludeFromRecents="true"/>
+        <!-- Daemon NEW_TASK requests must not front the window-list task under
+             this transparent coordinator. Shell's in-task handoff stays local. -->
+        <activity android:name=".OpenWindowActivity" android:exported="true"
+                  android:theme="@style/Theme.AnlandLaunch"
+                  android:taskAffinity="${applicationId}.launch"
+                  android:excludeFromRecents="true"/>
         <provider android:name=".SessionWindowsProvider" android:authorities="com.anlandnext.sessions" android:exported="true"/>
 
         <!-- client closed its own window → daemon notification finishes the Activity -->
