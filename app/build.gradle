@@ -22,6 +22,7 @@ android {
         targetSdk 29
         versionCode 1
         versionName '0.1'
+        testInstrumentationRunner 'com.anlandnext.awl.TaskIdentityInstrumentation'
     }
 
     compileOptions {
@@ -44,6 +45,7 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    testBuildType 'release'
 
     lint {
         // Sideloaded root tool — never distributed via Google Play; targetSdk 29

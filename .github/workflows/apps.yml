@@ -92,10 +92,11 @@ jobs:
         run: |
           set -euo pipefail
           cp debug.keystore shell-app/debug.keystore
-          (cd app && bash gradlew assembleRelease lintRelease --console=plain)
+          (cd app && bash gradlew assembleRelease assembleReleaseAndroidTest lintRelease --console=plain)
           (cd shell-app && bash gradlew assembleRelease assembleReleaseAndroidTest lintRelease --console=plain)
           mkdir release
           cp app/build/outputs/apk/release/*.apk release/anland-wayland.apk
+          cp app/build/outputs/apk/androidTest/release/*.apk release/anland-wayland-tests.apk
           cp shell-app/build/outputs/apk/release/*.apk release/anland-shell.apk
           cp shell-app/build/outputs/apk/androidTest/release/*.apk release/anland-shell-tests.apk
       - name: Build native daemon

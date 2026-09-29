@@ -266,7 +266,10 @@ public final class Awl {
     static final class HostEntry {
         final WlWindow win;
         final HostCallbacks cbs;
-        HostEntry(WlWindow win, HostCallbacks cbs) { this.win = win; this.cbs = cbs; }
+        final WindowTaskIdentity identity;
+        HostEntry(WlWindow win, HostCallbacks cbs, WindowTaskIdentity identity) {
+            this.win = win; this.cbs = cbs; this.identity = identity;
+        }
     }
 
     /* attach serialization: startActivity for the same window twice before
@@ -278,6 +281,8 @@ public final class Awl {
     private static final java.util.HashSet<Long> attachPending = new java.util.HashSet<>();
     private static final java.util.concurrent.ConcurrentHashMap<Long, HostEntry> hostEntries =
             new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ExecutorService launchLoader =
+            java.util.concurrent.Executors.newFixedThreadPool(2);
 
     /**
      * Show a wayland toplevel as a window of THIS app: starts the library's
@@ -299,33 +304,56 @@ public final class Awl {
 
     /** Same, taking the window from {@link #getWindows} / a created event. */
     public static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs) {
-        if (ctx == null || win == null) return;
+        attachWindow(ctx, win, cbs, null);
+    }
+
+    /* The broadcast receiver holds goAsync until the asynchronous launch has
+     * finished, so Android cannot freeze its process between load and start. */
+    static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs, Runnable launched) {
+        if (ctx == null || win == null) { if (launched != null) launched.run(); return; }
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> attachWindow(ctx, win, cbs));
+                    .post(() -> attachWindow(ctx, win, cbs, launched));
             return;
         }
-        Intent it = new Intent(ctx, AwlWindowActivity.class);
-        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
-        it.setData(Uri.parse("anland://win/" + win.id));
-        it.putExtra("id", win.id);
-        if (win.title != null) it.putExtra("title", win.title);
         synchronized (ATTACH_LOCK) {
-            if (!attachPending.add(win.id))
+            if (!attachPending.add(win.id)) {
+                if (launched != null) launched.run();
                 return;   /* an attach for this window is already launching */
-            if (cbs != null) hostEntries.put(win.id, new HostEntry(win, cbs));
-            else hostEntries.remove(win.id);   /* a re-attach without hooks clears stale ones */
+            }
         }
-        try {
-            // Classify before launching: a temporary NEW_DOCUMENT Activity
-            // causes an app-switch animation even if onCreate redirects it.
-            if (!AwlWindowActivity.launchDialog(ctx, win.id, win.title))
-                ctx.startActivity(it);
-        } catch (Exception e) {
-            attachFailed(win.id);
-            Log.e(TAG, "attachWindow failed", e);
-        }
+        // A title-only task can be cached by Recents before surfaceChanged's
+        // asynchronous icon fetch finishes. Resolve the complete identity
+        // before creating the task, then publish label + icon together in
+        // onCreate. No filesystem reads or SVG decoding on the UI thread.
+        launchLoader.execute(() -> {
+            WindowTaskIdentity loaded = null;
+            try { loaded = WindowTaskIdentity.load(win.id); }
+            catch (RuntimeException e) { Log.w(TAG, "initial task identity unavailable", e); }
+            final WindowTaskIdentity identity = loaded;
+            MAIN.post(() -> {
+                try {
+                    synchronized (ATTACH_LOCK) {
+                        if (!attachPending.contains(win.id)) return; // window died while loading
+                    }
+                    String title = identity != null ? identity.title : win.title;
+                    hostEntries.put(win.id, new HostEntry(new WlWindow(win.id, win.attached, title), cbs, identity));
+                    // Classify before launching: a temporary NEW_DOCUMENT Activity
+                    // causes an app-switch animation even if onCreate redirects it.
+                    if (!AwlWindowActivity.launchDialog(ctx, win.id, title)) {
+                        Intent it = new Intent(ctx, AwlWindowActivity.class);
+                        it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+                        it.setData(Uri.parse("anland://win/" + win.id));
+                        it.putExtra("id", win.id);
+                        if (title != null) it.putExtra("title", title);
+                        ctx.startActivity(it);
+                    }
+                } catch (Exception e) {
+                    attachFailed(win.id);
+                    Log.e(TAG, "attachWindow failed", e);
+                } finally { if (launched != null) launched.run(); }
+            });
+        });
     }
 
     private static void attachFailed(long id) {

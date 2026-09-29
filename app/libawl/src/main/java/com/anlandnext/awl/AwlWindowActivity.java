@@ -445,16 +445,22 @@ public class AwlWindowActivity extends Activity {
             Awl.HostEntry he = Awl.hostEntry(id);
             hostCbs = he != null ? he.cbs : null;
             hostWin = he != null ? he.win : null;
+            if (he != null && he.identity != null) {
+                taskTitle = he.identity.title;
+                taskIcon = he.identity.icon;
+                if (he.identity.desktop != null) {
+                    taskAppId = he.identity.desktop.appId;
+                    taskDesktopName = he.identity.desktop.name;
+                }
+            }
         } else {
             hostWin = new Awl.WlWindow(id, true, title);
             hostCbs = cbs;
         }
 
         /* Recents shows the wayland window's real title (the UI itself has no title bar, only the task label) */
-        if (title != null && !title.isEmpty()) {
-            taskTitle = title;
-            applyTaskDescription();
-        }
+        if (taskTitle == null) taskTitle = title;
+        applyTaskDescription();
 
         if (firstBind) {
             /* Long-lived binder death monitoring: daemon gone (module restart / killed) → exit, no dead windows left behind */
@@ -714,48 +720,22 @@ public class AwlWindowActivity extends Activity {
         iconFetchRunning = true;
         final long fid = id;
         final int request = iconRequest.incrementAndGet();
+        final String requestedTitle = taskTitle;
         new Thread(() -> {
-            final AwlClient.DesktopInfo desktop = AwlClient.desktopInfo(fid);
-            int[] wh = new int[2];
-            byte[] px = AwlClient.icon(fid, wh);
-            android.graphics.Bitmap bmp = null;
-            if (px != null && wh[0] > 0 && wh[1] > 0
-                    && (long) wh[0] * wh[1] * 4 == px.length) {
-                try {
-                    bmp = android.graphics.Bitmap.createBitmap(
-                            wh[0], wh[1], android.graphics.Bitmap.Config.ARGB_8888);
-                    bmp.copyPixelsFromBuffer(java.nio.ByteBuffer.wrap(px));
-                } catch (Exception e) {
-                    Log.w(TAG, "toplevel icon decode failed", e);
-                    bmp = null;
-                }
-            }
-            if (bmp == null && desktop != null && desktop.icon != null && desktop.icon.length > 0) {
-                android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
-                bounds.inJustDecodeBounds = true;
-                android.graphics.BitmapFactory.decodeByteArray(desktop.icon, 0, desktop.icon.length, bounds);
-                if (bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth <= 4096 && bounds.outHeight <= 4096) {
-                    bounds.inJustDecodeBounds = false;
-                    bounds.inSampleSize = Math.max(1, Math.max(bounds.outWidth, bounds.outHeight) / 128);
-                    bmp = android.graphics.BitmapFactory.decodeByteArray(desktop.icon, 0, desktop.icon.length, bounds);
-                } else {
-                    // Render desktop SVG icons into a bounded bitmap. Do not
-                    // install an external-file/network resolver for SVG assets.
-                    try {
-                        String xml = new String(desktop.icon, java.nio.charset.StandardCharsets.UTF_8);
-                        if (xml.contains("<svg") && !xml.contains("<!DOCTYPE") && !xml.contains("<!ENTITY")) {
-                            com.caverock.androidsvg.SVG svg = com.caverock.androidsvg.SVG.getFromString(xml);
-                            bmp = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888);
-                            new android.graphics.Canvas(bmp).drawPicture(svg.renderToPicture(128, 128));
-                        }
-                    } catch (Exception e) { Log.w(TAG, "desktop SVG decode failed", e); }
-                }
-            }
-            final android.graphics.Bitmap fb = bmp;
+            WindowTaskIdentity loaded = null;
+            try { loaded = WindowTaskIdentity.load(fid); }
+            catch (RuntimeException e) { Log.w(TAG, "task identity unavailable", e); }
+            final WindowTaskIdentity identity = loaded;
+            final AwlClient.DesktopInfo desktop = identity != null ? identity.desktop : null;
+            final android.graphics.Bitmap fb = identity != null ? identity.icon : null;
             runOnUiThread(() -> {
                 iconFetchRunning = false;
                 if (isFinishing() || isDestroyed()) return;
                 if (request == iconRequest.get() && fid == id) {
+                    // Refresh title changes made before attachment / while
+                    // stopped, without overwriting a newer control event.
+                    if (identity != null && java.util.Objects.equals(taskTitle, requestedTitle))
+                        taskTitle = identity.title;
                     if (desktop != null) {
                         if (taskAppId != null && !taskAppId.equals(desktop.appId)) taskIcon = null;
                         taskAppId = desktop.appId;

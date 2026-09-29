@@ -15,7 +15,8 @@ public final class AwlWindowLaunchReceiver extends BroadcastReceiver {
         if (windows == null) return;
         for (Awl.WlWindow window : windows) {
             if (window.id == id) {
-                Awl.attachWindow(context, id, window.title);
+                PendingResult pending = goAsync();
+                Awl.attachWindow(context, window, null, pending::finish);
                 return;
             }
         }
