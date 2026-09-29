@@ -79,7 +79,7 @@ final class AwlClient {
     static boolean available() { return get() != null; }
 
     static int surface(long id, int w, int h, Surface surface, IBinder deathToken,
-                       long host) {
+                       long host, long generation) {
         IBinder b = get();
         if (b == null || surface == null) return -1;
         Parcel d = Parcel.obtain();
@@ -92,6 +92,7 @@ final class AwlClient {
             surface.writeToParcel(d, 0);
             d.writeStrongBinder(deathToken);
             d.writeLong(host);
+            d.writeLong(generation);
             b.transact(T_SURFACE, d, r, 0);
             return r.dataSize() >= 4 ? r.readInt() : Integer.MIN_VALUE;
         } catch (Exception e) {
@@ -126,7 +127,7 @@ final class AwlClient {
     }
 
     /** onPause → daemon full detach (minimize; ONEWAY — daemon teardown joins threads) */
-    static void pause(long id, long host) {
+    static void pause(long id, long host, long generation) {
         IBinder b = get();
         if (b == null) return;
         Parcel d = Parcel.obtain();
@@ -134,6 +135,7 @@ final class AwlClient {
             d.writeInterfaceToken(DESCRIPTOR);
             d.writeLong(id);
             d.writeLong(host);
+            d.writeLong(generation);
             b.transact(T_PAUSE, d, null, IBinder.FLAG_ONEWAY);
         } catch (Exception e) {
             s = null;
@@ -142,7 +144,7 @@ final class AwlClient {
         }
     }
 
-    static int focus(long id, boolean hasFocus) {
+    static int focus(long id, boolean hasFocus, long host, long generation) {
         IBinder b = get();
         if (b == null) return -1;
         Parcel d = Parcel.obtain();
@@ -151,6 +153,8 @@ final class AwlClient {
             d.writeInterfaceToken(DESCRIPTOR);
             d.writeLong(id);
             d.writeInt(hasFocus ? 1 : 0);
+            d.writeLong(host);
+            d.writeLong(generation);
             b.transact(T_FOCUS, d, r, 0);
             return r.dataSize() >= 4 ? r.readInt() : -1;
         } catch (Exception e) {

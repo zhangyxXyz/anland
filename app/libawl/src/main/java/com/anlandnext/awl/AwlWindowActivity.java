@@ -107,6 +107,7 @@ public class AwlWindowActivity extends Activity {
 
     private long id = -1;   /* -1 = unbound (bindWindowId's firstBind test; a plain long would read 0 = "bound to window 0") */
     private long host;
+    private long surfaceGeneration;
     private SurfaceView sv;
     private FrameLayout root;
     private EditText hiddenInput;
@@ -379,7 +380,7 @@ public class AwlWindowActivity extends Activity {
         if (newId == id || newId < 0) return;
         boolean firstBind = id < 0;
         if (!firstBind) {   /* switching away from a bound window */
-            if (attached) AwlClient.pause(id, host);   /* daemon detaches the old id */
+            if (attached) AwlClient.pause(id, host, surfaceGeneration);   /* daemon detaches the old id */
             setPointerCaptureMode(CAPTURE_NONE, 0, 0, 0, 0);   /* the old window's constraint does not carry over */
             LIVE.remove(id);
             attached = false;
@@ -392,6 +393,7 @@ public class AwlWindowActivity extends Activity {
         taskIcon = null;
         if (root != null) root.requestApplyInsets();
         host = HOST_SEQ.incrementAndGet();
+        surfaceGeneration = 0;
         ctrl = new CtrlBinder();
         /* lastW/H keep the surface size (an Android-window property, not a
          * wayland-window one): if surfaceChanged already fired while awaiting,
@@ -660,7 +662,9 @@ public class AwlWindowActivity extends Activity {
      *  paused or its process dead, daemon restarted, stale card tapped) —
      *  no placeholder instance and no dead card left behind */
     private void sendSurface(SurfaceHolder holder, int w, int h) {
-        int rc = AwlClient.surface(id, w, h, holder.getSurface(), ctrl, host);
+        // PAUSE is asynchronous. A fresh generation makes a delayed pause of
+        // the previous attachment harmless even when this Activity is reused.
+        int rc = AwlClient.surface(id, w, h, holder.getSurface(), ctrl, host, ++surfaceGeneration);
         attached = rc == 0;
         lastW = w;
         lastH = h;
@@ -669,6 +673,10 @@ public class AwlWindowActivity extends Activity {
             finishAndDropTask();
             return;
         }
+        // onNewIntent can cause pause/resume WITHOUT a window-focus callback.
+        // Detach sent keyboard/text-input leave, so restore the actual Android
+        // focus as part of attachment; rendering alone cannot restore input.
+        AwlClient.focus(id, hasWindowFocus(), host, surfaceGeneration);
         applyTaskIconAsync();   /* the daemon may already hold an icon (re-attach / set before map) */
     }
 
@@ -769,7 +777,7 @@ public class AwlWindowActivity extends Activity {
         /* treat as minimize: daemon full detach (rendering resources freed,
          * wayland window kept alive). Clear attached locally too —
          * onResume/surfaceChanged re-attach from there */
-        AwlClient.pause(id, host);
+        AwlClient.pause(id, host, surfaceGeneration);
         attached = false;
         Awl.release();
         Awl.unregisterCallback(winEvents);
@@ -781,7 +789,7 @@ public class AwlWindowActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (id < 0) return;   /* awaiting: nothing to report focus for */
-        AwlClient.focus(id, hasFocus);   /* focus notifies the wayland client (configure ACTIVATED) */
+        AwlClient.focus(id, hasFocus, host, surfaceGeneration);   /* focus notifies the wayland client (configure ACTIVATED) */
         if (hasFocus) {
             tryShowIme();        /* C_IME_SHOW may arrive before focus does (input state kept across re-attach) */
             pushClipboard();     /* daemon restart / listener missed the change → re-push while focused */

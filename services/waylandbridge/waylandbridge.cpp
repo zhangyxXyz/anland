@@ -255,6 +255,7 @@ struct awl_win_state {
     char* title = nullptr;   /* heap strdup — NULL == empty (keeps the map node
                               * small; only the AWL_T_LIST dump reads it) */
     int64_t host = 0;     /* current holder Activity instance id (SURFACE-reported; 0=unknown) */
+    int64_t generation = 0; /* attachment within that Activity; 0 = legacy client */
     AIBinder* ctrl;       /* control channel binder (proxy of the Activity's CtrlBinder) */
 
     /* IME lifecycle (mirror of the client text_input state; kept alive
@@ -277,6 +278,13 @@ struct awl_win_state {
 };
 
 static std::mutex g_state_lock;
+/* Binder orders ONEWAY calls among themselves, not against synchronous
+ * SURFACE/FOCUS calls. Serialize their complete lifecycle transitions, including
+ * renderer teardown and keyboard leave. Generation checks under this lock make
+ * an old pause harmless whether it arrives before or after the next SURFACE.
+ * Lock order: lifecycle -> state / logic locks; callbacks never take lifecycle.
+ * Do not hold g_state_lock over renderer joins or Wayland event delivery. */
+static std::mutex g_lifecycle_lock;
 static std::map<uint64_t, awl_win_state> g_wins;
 
 /* death token → associated windows (APP process → multiple windows) */
@@ -328,6 +336,7 @@ static void evt_dispatch(uid_t owner, uint64_t id, transaction_code_t code, cons
  * reset → focus-loss event outside the lock (awl_window_set_activated
  * goes through rwl+ev_lock+socket flush; must not hold g_state_lock). */
 static void detach_window(uint64_t id) {
+    /* caller holds g_lifecycle_lock (PAUSE or process-death callback) */
     bool had_kbd = false;
     bool sched_drop = false;      /* was attached → restore the client's cgroups */
     bool sched_none_left = false; /* this detach emptied the attach set → self falls back */
@@ -597,6 +606,7 @@ static void evt_watchdog_fn(void) {
 }
 
 static void on_token_died(void* cookie) {
+    std::lock_guard<std::mutex> lifecycle(g_lifecycle_lock);
     death_link* dl = (death_link*)cookie;
     std::vector<uint64_t> ids;
     {
@@ -1587,6 +1597,7 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
     if (!caller_ok(code)) return STATUS_PERMISSION_DENIED;
     switch (code) {
     case AWL_T_SURFACE: {
+        std::lock_guard<std::mutex> lifecycle(g_lifecycle_lock);
         int64_t id64; int32_t w, h;
         if (AParcel_readInt64(in, &id64) != STATUS_OK ||
             AParcel_readInt32(in, &w) != STATUS_OK ||
@@ -1631,6 +1642,8 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         /* trailing optional host (Activity instance id; older APKs lack this field → 0 = takes no part in evict decisions) */
         int64_t host = 0;
         (void)AParcel_readInt64(in, &host);
+        int64_t generation = 0;
+        (void)AParcel_readInt64(in, &generation); /* optional since attachment focus fix */
 
         /* register the death token early (a crash mid-attach still gets a
          * death-notification backstop); stale members are neutralized by
@@ -1695,6 +1708,7 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
                 }
                 ws.attached = true;
                 if (host) ws.host = host;
+                ws.generation = generation;
                 /* link convergence: the id stays only on this token's chain (stale members pruned from other chains) */
                 std::vector<death_link*> retire;   /* retired after the scan (no mid-iteration erase) */
                 for (death_link* dl : g_links) {
@@ -1740,8 +1754,8 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         xwm_resize_window(id, w, h);         /* Xwayland window: sync initial size to the X side */
         backend_request_render(id);          /* render a first frame */
         evt_dispatch(awl_window_client_uid(id), id, AWL_E_ATTACHED, nullptr);
-        LOGI("SURFACE %llu %dx%d → attached (host=%lld)",
-             (unsigned long long)id, w, h, (long long)host);
+        LOGI("SURFACE %llu %dx%d → attached (host=%lld generation=%lld)",
+             (unsigned long long)id, w, h, (long long)host, (long long)generation);
         AParcel_writeInt32(out, 0);
         return STATUS_OK;
     }
@@ -1938,10 +1952,13 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
     case AWL_T_PAUSE: {   /* Activity onPause → daemon immediately fully detaches (minimize).
                            * ONEWAY: renderer teardown joins a thread; must not block
                            * the APK main thread's transact */
+        std::lock_guard<std::mutex> lifecycle(g_lifecycle_lock);
         int64_t id64;
         AParcel_readInt64(in, &id64);
         int64_t host = 0;
         (void)AParcel_readInt64(in, &host);   /* trailing optional (same as SURFACE) */
+        int64_t generation = 0;
+        (void)AParcel_readInt64(in, &generation);
         /* ownership pass before the lock (window_ok takes the logic layer's
          * rwl; a rejected pause is simply dropped — the oneway caller reads
          * no reply) */
@@ -1957,6 +1974,12 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
                 AParcel_writeInt32(out, 0);
                 return STATUS_OK;
             }
+            if (generation && it->second.generation && generation != it->second.generation) {
+                LOGI("window %lld stale pause generation=%lld (current=%lld) ignored",
+                     (long long)id64, (long long)generation, (long long)it->second.generation);
+                AParcel_writeInt32(out, 0);
+                return STATUS_OK;
+            }
         }
         detach_window((uint64_t)id64);
         AParcel_writeInt32(out, 0);
@@ -1964,14 +1987,28 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         return STATUS_OK;
     }
     case AWL_T_FOCUS: {   /* focus → configure ACTIVATED + keyboard enter/leave */
+        std::lock_guard<std::mutex> lifecycle(g_lifecycle_lock);
         int64_t id64; int32_t has;
         AParcel_readInt64(in, &id64);
         AParcel_readInt32(in, &has);
+        int64_t host = 0, generation = 0;
+        (void)AParcel_readInt64(in, &host);
+        (void)AParcel_readInt64(in, &generation);
         if (!window_ok((uint64_t)id64)) { AParcel_writeInt32(out, -1); return STATUS_OK; }
         {
             std::lock_guard<std::mutex> lk(g_state_lock);
             auto it = g_wins.find((uint64_t)id64);
-            if (it != g_wins.end()) it->second.kbd_focus = has != 0;
+            if (it == g_wins.end()) { AParcel_writeInt32(out, -1); return STATUS_OK; }
+            auto& ws = it->second;
+            if ((host && ws.host && host != ws.host) ||
+                (generation && ws.generation && generation != ws.generation)) {
+                AParcel_writeInt32(out, 0);
+                return STATUS_OK;
+            }
+            // Attach restores the current focus; the platform may later report
+            // the same fact. Wayland enter/leave must still be paired exactly.
+            if (ws.kbd_focus == (has != 0)) { AParcel_writeInt32(out, 0); return STATUS_OK; }
+            ws.kbd_focus = has != 0;
         }
         awl_window_set_activated((uint64_t)id64, has);
         if (has) xwm_activate_window((uint64_t)id64, true);   /* Xwayland: raise + X input focus follow the Activity */
