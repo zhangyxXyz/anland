@@ -62,12 +62,6 @@ struct wl_window {
     EGLSurface surface = EGL_NO_SURFACE;
     EGLContext context = EGL_NO_CONTEXT;
     awl_gl_quad quad;
-    int cur_vw = 0, cur_vh = 0;    /* ANativeWindow size cache — valid until
-                                    * the logic layer reports a resize
-                                    * (awl_window_resize → size_dirty;
-                                    * small-window ↔ fullscreen resizes the
-                                    * surface in place, no SURFACE re-attach) */
-    std::atomic<bool> size_dirty{true};   /* render_frame re-queries once */
     bool logged_frame = false;     /* first-frame log (diagnostics) */
     uint64_t frame_no = 0;         /* LRU clock of the layer import caches */
     std::map<uint64_t, wl_layer> layers;   /* layer id → sources (includes root's own id) */
@@ -196,8 +190,6 @@ int awl_renderer_attach(uint64_t id, ANativeWindow* nw) {
             delete w;
             return -1;
         }
-        w->cur_vw = ANativeWindow_getWidth(nw);
-        w->cur_vh = ANativeWindow_getHeight(nw);
         w->th = std::thread(render_thread_loop, w);   /* dedicated render thread */
         std::lock_guard<std::mutex> lk(g_map_lock);
         g_windows[id] = w;
@@ -236,17 +228,20 @@ static void render_frame(wl_window* w) {
     awl_view_xform_t xf;
     awl_surface_get_view_xform(w->id, &xf);
 
-    /* size cache — dropped when the logic layer reports a resize
-     * (awl_window_resize → awl_renderer_window_resized); re-query renders the
-     * frame at the fresh viewport/u_view = the original full-screen flush */
-    if (w->size_dirty.load(std::memory_order_relaxed) || w->cur_vw <= 0 ||
-        w->cur_vh <= 0) {
-        w->cur_vw = ANativeWindow_getWidth(w->nw);
-        w->cur_vh = ANativeWindow_getHeight(w->nw);
-        w->size_dirty.store(false, std::memory_order_relaxed);
+    /* ANativeWindow reports the requested window size. During a live resize
+     * EGL can still own a dequeued back buffer of the preceding size until
+     * swap. Using the requested height for GL's bottom-origin viewport and
+     * our top-origin projection shifts/clips the entire frame. Query the
+     * drawable every frame: its size can advance at swap without another
+     * Android resize notification. No window reattach or frame delay needed. */
+    EGLint vw = 0, vh = 0;
+    if (!eglQuerySurface(awl_gl_display(), w->surface, EGL_WIDTH, &vw) ||
+        !eglQuerySurface(awl_gl_display(), w->surface, EGL_HEIGHT, &vh) ||
+        vw <= 0 || vh <= 0) {
+        LOGE("window %llu drawable size unavailable: 0x%x",
+             (unsigned long long)w->id, eglGetError());
+        return;
     }
-    int vw = w->cur_vw;
-    int vh = w->cur_vh;
     LOGD("win %llu render: view=%dx%d n=%d bottom=%llu xf(s=%.3f,%.3f o=%.1f,%.1f go=%d,%d)",
          (unsigned long long)w->id, vw, vh, n,
          (unsigned long long)lay[0].surface_id,
@@ -453,16 +448,13 @@ void awl_renderer_request_render(uint64_t id) {
     w->cv.notify_all();
 }
 
-/* Logic layer (awl_window_resize, any thread): the Android window resized in
- * place — the cached ANativeWindow size is stale. Drop it and wake the render
- * thread: the next frame re-queries and presents at the new size (the
- * original full-screen resize path). Coalesced like a render request. */
+/* Wake rendering for an in-place Android resize. EGL's drawable dimensions
+ * are queried on the render thread, rather than cached from the resize. */
 void awl_renderer_window_resized(uint64_t id) {
     std::lock_guard<std::mutex> lk(g_map_lock);
     auto it = g_windows.find(id);
     if (it == g_windows.end()) return;
     wl_window* w = it->second;
-    w->size_dirty.store(true, std::memory_order_relaxed);
     std::lock_guard<std::mutex> lw(w->m);
     w->render_req = true;
     w->cv.notify_all();

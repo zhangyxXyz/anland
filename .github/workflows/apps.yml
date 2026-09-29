@@ -10,6 +10,10 @@ on:
         description: Also build the native Wayland daemon
         type: boolean
         default: false
+      native_only:
+        description: Build only the native daemon (reuse the already installed APK)
+        type: boolean
+        default: false
   push:
     branches: [dev]
     paths: ['.github/workflows/apps.yml']
@@ -29,16 +33,19 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: actions/cache/restore@v4
+        if: inputs.native_only != true
         with:
           path: app/debug.keystore
           key: anland-debug-keystore-v1
           fail-on-cache-miss: true
       - uses: actions/cache/restore@v4
+        if: inputs.native_only != true
         with:
           path: debug.keystore
           key: anland-shell-signing-v1
           fail-on-cache-miss: true
       - uses: gradle/actions/setup-gradle@v4
+        if: inputs.native_only != true
       - uses: actions/cache/restore@v4
         with:
           path: |
@@ -51,7 +58,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.22.1"
       - name: Prepare native build tools
-        if: inputs.native == true
+        if: inputs.native == true || inputs.native_only == true
         run: |
           set -euo pipefail
           git submodule update --init third_party/libffi third_party/wayland
@@ -77,6 +84,7 @@ jobs:
             -o /tmp/anland-metadata-test
           /tmp/anland-metadata-test
       - name: Build and lint both apps
+        if: inputs.native_only != true
         run: |
           set -euo pipefail
           cp debug.keystore shell-app/debug.keystore
@@ -87,12 +95,14 @@ jobs:
           cp shell-app/build/outputs/apk/release/*.apk release/anland-shell.apk
           cp shell-app/build/outputs/apk/androidTest/release/*.apk release/anland-shell-tests.apk
       - name: Build native daemon
-        if: inputs.native == true
+        if: inputs.native == true || inputs.native_only == true
         run: |
           set -euo pipefail
           make libffi native
+          mkdir -p release
           cp build/waylandbridge release/waylandbridge
       - name: Verify upgrade certificates
+        if: inputs.native_only != true
         run: |
           set -euo pipefail
           signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
@@ -106,7 +116,7 @@ jobs:
           set -euo pipefail
           (cd release && sha256sum * > ../SHA256SUMS)
           mv SHA256SUMS release/SHA256SUMS
-          printf 'Shell and Wayland adaptive UI. Source: %s\n' "$GITHUB_SHA" > release-notes.md
+          printf 'Anland runtime build. Source: %s\nNative only: %s\n' "$GITHUB_SHA" '${{ inputs.native_only }}' > release-notes.md
           tag="anland-apps-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland apps $GITHUB_RUN_ID" --notes-file release-notes.md
           gh release upload "$tag" release/*
