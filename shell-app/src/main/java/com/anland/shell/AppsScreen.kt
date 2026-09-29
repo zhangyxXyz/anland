@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -51,7 +52,7 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
         DesktopBanner(state.apps.filter{it.desktopSession})
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             WorkspaceSearch(search,{search=it},stringResource(R.string.search_apps),Modifier.weight(1f))
-            IconToggleButton(listView,{listView=it}){Icon(if(listView)Icons.Outlined.GridView else Icons.Outlined.ViewList,stringResource(if(listView)R.string.design_grid_view else R.string.design_list_view))}
+            IconToggleButton(listView,{listView=it}){Icon(if(listView)Icons.Outlined.GridView else Icons.AutoMirrored.Outlined.ViewList,stringResource(if(listView)R.string.design_grid_view else R.string.design_list_view))}
         }
         if(state.anlandxInstalled==false) Text(stringResource(R.string.tab_apps_no_anlandx),color=MaterialTheme.colorScheme.error)
         val applications=state.apps.filter{!it.desktopSession}

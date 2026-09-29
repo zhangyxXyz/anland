@@ -37,7 +37,7 @@ class OpenWindowActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
-        overridePendingTransition(0, 0)
+        suppressLocaleTransition()
         window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
         val targets = listOfNotNull(intent.getStringExtra("window_app_id"), intent.getStringExtra("desktop_id"))
             .filter { it.isNotBlank() }.map { it.removeSuffix(".desktop") }
@@ -117,5 +117,5 @@ class OpenWindowActivity : AppCompatActivity() {
         // A stale waiter must never reopen that window or show a later error.
         if (!isChangingConfigurations) finish()
     }
-    override fun finish() { super.finish(); overridePendingTransition(0, 0) }
+    override fun finish() { super.finish(); suppressLocaleTransition() }
 }

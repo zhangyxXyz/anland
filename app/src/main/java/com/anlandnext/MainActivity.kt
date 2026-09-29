@@ -12,6 +12,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -148,7 +149,7 @@ open class MainActivity : AppCompatActivity() {
 
 @Composable
 internal fun AutoLaunch(state:WindowState) {
-    SettingItem(stringResource(R.string.auto_attach),description=stringResource(R.string.auto_attach_tip),icon=Icons.Outlined.OpenInNew,descriptionMaxLines=5,enabled=state.connected,
+    SettingItem(stringResource(R.string.auto_attach),description=stringResource(R.string.auto_attach_tip),icon=Icons.AutoMirrored.Outlined.OpenInNew,descriptionMaxLines=5,enabled=state.connected,
         trailingContent={Switch(state.config["auto_attach"]==1,{state.set("auto_attach",if(it)1 else 0)},enabled=state.connected && !state.writing)})
 }
 
@@ -181,7 +182,7 @@ private fun WindowsPage(state:WindowState) {
                             Box {
                                 IconButton(onClick={menu=true}){Icon(Icons.Outlined.MoreVert,stringResource(R.string.menu_window_info))}
                                 DropdownMenu(menu,{menu=false}) {
-                                    DropdownMenuItem(text={Text(stringResource(R.string.window_open))},leadingIcon={Icon(Icons.Outlined.OpenInNew,null)},onClick={menu=false;Awl.attachWindow(context,window.id,window.title)})
+                                    DropdownMenuItem(text={Text(stringResource(R.string.window_open))},leadingIcon={Icon(Icons.AutoMirrored.Outlined.OpenInNew,null)},onClick={menu=false;Awl.attachWindow(context,window.id,window.title)})
                                     DropdownMenuItem(text={Text(stringResource(R.string.window_close))},leadingIcon={Icon(Icons.Outlined.Close,null)},enabled=window.id !in state.closing,onClick={menu=false;confirmClose=window})
                                     DropdownMenuItem(text={Text(stringResource(R.string.menu_window_info))},leadingIcon={Icon(Icons.Outlined.Info,null)},onClick={menu=false;info=window})
                                 }
@@ -190,7 +191,7 @@ private fun WindowsPage(state:WindowState) {
                         Text(window.title?.takeIf{it.isNotBlank()}?:stringResource(R.string.window_fallback_title,window.id),style=MaterialTheme.typography.titleMedium,maxLines=2,minLines=2,overflow=TextOverflow.Ellipsis)
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                             StatusPill(stringResource(if(window.attached)R.string.state_visible else R.string.state_background),Modifier.weight(1f,false),window.attached)
-                            FilledTonalIconButton(onClick={Awl.attachWindow(context,window.id,window.title)}){Icon(Icons.Outlined.OpenInNew,stringResource(R.string.window_open))}
+                            FilledTonalIconButton(onClick={Awl.attachWindow(context,window.id,window.title)}){Icon(Icons.AutoMirrored.Outlined.OpenInNew,stringResource(R.string.window_open))}
                         }
                     }
                 }

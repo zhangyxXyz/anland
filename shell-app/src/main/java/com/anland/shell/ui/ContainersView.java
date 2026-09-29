@@ -43,7 +43,7 @@ public final class ContainersView extends LinearLayout {
             TextView empty = new TextView(ctx);
             empty.setText(R.string.status_no_containers);
             empty.setTextSize(13);
-            empty.setTextColor(getResources().getColor(R.color.text_secondary));
+            empty.setTextColor(getResources().getColor(R.color.text_secondary, null));
             empty.setPadding(dp(16), dp(16), dp(16), dp(16));
             addView(empty, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -59,14 +59,14 @@ public final class ContainersView extends LinearLayout {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(16), dp(12), dp(12), dp(12));
         row.setBackgroundColor(active
-                ? getResources().getColor(R.color.accent_dim) : 0);
+                ? getResources().getColor(R.color.accent_dim, null) : 0);
 
         LinearLayout info = new LinearLayout(ctx);
         info.setOrientation(VERTICAL);
         TextView name = new TextView(ctx);
         name.setText(c.name);
         name.setTextSize(16);
-        name.setTextColor(getResources().getColor(R.color.text_primary));
+        name.setTextColor(getResources().getColor(R.color.text_primary, null));
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         info.addView(name, new LinearLayout.LayoutParams(
@@ -74,10 +74,10 @@ public final class ContainersView extends LinearLayout {
 
         TextView status = new TextView(ctx);
         status.setTextSize(12);
-        status.setTextColor(getResources().getColor(R.color.text_secondary));
+        status.setTextColor(getResources().getColor(R.color.text_secondary, null));
         if (c.running()) {
             status.setText(getContext().getString(R.string.running_fmt, c.pid));
-            status.setTextColor(getResources().getColor(R.color.accent));
+            status.setTextColor(getResources().getColor(R.color.accent, null));
         } else {
             status.setText(R.string.stopped);
         }

@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class TaskIdentityInstrumentation extends Instrumentation {
     private Bundle args;
     @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); args = arguments; start(); }
+    @SuppressWarnings("deprecation") // Assert the dynamic task bitmap, not a packaged resource icon.
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {

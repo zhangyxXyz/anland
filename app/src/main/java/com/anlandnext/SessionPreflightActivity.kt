@@ -1,5 +1,6 @@
 package com.anlandnext
 
+import com.anland.design.suppressLocaleTransition
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -17,7 +18,7 @@ import kotlinx.coroutines.withContext
 class SessionPreflightActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        overridePendingTransition(0, 0)
+        suppressLocaleTransition()
         // An explicit result request identifies the caller; Intent extras cannot.
         if (callingPackage != "com.anland.shell") { finish(); return }
         lifecycleScope.launch {
@@ -31,5 +32,5 @@ class SessionPreflightActivity : AppCompatActivity() {
         }
     }
 
-    override fun finish() { super.finish(); overridePendingTransition(0, 0) }
+    override fun finish() { super.finish(); suppressLocaleTransition() }
 }

@@ -417,7 +417,11 @@ static int pa_init_sles_player(struct userdata *u, pa_sample_spec *ss, pa_channe
     }
 
     // create the engine
+    /* Keep OpenSL ES as the compatibility fallback for AAudio. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     CHK(slCreateEngine(&u->EngineObject, 0, NULL, 0, NULL, NULL));
+#pragma clang diagnostic pop
     CHK((*u->EngineObject)->Realize(u->EngineObject, SL_BOOLEAN_FALSE));
 
     // create the outputmix

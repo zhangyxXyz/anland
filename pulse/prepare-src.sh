@@ -13,6 +13,7 @@ SRC=third_party/pulseaudio
 DST=${1:?dest dir}
 RT=${2:-/data/local/tmp/awl}
 TERMUX=$PWD/pulse/termux
+COMPILER_PATCH=$PWD/pulse/compiler-compat.patch
 
 [ -f "$SRC/meson.build" ] || { echo "prepare-src: $SRC empty — git submodule update --init $SRC" >&2; exit 1; }
 rm -rf "$DST"
@@ -48,4 +49,7 @@ sed -i "s|^cdata.set('ENABLE_NLS', 1)\$|if cc.has_function('dgettext')\n  cdata.
 sed -i "/^ *subdir('po')\$/d" meson.build
 
 grep -q "has_function('dgettext')" meson.build || { echo "prepare-src: NLS sed did not apply" >&2; exit 1; }
+# Clang: initialize async-message outputs; mark generated helpers as optional;
+# only declare the POSIX SHM name when shm_open is available.
+patch -p1 -s < "$COMPILER_PATCH"
 echo "pulseaudio source prepared in $DST"

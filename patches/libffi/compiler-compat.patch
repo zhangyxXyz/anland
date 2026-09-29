@@ -1,0 +1,24 @@
+--- a/src/dlmalloc.c
++++ b/src/dlmalloc.c
+@@ -3412,6 +3412,7 @@
+       break;
+   }
+   assert(nfences >= 2);
++  (void)nfences; /* Also used in builds with assertions disabled. */
+ 
+   /* Insert the rest of old top into a bin as an ordinary free chunk */
+   if (csp != old_top) {
+--- a/src/java_raw_api.c
++++ b/src/java_raw_api.c
+@@ -40,6 +40,11 @@
+ #include <stdlib.h>
+ 
+ #if !defined(NO_JAVA_RAW_API)
++
++/* This compatibility implementation calls its own deprecated public API. */
++#if defined(__clang__)
++#pragma clang diagnostic ignored "-Wdeprecated-declarations"
++#endif
+ 
+ size_t
+ ffi_java_raw_size (ffi_cif *cif)

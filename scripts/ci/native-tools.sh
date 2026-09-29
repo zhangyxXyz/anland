@@ -7,6 +7,7 @@ sudo apt-get install -y --no-install-recommends meson ninja-build pkg-config m4 
 curl -fsSL --retry 3 https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz \
     | tar xz --strip-components=1 -C third_party/libffi
 test -x third_party/libffi/configure
+patch -d third_party/libffi -p1 < patches/libffi/compiler-compat.patch
 meson setup /tmp/wl-scanner third_party/wayland \
     -Dscanner=true -Dlibraries=false -Ddocumentation=false -Dtests=false -Ddtd_validation=false
 ninja -C /tmp/wl-scanner

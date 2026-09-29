@@ -46,7 +46,7 @@ public final class AppsView extends LinearLayout {
 
         status = new TextView(context);
         status.setTextSize(13);
-        status.setTextColor(getResources().getColor(R.color.text_secondary));
+        status.setTextColor(getResources().getColor(R.color.text_secondary, null));
         head.addView(status, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 

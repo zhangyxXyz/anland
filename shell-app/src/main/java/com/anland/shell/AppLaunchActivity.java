@@ -23,7 +23,6 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
 
     private LaunchUi.Progress msg;
     private boolean foreground;
-    private static final int SESSION_PREFLIGHT = 1;
     private volatile java.util.concurrent.CompletableFuture<Bundle> sessionPreflight;
 
     @Override protected void onResume() { super.onResume(); foreground = true; }
@@ -35,19 +34,19 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
         if (sessionPreflight == null && !isChangingConfigurations()) finish();
     }
 
-    @Override protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != SESSION_PREFLIGHT) return;
+    private final androidx.activity.result.ActivityResultLauncher<android.content.Intent> preflightLauncher =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(), result -> {
+        android.content.Intent data = result.getData();
         java.util.concurrent.CompletableFuture<Bundle> pending = sessionPreflight;
         sessionPreflight = null;
         if (pending == null) return;
-        if (resultCode == RESULT_OK && data != null && data.hasExtra("window_ids")) {
+        if (result.getResultCode() == RESULT_OK && data != null && data.hasExtra("window_ids")) {
             pending.complete(data.getExtras());
         } else {
             String error = data == null ? null : data.getStringExtra("error");
             pending.completeExceptionally(new IllegalStateException(error == null ? getString(R.string.host_update_needed) : error));
         }
-    }
+    });
 
     @Override protected void onDestroy() {
         java.util.concurrent.CompletableFuture<Bundle> pending = sessionPreflight;
@@ -71,9 +70,9 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
         runOnUiThread(() -> {
             if (isFinishing() || isDestroyed() || !foreground) { pending.cancel(false); return; }
             try {
-                startActivityForResult(new android.content.Intent()
+                preflightLauncher.launch(new android.content.Intent()
                         .setClassName("com.anlandnext", "com.anlandnext.SessionPreflightActivity")
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION), SESSION_PREFLIGHT);
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION));
             } catch (android.content.ActivityNotFoundException e) {
                 pending.completeExceptionally(new IllegalStateException(getString(R.string.host_update_needed), e));
             }
@@ -88,7 +87,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
     @Override protected void onCreate(Bundle savedInstanceState) {
         LaunchUi.prepare(this);
         super.onCreate(savedInstanceState);
-        overridePendingTransition(0, 0);
+        com.anland.design.LanguageSettingsScreenKt.suppressLocaleTransition(this);
 
         final String container = getIntent().getStringExtra("container");
         final String exec = getIntent().getStringExtra("exec");
@@ -210,7 +209,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
 
     @Override public void finish() {
         super.finish();
-        overridePendingTransition(0, 0);
+        com.anland.design.LanguageSettingsScreenKt.suppressLocaleTransition(this);
     }
 
     private void post(final int res, final Object... args) {

@@ -118,13 +118,13 @@ For manual runs, the dispatcher must also exist on GitHub's default branch; sele
 [`version.properties`](version.properties) is the single configuration entry point. Components have independent versions:
 
 ```properties
-RELEASE_VERSION=0.5.0
-SHELL_VERSION_NAME=0.2.0
-SHELL_VERSION_CODE=2
-WAYLAND_VERSION_NAME=0.2.0
-WAYLAND_VERSION_CODE=2
-MODULE_VERSION_NAME=0.5.0
-MODULE_VERSION_CODE=5
+RELEASE_VERSION=0.5.2
+SHELL_VERSION_NAME=0.2.2
+SHELL_VERSION_CODE=4
+WAYLAND_VERSION_NAME=0.2.2
+WAYLAND_VERSION_CODE=4
+MODULE_VERSION_NAME=0.5.1
+MODULE_VERSION_CODE=6
 ROOTFS_VERSION=0.1.0
 ```
 

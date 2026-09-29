@@ -20,7 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalClipboardManager
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +47,7 @@ fun BackupSettingsScreen(
     onOpenWebDav: () -> Unit,
 ) {
     val context = LocalContext.current
-    @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val manager = remember { BackupManager(context.applicationContext) }
     var settings by remember { mutableStateOf(manager.settings()) }
     var busy by remember { mutableStateOf(false) }
@@ -141,7 +143,7 @@ fun BackupSettingsScreen(
                 retention = retentionLabel(settings.localRetentionCount),
                 onChooseFolder = { treePicker.launch(defaultDocumentsUri()) },
                 onCopyFolder = {
-                    clipboard.setText(AnnotatedString(backupPath))
+                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Backup folder", backupPath))) }
                     Toast.makeText(context, R.string.maintenance_backup_path_copied, Toast.LENGTH_SHORT).show()
                 },
                 onRestore = { runAction { localChoices = manager.localBackups() } },

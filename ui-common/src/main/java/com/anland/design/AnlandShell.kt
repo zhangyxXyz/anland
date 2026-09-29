@@ -84,12 +84,7 @@ fun WithAnlandTheme(manageSystemBars: Boolean = true, content: @Composable (Appe
             (owner as? Activity)?.window?.let { window ->
                 // Custom theme mode can differ from the system mode: system bar
                 // icons must follow the rendered surface, not the device setting.
-                window.statusBarColor=surface.toArgb()
-                window.navigationBarColor=surface.toArgb()
-                if(android.os.Build.VERSION.SDK_INT >= 29) {
-                    window.isStatusBarContrastEnforced=false
-                    window.isNavigationBarContrastEnforced=false
-                }
+                applyInsetSystemBarColors(window, surface.toArgb())
                 WindowCompat.getInsetsController(window,window.decorView).apply {
                     isAppearanceLightStatusBars=surface.luminance()>0.5f
                     isAppearanceLightNavigationBars=surface.luminance()>0.5f
@@ -188,4 +183,15 @@ fun AppearanceSettings(state: Appearance) {
         onCancelCustomTheme={state.restoreCustom(beforeColor,beforeCustom,beforeDynamic)},
         onOpenLanguage={context.startActivity(android.content.Intent(context,LanguageActivity::class.java))},
         liquidGlass=state.glass,onLiquidGlassChange=state::glass)
+}
+
+/** Compatibility for the apps' intentional inset layout at target SDK 28/29. */
+@Suppress("DEPRECATION")
+private fun applyInsetSystemBarColors(window: android.view.Window, color: Int) {
+    window.statusBarColor=color
+    window.navigationBarColor=color
+    if(android.os.Build.VERSION.SDK_INT >= 29) {
+        window.isStatusBarContrastEnforced=false
+        window.isNavigationBarContrastEnforced=false
+    }
 }

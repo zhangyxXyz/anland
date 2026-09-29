@@ -1,0 +1,151 @@
+--- a/src/pulsecore/source.c
++++ b/src/pulsecore/source.c
+@@ -1157,7 +1157,7 @@
+ 
+ /* Called from main thread */
+ pa_usec_t pa_source_get_latency(pa_source *s) {
+-    int64_t usec;
++    int64_t usec = 0;
+ 
+     pa_source_assert_ref(s);
+     pa_assert_ctl_context();
+@@ -1920,7 +1920,7 @@
+     pa_assert(PA_SOURCE_IS_LINKED(s->state));
+ 
+     if ((s->refresh_muted || force_refresh) && s->get_mute) {
+-        bool mute;
++        bool mute = false;
+ 
+         if (s->flags & PA_SOURCE_DEFERRED_VOLUME) {
+             if (pa_asyncmsgq_send(s->asyncmsgq, PA_MSGOBJECT(s), PA_SOURCE_MESSAGE_GET_MUTE, &mute, 0, NULL) >= 0)
+@@ -2597,7 +2597,7 @@
+ 
+ /* Called from main thread */
+ pa_usec_t pa_source_get_fixed_latency(pa_source *s) {
+-    pa_usec_t latency;
++    pa_usec_t latency = 0;
+ 
+     pa_source_assert_ref(s);
+     pa_assert_ctl_context();
+@@ -2661,7 +2661,7 @@
+ 
+ /* Called from main thread */
+ size_t pa_source_get_max_rewind(pa_source *s) {
+-    size_t r;
++    size_t r = 0;
+     pa_assert_ctl_context();
+     pa_source_assert_ref(s);
+ 
+--- a/src/pulsecore/sink.c
++++ b/src/pulsecore/sink.c
+@@ -1579,7 +1579,7 @@
+ 
+ /* Called from main thread */
+ size_t pa_sink_get_last_rewind(pa_sink *s) {
+-    size_t rewind_bytes;
++    size_t rewind_bytes = 0;
+ 
+     pa_sink_assert_ref(s);
+     pa_assert_ctl_context();
+@@ -2397,7 +2397,7 @@
+     pa_assert(PA_SINK_IS_LINKED(s->state));
+ 
+     if ((s->refresh_muted || force_refresh) && s->get_mute) {
+-        bool mute;
++        bool mute = false;
+ 
+         if (s->flags & PA_SINK_DEFERRED_VOLUME) {
+             if (pa_asyncmsgq_send(s->asyncmsgq, PA_MSGOBJECT(s), PA_SINK_MESSAGE_GET_MUTE, &mute, 0, NULL) >= 0)
+@@ -3383,7 +3383,7 @@
+ 
+ /* Called from main thread */
+ pa_usec_t pa_sink_get_fixed_latency(pa_sink *s) {
+-    pa_usec_t latency;
++    pa_usec_t latency = 0;
+ 
+     pa_sink_assert_ref(s);
+     pa_assert_ctl_context();
+@@ -3452,7 +3452,7 @@
+ 
+ /* Called from main context */
+ size_t pa_sink_get_max_rewind(pa_sink *s) {
+-    size_t r;
++    size_t r = 0;
+     pa_assert_ctl_context();
+     pa_sink_assert_ref(s);
+ 
+@@ -3466,7 +3466,7 @@
+ 
+ /* Called from main context */
+ size_t pa_sink_get_max_request(pa_sink *s) {
+-    size_t r;
++    size_t r = 0;
+     pa_sink_assert_ref(s);
+     pa_assert_ctl_context();
+ 
+--- a/src/modules/module-tunnel.c
++++ b/src/modules/module-tunnel.c
+@@ -926,7 +926,7 @@
+     pa_sample_spec *ss;
+     int64_t delay;
+ #ifdef TUNNEL_SINK
+-    uint64_t send_counter;
++    uint64_t send_counter = 0;
+ #endif
+ 
+     pa_assert(pd);
+--- a/src/pulsecore/shm.c
++++ b/src/pulsecore/shm.c
+@@ -143,7 +143,9 @@
+ 
+ static int sharedmem_create(pa_shm *m, pa_mem_type_t type, size_t size, mode_t mode) {
+ #if defined(HAVE_SHM_OPEN) || defined(HAVE_MEMFD)
++#ifdef HAVE_SHM_OPEN
+     char fn[32];
++#endif
+     int fd = -1;
+     struct shm_marker *marker;
+     bool do_unlink = false;
+@@ -353,7 +355,9 @@
+ 
+ static int shm_attach(pa_shm *m, pa_mem_type_t type, unsigned id, int memfd_fd, bool writable, bool for_cleanup) {
+ #if defined(HAVE_SHM_OPEN) || defined(HAVE_MEMFD)
++#ifdef HAVE_SHM_OPEN
+     char fn[32];
++#endif
+     int fd = -1;
+     int prot;
+     struct stat st;
+--- a/src/pulsecore/object.h
++++ b/src/pulsecore/object.h
+@@ -68,24 +68,24 @@
+ #define PA_OBJECT(o) pa_object_cast(o)
+ 
+ #define PA_DECLARE_CLASS_COMMON(c)                                      \
+-    static inline bool c##_isinstance(void *o) {                        \
++    static inline PA_GCC_UNUSED bool c##_isinstance(void *o) {                        \
+         pa_object *obj = (pa_object*) o;                                \
+         return obj ? obj->check_type(c##_type_id) : true;               \
+     }                                                                   \
+-    static inline c* c##_cast(void *o) {                                \
++    static inline PA_GCC_UNUSED c* c##_cast(void *o) {                                \
+         pa_assert(c##_isinstance(o));                                   \
+         return (c*) o;                                                  \
+     }                                                                   \
+-    static inline c* c##_ref(c *o) {                                    \
++    static inline PA_GCC_UNUSED c* c##_ref(c *o) {                                    \
+         return (c *) ((void *) pa_object_ref(PA_OBJECT(o)));            \
+     }                                                                   \
+-    static inline void c##_unref(c* o) {                                \
++    static inline PA_GCC_UNUSED void c##_unref(c* o) {                                \
+         pa_object_unref(PA_OBJECT(o));                                  \
+     }                                                                   \
+-    static inline int c##_refcnt(c* o) {                                \
++    static inline PA_GCC_UNUSED int c##_refcnt(c* o) {                                \
+         return pa_object_refcnt(PA_OBJECT(o));                          \
+     }                                                                   \
+-    static inline void c##_assert_ref(c *o) {                           \
++    static inline PA_GCC_UNUSED void c##_assert_ref(c *o) {                           \
+         pa_object_assert_ref(PA_OBJECT(o));                             \
+     }                                                                   \
+     struct __stupid_useless_struct_to_allow_trailing_semicolon

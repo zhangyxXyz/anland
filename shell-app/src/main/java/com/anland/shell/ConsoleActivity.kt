@@ -21,7 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalClipboardManager
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -177,7 +179,8 @@ class ConsoleActivity:AppCompatActivity() {
             var historySearch by rememberSaveable{mutableStateOf("")}
             var exit by rememberSaveable{mutableStateOf(false)}
             var options by remember{mutableStateOf(false)}
-            val clipboard=LocalClipboardManager.current
+            val clipboard=LocalClipboard.current
+            val clipboardScope=rememberCoroutineScope()
             val back={if(session.dead)finish()else exit=true}
             BackHandler(onBack=back)
             val scroll=rememberScrollState()
@@ -193,7 +196,7 @@ class ConsoleActivity:AppCompatActivity() {
                     title={Column {Text(stringResource(R.string.enter_console));Text(session.title+if(session.user.isNotBlank())" / ${session.user}" else "",style=MaterialTheme.typography.labelMedium)}},
                     navigationIcon={IconButton(onClick=back){Icon(Icons.AutoMirrored.Outlined.ArrowBack,stringResource(com.anland.design.R.string.design_back))}},
                     actions={
-                        IconButton(onClick={clipboard.setText(AnnotatedString(session.output))}){Icon(Icons.Outlined.ContentCopy,stringResource(R.string.design_copy_output))}
+                        IconButton(onClick={clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Console output", session.output))) }}){Icon(Icons.Outlined.ContentCopy,stringResource(R.string.design_copy_output))}
                         IconButton(onClick={history=!history}){Icon(Icons.Outlined.History,stringResource(R.string.history))}
                         Box {
                             IconButton(onClick={options=true}){Icon(Icons.Outlined.MoreVert,stringResource(R.string.design_console_options))}

@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -220,7 +221,7 @@ fun CredentialsPage(state:CredentialsState,window:android.view.Window,
                                 else stringResource(R.string.ssh_launch_bound_help,profile.container,profile.username),
                                 style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                                FilledTonalButton(onClick={state.openConsole=profile.id},enabled=!state.busy){Icon(Icons.Outlined.Login,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.credential_login))}
+                                FilledTonalButton(onClick={state.openConsole=profile.id},enabled=!state.busy){Icon(Icons.AutoMirrored.Outlined.Login,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.credential_login))}
                                 Spacer(Modifier.weight(1f))
                                 IconButton(onClick={state.editor=profile},enabled=!state.busy){Icon(Icons.Outlined.Edit,stringResource(R.string.credential_edit))}
                                 IconButton(onClick={delete=profile},enabled=!state.busy){Icon(Icons.Outlined.DeleteOutline,stringResource(R.string.credential_delete))}

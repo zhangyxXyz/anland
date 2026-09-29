@@ -190,13 +190,17 @@ pulse-deps: check-tools
 	  -DBUILD_TESTING=OFF -DBUILD_REGTEST=OFF -DENABLE_CPACK=OFF -DENABLE_PACKAGE_CONFIG=OFF >/dev/null
 	cmake --build build/pulse-deps-src/sndfile-build -j$$(nproc) >/dev/null
 	cmake --install build/pulse-deps-src/sndfile-build >/dev/null
+	# soxr uses stdbool.h; compile its C sources with GNU C99.
+	sed -i s/-std=gnu89/-std=gnu99/g build/pulse-deps-src/soxr-0.1.3/CMakeLists.txt
 	cmake -S build/pulse-deps-src/soxr-0.1.3 -B build/pulse-deps-src/soxr-build $$CM \
 	  -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DWITH_OPENMP=OFF -DWITH_LSR_BINDINGS=OFF >/dev/null
 	cmake --build build/pulse-deps-src/soxr-build -j$$(nproc) >/dev/null
 	cmake --install build/pulse-deps-src/soxr-build >/dev/null
+	# libltdl uses portable statement-expression and configure-constant macros.
 	cd build/pulse-deps-src/libtool-2.4.7/libltdl
 	CC="$(PA_TC)/aarch64-linux-android$(PA_API)-clang" AR="$(PA_TC)/llvm-ar" RANLIB="$(PA_TC)/llvm-ranlib" \
-	CFLAGS="-O2 -fPIC" ./configure --host=aarch64-linux-android --prefix="$(PA_DEPS)" \
+	NM="$(PA_TC)/llvm-nm" STRIP="$(PA_TC)/llvm-strip" OBJDUMP="$(PA_TC)/llvm-objdump" \
+	CFLAGS="-O2 -fPIC -Wno-compound-token-split-by-macro -Wno-constant-logical-operand" ./configure --host=aarch64-linux-android --prefix="$(PA_DEPS)" \
 	  --enable-static --disable-shared --enable-ltdl-install >/dev/null
 	make -j$$(nproc) >/dev/null && make install >/dev/null
 	ls -la "$(PA_DEPS)"/lib/*.a
@@ -327,6 +331,7 @@ libffi: check-tools
 	CC="$$TC/aarch64-linux-android35-clang" \
 	CXX="$$TC/aarch64-linux-android35-clang++" \
 	AR="$$TC/llvm-ar" RANLIB="$$TC/llvm-ranlib" STRIP="$$TC/llvm-strip" \
+	NM="$$TC/llvm-nm" OBJDUMP="$$TC/llvm-objdump" CFLAGS="-O2 -fPIC" \
 	  ../../third_party/libffi/configure --host=aarch64-linux-android \
 	    --prefix="$$PWD/../libffi-android-out" \
 	    --enable-static --disable-shared --disable-docs \

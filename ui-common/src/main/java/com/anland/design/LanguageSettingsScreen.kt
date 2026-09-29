@@ -107,7 +107,7 @@ internal fun currentLanguageTags(context: android.content.Context): String =
     if (Build.VERSION.SDK_INT >= 33) context.getSystemService(LocaleManager::class.java).applicationLocales.toLanguageTags()
     else AppCompatDelegate.getApplicationLocales().toLanguageTags()
 
-private fun Activity.suppressLocaleTransition() {
+fun Activity.suppressLocaleTransition() {
     if (Build.VERSION.SDK_INT >= 34) {
         overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
         overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)

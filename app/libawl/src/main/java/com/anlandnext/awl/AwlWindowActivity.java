@@ -324,7 +324,7 @@ public class AwlWindowActivity extends Activity {
         if (isFinishing()) return;
         if (this instanceof AwlDialogActivity) {
             finish();
-            overridePendingTransition(0, 0);
+            suppressActivityTransitions();
         } else if (!isTaskRoot()) finish();
         else finishAndRemoveTask();
     }
@@ -590,7 +590,7 @@ public class AwlWindowActivity extends Activity {
          * bar strip exposes the black window background. Take over inset
          * handling so the surface draws under the bar. */
         if (android.os.Build.VERSION.SDK_INT >= 30) {
-            getWindow().setDecorFitsSystemWindows(false);
+            useClientInsets();
             // Insets below own the viewport. Platform adjustPan would move
             // the whole host independently of that same keyboard animation.
             if (!(this instanceof AwlDialogActivity))
@@ -620,7 +620,7 @@ public class AwlWindowActivity extends Activity {
         // added after first map. Normal launches classify before any Activity
         // is created and do not take this fallback path.
         finish();
-        overridePendingTransition(0, 0);
+        suppressActivityTransitions();
         return true;
     }
 
@@ -674,7 +674,7 @@ public class AwlWindowActivity extends Activity {
         if (!(this instanceof AwlDialogActivity)) return;
         AwlClient.Presentation p = AwlClient.presentation(id);
         android.graphics.Point screen = new android.graphics.Point();
-        getWindowManager().getDefaultDisplay().getSize(screen);
+        presentationDisplaySize(screen);
         int margin = Math.round(16 * getResources().getDisplayMetrics().density);
         int availableW = Math.max(1, screen.x - margin * 2);
         int availableH = Math.max(1, screen.y - margin * 2);
@@ -695,6 +695,7 @@ public class AwlWindowActivity extends Activity {
 
     /* Immersive fullscreen: hide status bar + navigation bar, swipe-revealed
      * as transient overlays, extend into the display cutout area. */
+    @SuppressWarnings("deprecation") // Legacy immersive flags are only used below API 30.
     private void setupFullscreen() {
         if (this instanceof AwlDialogActivity) return;
         if (android.os.Build.VERSION.SDK_INT < 30) {
@@ -716,6 +717,7 @@ public class AwlWindowActivity extends Activity {
     /** Recents entry: last known client title + last fetched toplevel icon.
      *  TaskDescription is atomic — every label update must re-carry the icon
      *  or it is silently dropped. */
+    @SuppressWarnings("deprecation") // Runtime Linux app bitmaps have no Android drawable resource ID.
     private void applyTaskDescription() {
         if (this instanceof AwlDialogActivity) return; // retain the parent's task identity
         if (!taskIdentityReady) return;
@@ -2162,4 +2164,22 @@ public class AwlWindowActivity extends Activity {
         attached = false;
         super.onDestroy();
     }
+    // Dialog sizing needs the display's usable area, not its own current bounds.
+    @SuppressWarnings("deprecation")
+    private void presentationDisplaySize(android.graphics.Point screen) {
+        getWindowManager().getDefaultDisplay().getSize(screen);
+    }
+    @SuppressWarnings("deprecation") // The host deliberately owns its insets at target SDK 29.
+    private void useClientInsets() {
+        if (android.os.Build.VERSION.SDK_INT >= 30)
+            getWindow().setDecorFitsSystemWindows(false);
+    }
+    @SuppressWarnings("deprecation") // Keep pre-Android 14 transition support.
+    private void suppressActivityTransitions() {
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0);
+            overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0);
+        } else { overridePendingTransition(0, 0); }
+    }
+
 }

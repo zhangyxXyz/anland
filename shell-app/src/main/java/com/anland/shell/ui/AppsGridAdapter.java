@@ -94,7 +94,7 @@ public final class AppsGridAdapter extends BaseAdapter {
             label.setMaxLines(2);
             label.setEllipsize(android.text.TextUtils.TruncateAt.END);
             label.setTextSize(12);
-            label.setTextColor(ctx.getResources().getColor(R.color.text_primary));
+            label.setTextColor(ctx.getResources().getColor(R.color.text_primary, null));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.topMargin = dp(6);

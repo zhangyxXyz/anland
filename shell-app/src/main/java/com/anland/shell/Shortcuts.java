@@ -52,12 +52,17 @@ public final class Shortcuts {
             return sm.requestPinShortcut(info, null);
         }
 
-        /* legacy broadcast — the manifest holds INSTALL_SHORTCUT permission */
+        sendLegacyPinRequest(ctx, app.name, icon, launch);
+        return false;
+    }
+    /** Compatibility with launchers that only implement INSTALL_SHORTCUT. */
+    @SuppressWarnings("deprecation")
+    private static void sendLegacyPinRequest(Context ctx, String name, Bitmap icon, Intent launch) {
         Intent add = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
-        add.putExtra(Intent.EXTRA_SHORTCUT_NAME, app.name);
+        add.putExtra(Intent.EXTRA_SHORTCUT_NAME, name);
         add.putExtra(Intent.EXTRA_SHORTCUT_ICON, icon);
         add.putExtra(Intent.EXTRA_SHORTCUT_INTENT, launch);
         ctx.sendBroadcast(add);
-        return false;
     }
+
 }
