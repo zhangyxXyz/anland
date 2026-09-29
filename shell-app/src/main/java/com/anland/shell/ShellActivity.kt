@@ -31,33 +31,58 @@ import androidx.lifecycle.viewModelScope
 import com.anland.design.*
 import com.anland.shell.ds.*
 import com.anland.shell.ui.IconLoader
+import com.anland.shell.connections.CredentialsPage
+import com.anland.shell.connections.CredentialsState
 import kotlinx.coroutines.*
 
 class ShellActivity:AppCompatActivity() {
     private val state:ShellState by viewModels()
+    private val credentials:CredentialsState by viewModels()
     override fun onCreate(savedInstanceState:Bundle?) {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         setContent { WithAnlandTheme { appearance ->
             val icons=state.icons
-            var settingsRoute by rememberSaveable{mutableStateOf<String?>(null)}
-            AnlandShell(listOf(Destination(getString(R.string.tab_apps),Icons.Outlined.Apps),Destination(getString(R.string.tab_containers),Icons.Outlined.Storage),Destination(getString(R.string.shell_settings),Icons.Outlined.Settings)),appearance,
+            var route by rememberSaveable{mutableStateOf<String?>(null)}
+            var environmentContainer by rememberSaveable{mutableStateOf("")}
+            val secondaryTitle=when {
+                credentials.editor!=null -> getString(R.string.credential_edit)
+                route=="user" -> getString(R.string.launch_user_title_fmt,state.active)
+                route=="env" -> getString(R.string.env_editor_title_fmt,environmentContainer)
+                else -> null
+            }
+            AnlandShell(listOf(Destination(getString(R.string.tab_apps),Icons.Outlined.Apps),Destination(getString(R.string.tab_containers),Icons.Outlined.Storage),Destination(getString(R.string.tab_credentials),Icons.Outlined.Key),Destination(getString(R.string.shell_settings),Icons.Outlined.Settings)),appearance,
                 brand=getString(R.string.app_name),contextLabel=state.active,
-                secondaryTitle=settingsRoute?.let{getString(if(it=="user")R.string.user_settings else R.string.env_settings)},onSecondaryBack={settingsRoute=null},
+                secondaryTitle=secondaryTitle,onSecondaryBack={
+                    if(!credentials.busy) {
+                        if(credentials.editor!=null)credentials.discardEditor=true else route=null
+                    }
+                },
                 actions={
                     var choose by remember{mutableStateOf(false)}
                     Box {
                         TextButton(onClick={choose=true},enabled=state.containers.isNotEmpty()&&!state.busy){Text(state.active);Icon(Icons.Outlined.ExpandMore,null)}
                         DropdownMenu(choose,{choose=false}){state.containers.forEach{container->DropdownMenuItem(text={Text(container.name)},onClick={state.select(container.name);choose=false})}}
                     }
-                    IconButton(onClick=state::refresh,enabled=!state.busy){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}
+                    IconButton(onClick={state.refresh();credentials.reload()},enabled=!state.busy&&!credentials.busy){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}
                 }) { tab, navigate ->
-                when(tab){0->AppsPage(state,icons);1->ContainersPage(state,onSettings={navigate(2)},onApps={navigate(0)});else->ShellSettings(state,appearance,settingsRoute){settingsRoute=it}}
+                when {
+                    route=="env" -> LaunchEnvironmentPage(environmentContainer){route=null}
+                    route=="user" -> LaunchUserPage(state,credentials)
+                    tab==0 -> AppsPage(state,icons)
+                    tab==1 -> ContainersPage(state,
+                        onEnvironment={container->environmentContainer=container;route="env"},
+                        onCredentials={navigate(2)},onApps={navigate(0)})
+                    tab==2 -> CredentialsPage(credentials,window,onLaunchChanged=state::refresh) {
+                        LaunchAccountSummary(state,credentials){route="user"}
+                    }
+                    else -> ShellSettings(appearance)
+                }
             }
             state.error?.let { message->AlertDialog(onDismissRequest={state.error=null},title={Text(stringResource(R.string.error_title))},text={Text(message)},confirmButton={TextButton(onClick={state.error=null}){Text(stringResource(R.string.dialog_ok))}}) }
         } }
     }
-    override fun onResume(){super.onResume();state.refresh()}
+    override fun onResume(){super.onResume();state.refresh();credentials.reload()}
 }
 
 internal fun openWindows(context:android.content.Context) {

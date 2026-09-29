@@ -48,6 +48,11 @@ public final class Prefs {
         sp(c).edit().putString("launch_credential." + container, id).apply();
     }
 
+    public static void setVerifiedLaunchUser(Context c, String container, String user, String id) {
+        sp(c).edit().putString("launch_user." + container, user)
+                .putString("launch_credential." + container, id).apply();
+    }
+
     /** Custom launch environment for a container: KEY=VALUE lines merged
      *  over the built-ins (empty value removes the built-in, # = comment).
      *  "" = built-ins only. */

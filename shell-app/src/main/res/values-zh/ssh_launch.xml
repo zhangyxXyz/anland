@@ -1,0 +1,13 @@
+<resources>
+    <string name="ssh_launch_help">启动本机应用前验证 SSH 凭据。开启时选择容器，SSH 服务器必须是该容器本身。</string>
+    <string name="ssh_launch_bound_help">启动验证关联：%1$s · %2$s。开启后，每次启动均核对 SSH 主机、容器身份并验证保存的凭据。</string>
+    <string name="ssh_launch_bind_title">使用 SSH 验证应用启动</string>
+    <string name="ssh_launch_bind_help">选择此连接对应的容器。验证成功后，应用将以 %1$s 身份启动，主机、账号或凭据无法验证时，停止启动。</string>
+    <string name="ssh_launch_bind_confirm">验证并开启</string>
+    <string name="ssh_launch_trust_required">请先登录此 SSH 连接并确认当前主机指纹，再开启启动时验证。</string>
+    <string name="ssh_launch_identity_unavailable">无法读取容器的 SSH 身份，请检查该账号、Python 3 和 OpenSSH 服务配置。</string>
+    <string name="ssh_launch_wrong_container">SSH 服务器或实际登录用户与所选容器账号不符，已停止启动。</string>
+    <string name="ssh_launch_auth_failed">SSH 连接或认证失败，请检查服务和保存的凭据，已停止启动。</string>
+    <string name="ssh_launch_cleanup_failed">无法清理容器验证的临时文件，已停止启动。</string>
+    <string name="ssh_launch_disable_before_move">请先关闭启动时验证，再修改此凭据关联的容器。</string>
+</resources>

@@ -101,7 +101,7 @@ class ConsoleSession(app:Application):AndroidViewModel(app) {
                 user=withContext(Dispatchers.IO){
                     val selected=profile?.username?:Prefs.launchUser(context,localContainer).ifEmpty{DsCli.autoUser(localContainer)}
                     if(profile!=null)LocalLogin.authenticate(context,profile)
-                    else LocalLogin.authenticateLaunch(context,localContainer,selected)
+                    else LaunchLogin.authenticateLaunch(context,localContainer,selected)
                     selected
                 }
                 val child=withContext(Dispatchers.IO){

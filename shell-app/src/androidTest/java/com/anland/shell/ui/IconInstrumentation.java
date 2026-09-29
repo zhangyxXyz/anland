@@ -13,6 +13,16 @@ public final class IconInstrumentation extends Instrumentation {
         try {
             if ("maintenance".equals(arguments.getString("mode"))) {
                 result.putString("stream",MaintenanceProbe.run(getTargetContext()));
+            } else if ("keystore".equals(arguments.getString("mode"))) {
+                result.putString("stream",KeystoreProbe.run());
+            } else if ("launch-credentials".equals(arguments.getString("mode"))) {
+                getTargetContext().startActivity(new android.content.Intent(getTargetContext(),com.anland.shell.ShellActivity.class)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                result.putString("stream",LaunchCredentialProbe.run(getTargetContext(),arguments));
+            } else if ("ssh-launch-credentials".equals(arguments.getString("mode"))) {
+                getTargetContext().startActivity(new android.content.Intent(getTargetContext(),com.anland.shell.ShellActivity.class)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                result.putString("stream",SshLaunchCredentialProbe.run(getTargetContext(),arguments));
             } else if ("credentials".equals(arguments.getString("mode"))) {
                 result.putString("stream",CredentialProbe.run(getTargetContext(),arguments));
             } else {

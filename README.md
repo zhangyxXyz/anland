@@ -24,6 +24,8 @@ The two Apps share responsive Material UI, theme preferences and navigation. Lin
 
 Android touch, keyboard and IME events are forwarded to Wayland. X11 applications use a patched Xwayland. The host supports SurfaceControl and EGL rendering, configurable window scaling, safe-area handling, and controls for automatic attachment and window lifecycle. GPU and touch behavior still require validation on the target device.
 
+Shell provides a dedicated Credentials tab. A saved local or SSH login can be bound to a container user; application, desktop, shortcut and local-console launches validate that binding. SSH bindings require a trusted host key and a fresh proof that the session reaches the selected container and user. Container environment settings are available from the Containers page.
+
 ## Requirements and installation
 
 - A rooted ARM64 Android device with SukiSU/KernelSU and Droidspaces. Wayland App requires Android 10 or newer; the native daemon is built for Android API 35, so the complete bundle targets Android 15 or newer.

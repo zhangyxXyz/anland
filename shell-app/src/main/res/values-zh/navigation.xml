@@ -1,0 +1,21 @@
+<resources>
+    <string name="tab_credentials">凭据</string>
+    <string name="launch_account_summary">启动用户与已保存凭据</string>
+    <string name="launch_user_summary">选择应用启动时使用的 Linux 账号</string>
+    <string name="launch_user_title_fmt">启动用户 — %1$s</string>
+    <string name="launch_credential_fmt">使用已保存凭据：%1$s</string>
+    <string name="launch_saved_credentials">已保存凭据</string>
+    <string name="launch_direct_user">直接以本机用户启动</string>
+    <string name="env_summary">此容器的启动环境变量</string>
+    <string name="credentials_empty">尚未添加凭据</string>
+    <string name="credentials_add">添加凭据</string>
+    <string name="credentials_local_account">容器账号</string>
+    <string name="credentials_local_account_help">保存 Linux 用户名和密码，可用于启动前验证</string>
+    <string name="credentials_remote_ssh">远程 SSH</string>
+    <string name="credentials_remote_ssh_help">登录远程服务器</string>
+    <string name="credentials_show_password">显示密码</string>
+    <string name="credentials_hide_password">隐藏密码</string>
+    <string name="credentials_keystore_unavailable">系统加密服务不可用，已保存凭据保持原样。请检查 Android Keystore 或影响它的模块后重试。</string>
+    <string name="credential_verify_launch">启动时验证</string>
+    <string name="credential_verify_launch_help">开启后以此账号启动应用，并先校验已保存的密码，验证失败则停止启动。</string>
+</resources>

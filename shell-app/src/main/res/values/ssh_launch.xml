@@ -1,0 +1,13 @@
+<resources>
+    <string name="ssh_launch_help">Verify SSH credentials before launching local apps. Enable to choose a container; the server must be that container.</string>
+    <string name="ssh_launch_bound_help">Launch verification for %1$s · %2$s. When enabled, every launch verifies the SSH host, container identity and saved credentials.</string>
+    <string name="ssh_launch_bind_title">Use SSH for launch verification</string>
+    <string name="ssh_launch_bind_help">Choose the container for this connection. Once verification succeeds, apps launch as %1$s. If the host, account or credentials cannot be verified, launch stops.</string>
+    <string name="ssh_launch_bind_confirm">Verify and enable</string>
+    <string name="ssh_launch_trust_required">First log in to this SSH connection and confirm its current host fingerprint, then enable launch verification.</string>
+    <string name="ssh_launch_identity_unavailable">Could not read this container’s SSH identity. Check its account, Python 3 and OpenSSH server configuration.</string>
+    <string name="ssh_launch_wrong_container">The SSH server or logged-in user does not match the selected container account. Launch was stopped.</string>
+    <string name="ssh_launch_auth_failed">SSH connection or authentication failed. Check the server and saved credentials. Launch was stopped.</string>
+    <string name="ssh_launch_cleanup_failed">Could not remove the temporary container verification file. Launch was stopped.</string>
+    <string name="ssh_launch_disable_before_move">Turn off launch verification before changing this credential’s container.</string>
+</resources>

@@ -37,7 +37,7 @@ import kotlinx.coroutines.*
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ContainersPage(state:ShellState, onSettings:()->Unit, onApps:()->Unit) {
+internal fun ContainersPage(state:ShellState, onEnvironment:(String)->Unit, onCredentials:()->Unit, onApps:()->Unit) {
     val context=LocalContext.current
     var stop by remember{mutableStateOf<ContainerState?>(null)}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -59,9 +59,10 @@ internal fun ContainersPage(state:ShellState, onSettings:()->Unit, onApps:()->Un
                         WorkspaceAction(stringResource(R.string.enter_console),stringResource(R.string.design_console_detail),Icons.Outlined.Terminal,Modifier.weight(1f),container.running()&&!state.busy){context.startActivity(Intent(context,ConsoleActivity::class.java).putExtra("container",container.name))}
                     }
                     Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        desktops.firstOrNull()?.let{desktop->WorkspaceAction(stringResource(R.string.desktop_entry),stringResource(R.string.desktop_entry_help),Icons.Outlined.DesktopWindows,Modifier.weight(1f),!state.busy){context.startActivity(Shortcuts.launchIntent(context,desktop))}}
-                        WorkspaceAction(stringResource(R.string.design_startup_settings),stringResource(R.string.env_settings),Icons.Outlined.Tune,Modifier.weight(1f),!state.busy){state.select(container.name);onSettings()}
+                        WorkspaceAction(stringResource(R.string.user_settings),stringResource(R.string.launch_account_summary),Icons.Outlined.Person,Modifier.weight(1f),!state.busy){state.select(container.name);onCredentials()}
+                        WorkspaceAction(stringResource(R.string.env_settings),stringResource(R.string.env_summary),Icons.Outlined.Tune,Modifier.weight(1f),!state.busy){state.select(container.name);onEnvironment(container.name)}
                     }
+                    desktops.firstOrNull()?.let{desktop->WorkspaceAction(stringResource(R.string.desktop_entry),stringResource(R.string.desktop_entry_help),Icons.Outlined.DesktopWindows,Modifier.fillMaxWidth(),!state.busy){context.startActivity(Shortcuts.launchIntent(context,desktop))}}
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         if(selected)Text(stringResource(R.string.design_selected_container),Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary) else Spacer(Modifier.weight(1f))
                         TextButton(onClick={if(container.running())stop=container else state.changeRunning(container)},enabled=!state.busy,colors=ButtonDefaults.textButtonColors(contentColor=if(container.running())MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)) {

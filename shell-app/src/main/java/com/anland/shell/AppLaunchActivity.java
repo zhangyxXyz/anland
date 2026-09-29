@@ -128,7 +128,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
             boolean desktopEntry = getIntent().getBooleanExtra("desktop_session", false)
                     || "org.freedesktop.Xwayland".equals(getIntent().getStringExtra("window_app_id"));
             String launchUser = user == null || user.isEmpty() ? DsCli.autoUser(container) : user;
-            com.anland.shell.connections.LocalLogin.authenticateLaunch(this, container, launchUser);
+            com.anland.shell.connections.LaunchLogin.authenticateLaunch(this, container, launchUser);
             String probe;
             try (java.io.InputStream input = getAssets().open("desktop-session-probe.py")) {
                 java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();

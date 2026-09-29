@@ -1,0 +1,13 @@
+<resources>
+    <string name="ssh_launch_help">啟動本機應用程式前驗證 SSH 憑證。開啟時選擇容器，SSH 伺服器必須是該容器本身。</string>
+    <string name="ssh_launch_bound_help">啟動驗證關聯：%1$s · %2$s。開啟後，每次啟動均核對 SSH 主機、容器身分並驗證儲存的憑證。</string>
+    <string name="ssh_launch_bind_title">使用 SSH 驗證應用程式啟動</string>
+    <string name="ssh_launch_bind_help">選擇此連線對應的容器。驗證成功後，應用程式將以 %1$s 身分啟動，主機、帳號或憑證無法驗證時，停止啟動。</string>
+    <string name="ssh_launch_bind_confirm">驗證並開啟</string>
+    <string name="ssh_launch_trust_required">請先登入此 SSH 連線並確認目前主機指紋，再開啟啟動時驗證。</string>
+    <string name="ssh_launch_identity_unavailable">無法讀取容器的 SSH 身分，請檢查該帳號、Python 3 和 OpenSSH 服務設定。</string>
+    <string name="ssh_launch_wrong_container">SSH 伺服器或實際登入使用者與所選容器帳號不符，已停止啟動。</string>
+    <string name="ssh_launch_auth_failed">SSH 連線或認證失敗，請檢查服務和儲存的憑證，已停止啟動。</string>
+    <string name="ssh_launch_cleanup_failed">無法清理容器驗證的暫存檔，已停止啟動。</string>
+    <string name="ssh_launch_disable_before_move">請先關閉啟動時驗證，再修改此憑證關聯的容器。</string>
+</resources>

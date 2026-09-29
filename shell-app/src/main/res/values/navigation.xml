@@ -1,0 +1,21 @@
+<resources>
+    <string name="tab_credentials">Credentials</string>
+    <string name="launch_account_summary">Launch user and saved credentials</string>
+    <string name="launch_user_summary">Choose the Linux account used to launch apps</string>
+    <string name="launch_user_title_fmt">Launch user — %1$s</string>
+    <string name="launch_credential_fmt">Saved credential: %1$s</string>
+    <string name="launch_saved_credentials">Saved credentials</string>
+    <string name="launch_direct_user">Launch as a local user</string>
+    <string name="env_summary">Environment variables for this container</string>
+    <string name="credentials_empty">No saved credentials</string>
+    <string name="credentials_add">Add credentials</string>
+    <string name="credentials_local_account">Container account</string>
+    <string name="credentials_local_account_help">Save a Linux username and password for verification before launching apps</string>
+    <string name="credentials_remote_ssh">Remote SSH</string>
+    <string name="credentials_remote_ssh_help">Sign in to a remote server</string>
+    <string name="credentials_show_password">Show password</string>
+    <string name="credentials_hide_password">Hide password</string>
+    <string name="credentials_keystore_unavailable">The system encryption service is unavailable. Saved credentials remain unchanged. Check Android Keystore or modules affecting it, then retry.</string>
+    <string name="credential_verify_launch">Verify on launch</string>
+    <string name="credential_verify_launch_help">When enabled, launch apps as this account and verify the saved password first. Failed verification stops the launch.</string>
+</resources>

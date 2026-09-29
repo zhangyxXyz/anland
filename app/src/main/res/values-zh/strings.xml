@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Anland Wayland</string>
-
     <!-- MainActivity -->
     <string name="settings_title">窗口设置</string>
     <string name="status_daemon_unreachable">窗口服务尚未连接</string>
@@ -15,7 +14,6 @@
     <string name="state_attached_foreground">Attached（前台）</string>
     <string name="state_detached_kept">Detached（保活）</string>
     <string name="dialog_ok">确定</string>
-
     <!-- WlSettingsActivity -->
     <string name="ime_mode_tip">键盘显示方式</string>
     <string name="ime_mode_inset">缩小窗口，为键盘留出空间</string>
@@ -36,7 +34,7 @@
     <string name="sc_backend_tip">开启时交给 Android 系统合成；关闭时使用逐窗口 OpenGL 渲染，两者都可使用 GPU。仅对之后打开的窗口生效。</string>
     <string name="sc_backend">SurfaceControl 合成</string>
     <string name="close_on_swipe">上划卡片时关闭窗口</string>
-    <string name="close_on_swipe_help">移除最近任务卡片时，请求正常关闭窗口，也包括 Linux 桌面会话。保留未保存内容的确认；关闭此开关则保持应用运行。启用时会显示通知，以接收任务移除事件。</string>
+    <string name="close_on_swipe_help">移除最近任务卡片时，请求正常关闭窗口，也包括 Linux 桌面会话。保留未保存内容的确认，关闭此开关则保持应用运行。启用时会显示通知，以接收任务移除事件。</string>
     <string name="hide_titlebars">隐藏独立窗口标题栏</string>
     <string name="hide_titlebars_help">通过 Wayland 装饰协议，让支持的应用隐藏额外标题栏。可从窗口列表关闭，或启用上划关闭。自行绘制标题栏的应用可能仍会保留；不会裁切菜单、标签页或桌面面板。</string>
 </resources>
