@@ -159,10 +159,22 @@ under UBSan; link `awl_bufferqueue.c` when compiling this test.
 
 Candidate cd7db01 passed build 36550740272; both release and diagnostic binaries
 were downloaded from the draft Release and their SHA-256 checksums verified.
-The release candidate is staged on the tablet but has not replaced the running
-41fd555 daemon. Real-device deployment and
-visual verification remain pending confirmation about new unsaved content in
-the user's VS Code window; the earlier discard permission covered a separate
-disposable test file. Do not mark the delayed flicker resolved before that
-device check. Optional `native_debug` builds publish a separate diagnostic
-binary with per-frame geometry logging; release builds keep it compiled out.
+After the user authorized discarding the new test content, cd7db01 was deployed
+without rebooting or replacing the container (PID 30598 and configuration
+unchanged). The installed daemon matches the release SHA-256
+`0ea0ff5a5ec2b3354894f2f9c337a0a9fe6505358250b90686772a9aa27083cd`.
+Three IME show/hide rounds each observed six seconds after each transition.
+The client still trimmed its buffers approximately one second after settling,
+but the recorded delayed compression/black-tail flash did not recur. All 1499
+recorded frames retained the title icon, with no large position/scale jump
+(six animation frames differed by one pixel at its lower edge). Live resize
+can briefly expose space while the client renders its larger replacement;
+this result specifically verifies the delayed mismatched-crop flash.
+
+Two native dialog open/cancel rounds stayed in parent task 876 with no parent
+surface reattach. Portrait/landscape layout checks passed. Device logs confirm
+the Adreno OpenGL ES 3.2 dmabuf path remained active. Diagnostic client logging
+was stopped; rotation preferences and the 120-second timeout were restored.
+The same signed APK remains installed. Optional `native_debug` builds publish
+a separate diagnostic binary with per-frame geometry logging; release builds
+keep it compiled out. The device ran the release binary for these checks.
