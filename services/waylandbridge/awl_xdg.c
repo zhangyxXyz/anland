@@ -86,6 +86,7 @@ static void send_configure_locked(struct awl_surface* s,
     uint32_t serial = wl_display_next_serial(g_srv.display);
     s->u.xdg.conf_w = w;
     s->u.xdg.conf_h = h;
+    s->u.xdg.conf_serial = serial;
     s->configured = 1;
     xdg_toplevel_send_configure(s->u.xdg.role_res, w, h, &arr);
     wl_array_release(&arr);
@@ -675,7 +676,10 @@ static void xdg_surface_ack_configure(struct wl_client* c,
                                "ack before configure");
         return;
     }
+    pthread_mutex_lock(&s->ev_lock);
     s->acked = 1;
+    if (s->role == AWL_ROLE_TOPLEVEL) s->u.xdg.ack_serial = serial;
+    pthread_mutex_unlock(&s->ev_lock);
 }
 
 static const struct xdg_surface_interface xdg_surface_iface = {

@@ -107,8 +107,10 @@ void awl_surface_content_size(struct awl_surface* s, float* w, float* h) {
  *     No stretch, nothing resampled, no lost pixels — whatever scale_mode
  *     says.
  *  2) content does NOT follow the configure (fixed-size client ignoring
- *     resize, X window the X side did not resize, the frames between a
- *     configure and its ack) → daemon scale_mode placement (awl_view_map). */
+ *     resize, X window the X side did not resize) → daemon scale_mode
+ *     placement (awl_view_map). While a responsive native client rebuilds
+ *     its buffer, keep regime 1: stretching its old frame to the new height
+ *     and back on commit makes text visibly squash during IME transitions. */
 
 /* Buffer px per logical px of the root's current buffer, per axis — the
  * client's effective scale (1 for a scale-1 client, Z for a scale-aware one
@@ -182,18 +184,34 @@ void awl_view_map(int mode, double pw, double ph, double cw, double ch,
     *oy = round((ph - ch * *sy) * 0.5);
 }
 
-/* Per-root decision (regime 1 vs 2) — see the section comment. "Follows the
- * configure" = the committed content base (geometry rectangle, else surface
- * logical size) equals the last configure sent (conf_w/h); an X window has
+/* Apply the client's size response only when its content is committed, not
+ * when Android sends a new configure or the client merely acks it. Older
+ * responses during overlapping resizes cannot undo the established mapping.
+ * An explicit latest-serial response at a different size still selects the
+ * user's fixed-size placement mode. Empty ack commits must not rescale the
+ * previous buffer while its replacement is being rendered. ev_lock held. */
+void awl_surface_commit_view(struct awl_surface* root, int has_buffer) {
+    if (root->role != AWL_ROLE_TOPLEVEL) return;
+    float cw = 0, ch = 0;
+    awl_surface_content_size(root, &cw, &ch);
+    if (root->u.xdg.conf_w > 0 && root->u.xdg.conf_h > 0 &&
+        (int32_t)lroundf(cw) == root->u.xdg.conf_w &&
+        (int32_t)lroundf(ch) == root->u.xdg.conf_h) {
+        root->u.xdg.follows_configure = true;
+    } else if (has_buffer && root->configured &&
+               root->u.xdg.ack_serial == root->u.xdg.conf_serial) {
+        root->u.xdg.follows_configure = false;
+    }
+}
+
+/* Per-root decision (regime 1 vs 2) — see the section comment. An X window has
  * no configure and always takes regime 2, where a buffer that matches phys
  * maps 1:1 in every mode anyway. Caller holds root ev_lock. */
 void awl_surface_view_map(struct awl_surface* root,
                           double* sx, double* sy, double* ox, double* oy) {
     float cw = 0, ch = 0;
     awl_surface_content_size(root, &cw, &ch);
-    if (root->role == AWL_ROLE_TOPLEVEL && root->u.xdg.conf_w > 0 && root->u.xdg.conf_h > 0 &&
-        (int32_t)lroundf(cw) == root->u.xdg.conf_w &&
-        (int32_t)lroundf(ch) == root->u.xdg.conf_h) {
+    if (root->role == AWL_ROLE_TOPLEVEL && root->u.xdg.follows_configure) {
         *sx = *sy = awl_zoom_scale();
         *ox = *oy = 0.0;
         return;

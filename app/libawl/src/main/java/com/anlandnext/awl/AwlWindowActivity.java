@@ -548,8 +548,13 @@ public class AwlWindowActivity extends Activity {
          * with decor-fits enabled the DecorView pads the content up and the
          * bar strip exposes the black window background. Take over inset
          * handling so the surface draws under the bar. */
-        if (android.os.Build.VERSION.SDK_INT >= 30)
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
+            // Insets below own the viewport. Platform adjustPan would move
+            // the whole host independently of that same keyboard animation.
+            if (!(this instanceof AwlDialogActivity))
+                getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
+        }
 
         root = new FrameLayout(this);
         root.setFitsSystemWindows(false);
@@ -557,14 +562,8 @@ public class AwlWindowActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(hiddenInput, new FrameLayout.LayoutParams(1, 1));
         /* IME inset: in inset mode the surface yields (client reflows); in overlay mode the keyboard floats above */
-        root.setOnApplyWindowInsetsListener((v, insets) -> {
-            applyContentInsets(insets);
-            return insets;
-        });
-        root.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
-            WindowInsets insets = root.getRootWindowInsets();
-            if (insets != null) applyContentInsets(insets);
-        });
+        if (android.os.Build.VERSION.SDK_INT >= 30)
+            SurfaceInsetsController.install(root, this::applyContentInsets);
         setContentView(root);
 
         setupFullscreen();   /* immersive */
@@ -989,8 +988,14 @@ public class AwlWindowActivity extends Activity {
     private void applyContentInsets(WindowInsets insets) {
         if (android.os.Build.VERSION.SDK_INT < 30) return;
         if (root.getWidth() <= 0 || root.getHeight() <= 0) return;
-        android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.displayCutout()
-                | WindowInsets.Type.systemBars());
+        // Immersive bars are transient overlays, not a second resize target.
+        // The navigation strip can appear just before the IME and disappear
+        // just after it; counting it separately made the viewport jump twice.
+        // Caption bars and real cutouts still obstruct content; floating and
+        // multi-window hosts also retain their ordinary system-bar insets.
+        int bars = this instanceof AwlDialogActivity || isInMultiWindowMode()
+                ? WindowInsets.Type.systemBars() : WindowInsets.Type.captionBar();
+        android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.displayCutout() | bars);
         int[] margins = WindowSafeArea.contentMargins(
                 new int[]{safe.left, safe.top, safe.right, safe.bottom},
                 this instanceof AwlDialogActivity ? 0 : insets.getInsets(WindowInsets.Type.ime()).bottom,

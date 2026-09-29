@@ -957,6 +957,7 @@ static void surface_commit(struct wl_client* client, struct wl_resource* res) {
     int32_t map_bw = 0, map_bh = 0;
     bool presentation_changed = false;
     if (s->role == AWL_ROLE_TOPLEVEL) {
+        awl_surface_commit_view(s, attached && s->current_buffer_res);
         presentation_changed = s->u.xdg.min_w != s->u.xdg.next_min_w ||
             s->u.xdg.min_h != s->u.xdg.next_min_h ||
             s->u.xdg.max_w != s->u.xdg.next_max_w ||

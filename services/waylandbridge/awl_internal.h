@@ -223,6 +223,8 @@ struct awl_surface {
         struct {                            /* TOPLEVEL | POPUP */
             struct wl_resource* role_res;   /* xdg_toplevel / xdg_popup */
             int32_t conf_w, conf_h;         /* most recent configure contents */
+            uint32_t conf_serial, ack_serial;
+            bool follows_configure;        /* last committed response, retained while resize is pending */
             int32_t pend_w, pend_h;         /* cached when resize precedes map (Android owns sizing entirely) */
             bool fullscreen, maximized;    /* persist across resize and focus configures */
             char app_id[256];              /* xdg identity, guarded by ev_lock */
@@ -721,6 +723,7 @@ void awl_surface_logical_size(struct awl_surface* s, float* w, float* h);
  * carries shadow margins around it), else the surface logical size. Shared
  * by the view mapping, render dst and input inverse. */
 void awl_surface_content_size(struct awl_surface* s, float* w, float* h);
+void awl_surface_commit_view(struct awl_surface* root, int has_buffer); /* commit-time resize response; ev_lock held */
 /* Root → window view mapping, view = (logical − geometry origin) × s + o —
  * THE conversion shared by render dst / input inverse / relative deltas /
  * confine rects / IME cursor rect. Content following the
