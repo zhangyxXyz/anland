@@ -229,6 +229,7 @@ case "${1:-}" in
     start_pulse
     pulse_status=$?
     start_daemon
+    nohup /system/bin/sh "$MODDIR/appearance.sh" "$RT" > /data/local/tmp/awl_appearance.log 2>&1 &
     exit "$pulse_status"
     ;;
 esac

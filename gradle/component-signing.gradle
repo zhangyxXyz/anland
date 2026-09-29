@@ -1,0 +1,33 @@
+// Private JSON and keystores stay outside the repository. The build wrapper
+// validates the certificate before Gradle; CI restores the same files in RUNNER_TEMP.
+def component = project.ext.anlandComponent.toLowerCase()
+def configPath = System.getenv('ANLAND_SIGNING_CONFIG_FILE')
+def keyDirectory = System.getenv('ANLAND_KEYSTORE_DIR')
+if (!keyDirectory) keyDirectory = rootProject.file('../keystore').absolutePath
+if (!configPath && keyDirectory) {
+    configPath = new File(keyDirectory, "anland-${component}.json").absolutePath
+}
+if (configPath && new File(configPath).isFile()) {
+    def configFile = new File(configPath)
+    def config = new groovy.json.JsonSlurper().parse(configFile, 'UTF-8')
+    ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].each { key ->
+        if (!(config[key] instanceof String) || !config[key]) {
+            throw new GradleException("Missing signing field: ${key}")
+        }
+    }
+    def store = new File(config.storeFile)
+    if (!store.isAbsolute()) store = new File(configFile.parentFile, config.storeFile)
+    if (!store.isFile()) throw new GradleException('Configured keystore does not exist')
+    android.signingConfigs.release.with {
+        storeFile = store
+        storePassword = config.storePassword
+        keyAlias = config.keyAlias
+        keyPassword = config.keyPassword
+    }
+} else {
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.allTasks.any { it.name.contains('Release') }) {
+            throw new GradleException("Configure ANLAND_KEYSTORE_DIR or ANLAND_SIGNING_CONFIG_FILE before a release build")
+        }
+    }
+}

@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euo pipefail
+# Match the previous apparent size on the 200% host window while rendering
+# at native resolution. Keep subsequent user scaling choices intact.
+config="${XDG_CONFIG_HOME:-$HOME/.config}/anland"
+install -d -m 0700 "$config"
+if [[ ! -f "$config/desktop-hidpi-defaults-v1" ]]; then
+    xfconf-query -c xsettings -p /Gdk/WindowScalingFactor -s 2
+    xfconf-query -c xsettings -p /Xft/DPI -s 96
+    touch "$config/desktop-hidpi-defaults-v1"
+fi
+# Xfwm's Composite Overlay Window output becomes white in the current rootful
+# Xwayland path. Compose to the root with XRender instead; disabling all
+# compositing leaves the alpha corners of GTK menus black.
+xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null ||
+    xfconf-query -c xfwm4 -p /general/use_compositing -n -t bool -s false
+xcompmgr -n &
+compositor_pid=$!
+/usr/local/bin/anland-desktop-appearance &
+appearance_pid=$!
+xfce4-session &
+session_pid=$!
+cleanup() {
+    trap - EXIT INT TERM
+    kill "$session_pid" "$compositor_pid" "$appearance_pid" 2>/dev/null || true
+    wait 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+wait -n "$session_pid" "$compositor_pid" "$appearance_pid"

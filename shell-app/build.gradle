@@ -3,9 +3,8 @@
 // connections authenticate directly from the APK. Window hosting lives in
 // the anland daemon and the com.anlandnext host APK (auto-attach).
 //
-// Signing uses debug.keystore (gitignored; the Makefile bootstraps it with
-// keytool when missing) so release APKs stay installable over previous dev
-// builds — same scheme as the anland repo.
+// Signing comes from the repository's private keystore/ configuration in local
+// builds and the matching Actions Secrets in CI.
 plugins {
     id 'com.android.application' version '8.7.3'
     id 'com.android.library' version '8.7.3' apply false
@@ -26,8 +25,6 @@ android {
         applicationId 'com.anland.shell'
         minSdk 28
         targetSdk 28
-        versionCode 1
-        versionName '0.1'
         testInstrumentationRunner 'com.anland.shell.ui.IconInstrumentation'
     }
 
@@ -36,14 +33,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    signingConfigs {
-        release {
-            storeFile file('debug.keystore')
-            storePassword 'anland'
-            keyAlias 'anland'
-            keyPassword 'anland'
-        }
-    }
+    signingConfigs { release {} }
 
     buildTypes {
         release {
@@ -61,6 +51,10 @@ android {
         disable 'ExpiredTargetSdkVersion'
     }
 }
+
+ext.anlandComponent = 'SHELL'
+apply from: '../gradle/component-version.gradle'
+apply from: '../gradle/component-signing.gradle'
 
 dependencies {
     implementation project(':ui-common')

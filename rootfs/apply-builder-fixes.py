@@ -25,10 +25,16 @@ replace_once(builder / "scripts/configure-desktop.sh",
     "configure_anland_next_runtime() {\n",
     "configure_anland_next_runtime() {\n"
     '    bash "$(dirname "$0")/configure-anland-audio.sh" "$rootfs"\n'
+    '    bash "$(dirname "$0")/configure-anland-desktop.sh" "$rootfs"\n'
     '    install -m 0755 "$(dirname "$0")/anland-session-fixed.sh" "$rootfs/usr/bin/anland-session"\n')
 shutil.copyfile(source / "anland-session/anland-session.sh", builder / "scripts/anland-session-fixed.sh")
 shutil.copyfile(source / "rootfs/configure-anland-audio.sh", builder / "scripts/configure-anland-audio.sh")
+for name in ("configure-anland-desktop.sh", "anland-desktop", "anland-desktop-session", "anland-desktop-inner", "anland-desktop-appearance"):
+    shutil.copyfile(source / "rootfs" / name, builder / "scripts" / name)
+shutil.copytree(source / "rootfs/assets", builder / "scripts/assets", dirs_exist_ok=True)
 replace_once(builder / "Debian-13.Dockerfile",
     "COPY scripts/configure-desktop.sh /usr/local/sbin/configure-desktop\n",
     "COPY scripts/configure-desktop.sh /usr/local/sbin/configure-desktop\n"
-    "COPY scripts/configure-anland-audio.sh scripts/anland-session-fixed.sh /usr/local/sbin/\n")
+    "COPY scripts/configure-anland-audio.sh scripts/anland-session-fixed.sh /usr/local/sbin/\n"
+    "COPY scripts/configure-anland-desktop.sh scripts/anland-desktop scripts/anland-desktop-session scripts/anland-desktop-inner scripts/anland-desktop-appearance /usr/local/sbin/\n"
+    "COPY scripts/assets/ /usr/local/sbin/assets/\n")

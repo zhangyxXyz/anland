@@ -1,0 +1,60 @@
+#!/bin/bash
+# Optional complete desktop in a rootful Xwayland window. The ordinary Anland
+# session stays rootless: individual apps keep their independent Android tasks.
+# All display/authentication state is private to this session; never publish its
+# DISPLAY over ~/.anlandx or the existing systemd user-manager environment.
+set -euo pipefail
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+[[ -d "$XDG_RUNTIME_DIR" ]] || { echo 'No user runtime directory' >&2; exit 1; }
+if [[ -r "$HOME/.anlandx-env" ]]; then
+    while IFS= read -r line; do
+        case "$line" in ''|'#'*) ;; *=*) export "$line" ;; esac
+    done < "$HOME/.anlandx-env"
+fi
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-anland}"
+[[ -d /usr/lib/anland ]] && export PATH="/usr/lib/anland:$PATH"
+for command in Xwayland xfce4-session xauth dbus-run-session xdpyinfo; do
+    command -v "$command" >/dev/null || { echo "Desktop component missing: $command" >&2; exit 1; }
+done
+state="$XDG_RUNTIME_DIR/anland-desktop"
+install -d -m 0700 "$state"
+exec 9>"$state/lock"
+flock -n 9 || { echo 'Desktop session is already running' >&2; exit 0; }
+export XAUTHORITY="$state/Xauthority"
+touch "$XAUTHORITY"; chmod 0600 "$XAUTHORITY"
+cookie=$(mcookie)
+xauth -f "$XAUTHORITY" add :0 MIT-MAGIC-COOKIE-1 "$cookie"
+: > "$state/display"
+xpid= session_pid=
+cleanup() {
+    trap - EXIT TERM INT
+    [[ -z "$session_pid" ]] || kill "$session_pid" 2>/dev/null || true
+    [[ -z "$xpid" ]] || kill "$xpid" 2>/dev/null || true
+    wait 2>/dev/null || true
+    rm -f "$state/display" "$state/env" "$XAUTHORITY"
+}
+trap cleanup EXIT TERM INT
+# Render rootful buffers at the host's preferred scale. Without -hidpi the
+# compositor stretches a logical-pixel desktop, blurring text and icons.
+# Glamor keeps the same Mesa/kgsl GPU acceleration as independent apps.
+Xwayland -displayfd 3 -nolisten tcp -auth "$XAUTHORITY" -glamor es \
+    -hidpi -noreset -geometry "${ANLAND_DESKTOP_GEOMETRY:-1600x1000}" 3>"$state/display" &
+xpid=$!
+for ((i=0;i<150;i++)); do
+    [[ -s "$state/display" ]] && break
+    kill -0 "$xpid" 2>/dev/null || { echo 'Desktop display failed' >&2; exit 1; }
+    sleep .1
+done
+number=$(cat "$state/display")
+[[ "$number" =~ ^[0-9]+$ ]] || { echo 'Desktop display startup timed out' >&2; exit 1; }
+export DISPLAY=":$number"
+xauth -f "$XAUTHORITY" add "$DISPLAY" MIT-MAGIC-COOKIE-1 "$cookie"
+xdpyinfo >/dev/null
+printf 'DISPLAY=%s\nXAUTHORITY=%s\n' "$DISPLAY" "$XAUTHORITY" > "$state/env"
+# Xfce has its own bus. Its settings/autostart cannot take over the standalone
+# application's bus names; app launcher's global display remains untouched.
+env -u WAYLAND_DISPLAY -u SESSION_MANAGER -u DBUS_SESSION_BUS_ADDRESS \
+    XDG_SESSION_TYPE=x11 XDG_CURRENT_DESKTOP=XFCE GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb \
+    dbus-run-session -- /usr/local/bin/anland-desktop-inner &
+session_pid=$!
+wait -n "$xpid" "$session_pid"

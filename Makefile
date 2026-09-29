@@ -25,6 +25,7 @@ SHELL := /bin/bash
 
 ANDROID_HOME ?=
 JAVA_HOME    ?=
+PYTHON       ?= python3
 NDK_VERSION  ?= 29.0.13113456
 BT_VERSION   ?= 36.0.0
 PLATFORM_VER ?= android-36
@@ -99,18 +100,12 @@ native-debug: check-tools
 	ls -la "$(OUT)/waylandbridge-debug"
 
 # ---------------- APK + third-party AAR (gradle: app/ → AGP, artifacts collected into build/) ----------------
-# Pure-Java APK: rendering/protocol all live in the root daemon — no
-# dependencies, no native libs. Signed with app/debug.keystore (gitignored;
-# bootstrapped here with keytool when missing).
+# Rendering/protocol live in the root daemon. The App consumes libawl and the
+# shared UI; signing is configured under ignored keystore/ (or via environment).
 # :libawl = third-party client library (wayland fd / window list / events /
 # window hosting) — published as build/anland-awllib.aar.
 apk: check-tools
-	KS=app/debug.keystore
-	if [ ! -f "$$KS" ]; then
-	  "$(JAVA)/keytool" -genkeypair -keystore "$$KS" -alias anland \
-	    -storepass anland -keypass anland -keyalg RSA -keysize 2048 \
-	    -validity 10000 -dname "CN=Anland Debug" >/dev/null 2>&1
-	fi
+	$(PYTHON) scripts/ci/signing.py wayland --check
 	(cd app && ./gradlew --no-daemon -q assembleRelease :libawl:assembleRelease)
 	cp -f app/build/outputs/apk/release/anland-wayland-release.apk "$(OUT)/anland-wayland.apk"
 	cp -f app/libawl/build/outputs/aar/libawl-release.aar "$(OUT)/anland-awllib.aar"
@@ -145,12 +140,14 @@ module: native pulse
 	mkdir -p "$$MOD"
 	cp module/module.prop module/sepolicy.rule module/service.sh \
 	   module/customize.sh module/plat_service_contexts.anland "$$MOD/"
+	$(PYTHON) scripts/ci/versions.py --module module/module.prop "$$MOD/module.prop"
+	cp module/appearance.sh "$$MOD/"
 	cp LICENSE "$$MOD/"
 	cp "$(OUT)/waylandbridge" "$$MOD/"
 	cp -r "$(PA_ROOT)" "$$MOD/pulse"   # PulseAudio tree (bin/lib/etc), see `make pulse`
-	chmod 755 "$$MOD/waylandbridge" "$$MOD/service.sh" "$$MOD/customize.sh" "$$MOD"/pulse/bin/*
+	chmod 755 "$$MOD/waylandbridge" "$$MOD/service.sh" "$$MOD/customize.sh" "$$MOD/appearance.sh" "$$MOD"/pulse/bin/*
 	(cd "$$MOD" && zip -qr "$(OUT)/module/anland-awl.zip" \
-	  module.prop sepolicy.rule service.sh customize.sh \
+	  module.prop sepolicy.rule service.sh customize.sh appearance.sh \
 	  plat_service_contexts.anland waylandbridge pulse \
 	  LICENSE)
 	echo "OK: $(OUT)/module/anland-awl.zip"

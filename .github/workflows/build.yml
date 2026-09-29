@@ -1,236 +1,153 @@
-# Full build: native waylandbridge + com.anlandnext APK + libawl AAR + SukiSU
-# module zip, mirroring `make all` (see the repo-root Makefile).
-#
-# Host prerequisites the Makefile assumes but the runner lacks:
-#   - wayland-scanner 1.24 — built from the pinned third_party/wayland fork so
-#     the scanner version matches the cross-compiled libwayland sources
-#   - libffi configure — the git submodule ships none (autogen fails on the
-#     runner's libtool 2.4.7); the v3.4.6 release tarball is overlaid instead
-name: build
+name: Anland release
 
 on:
   push:
-    branches: [dev]
-    paths-ignore: ['docs/**', '**/*.md']
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      build_shell:
+        description: Build Shell APK and test APK
+        type: boolean
+        default: true
+      build_wayland:
+        description: Build Wayland APK, AAR, native daemon and Root module
+        type: boolean
+        default: true
+      build_rootfs:
+        description: Build Debian ARM64 with integrated desktop and Xwayland fixes
+        type: boolean
+        default: false
+
+# Serialize version-tag uploads. Independent manual runs use separate drafts.
+concurrency:
+  group: anland-release-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  BUILD_SHELL: ${{ inputs.build_shell }}
+  BUILD_WAYLAND: ${{ inputs.build_wayland }}
+  BUILD_ROOTFS: ${{ inputs.build_rootfs }}
 
 jobs:
-  scope:
+  plan:
     runs-on: ubuntu-latest
     outputs:
-      rootfs: ${{ steps.changed.outputs.rootfs }}
+      shell: ${{ steps.plan.outputs.shell }}
+      wayland: ${{ steps.plan.outputs.wayland }}
+      rootfs: ${{ steps.plan.outputs.rootfs }}
+      build_plan: ${{ steps.plan.outputs.build_plan }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - id: changed
-        env:
-          BASE_SHA: ${{ github.event.before }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          rebuild=true
-          if [ "$EVENT_NAME" = push ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            if git diff --quiet "$BASE_SHA" HEAD -- rootfs anland-session .github/workflows/build.yml; then rebuild=false; fi
-          fi
-          echo "rootfs=$rebuild" >> "$GITHUB_OUTPUT"
+      - id: plan
+        run: python3 scripts/ci/release.py plan
 
-  build:
+  test:
+    needs: plan
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      NDK_VERSION: 29.0.13113456
-      BT_VERSION: 36.0.0
-      PLATFORM_VER: android-36
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
       - uses: actions/setup-java@v4
+        if: needs.plan.outputs.wayland == 'true'
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Host build tools (scanner deps)
+      - name: Release planning and packaging regression tests
+        run: python3 -m unittest discover -s tests -p 'test_ci_*.py' -v
+      - name: Desktop launcher regression tests
+        if: needs.plan.outputs.shell == 'true'
+        run: python3 tests/desktop_session_probe_test.py
+      - name: Session startup regression tests
+        if: needs.plan.outputs.wayland == 'true' || needs.plan.outputs.rootfs == 'true'
+        run: python3 tests/session_startup_test.py
+      - name: Window geometry and desktop metadata regression tests
+        if: needs.plan.outputs.wayland == 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            meson ninja-build pkg-config m4 patch
-
-      - name: Desktop metadata regression tests
-        run: |
-          g++ -std=c++17 -Wall -Wextra -Werror -I services/waylandbridge \
-            services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \
-            -o /tmp/desktop-metadata-test
-          /tmp/desktop-metadata-test
           mkdir -p /tmp/anland-java-tests
           javac -d /tmp/anland-java-tests \
             app/libawl/src/main/java/com/anlandnext/awl/WindowSafeArea.java tests/WindowSafeAreaTest.java
           java -cp /tmp/anland-java-tests com.anlandnext.awl.WindowSafeAreaTest
-          python3 tests/session_startup_test.py
-
-      # libffi: overlay the v3.4.6 release tarball (same pin as the
-      # submodule) over third_party/libffi — it ships a generated configure,
-      # so `make libffi` skips autogen.sh. Ubuntu 24.04's libtool 2.4.7
-      # predates LT_SYS_SYMBOL_USCORE and cannot autogen the git checkout.
-      - name: libffi release tarball (pre-generated configure)
-        run: |
-          curl -fsSL https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz \
-            | tar xz --strip-components=1 -C third_party/libffi
-          test -x third_party/libffi/configure
-
-      - name: wayland-scanner (host, from the pinned fork)
-        run: |
-          meson setup /tmp/wl-scanner third_party/wayland \
-            -Dscanner=true -Dlibraries=false -Ddocumentation=false \
-            -Dtests=false -Ddtd_validation=false
-          ninja -C /tmp/wl-scanner
-          # meson builds it at src/wayland-scanner — install so cmake's
-          # find_program sees a stable path
-          sudo install -m755 /tmp/wl-scanner/src/wayland-scanner /usr/local/bin/wayland-scanner
-          wayland-scanner --version
-
-      - name: Cache Android SDK components
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.ANDROID_HOME }}/ndk
-            ${{ env.ANDROID_HOME }}/build-tools
-            ${{ env.ANDROID_HOME }}/platforms
-          key: android-${{ env.NDK_VERSION }}-${{ env.BT_VERSION }}-${{ env.PLATFORM_VER }}
-
-      - name: SDK components (NDK, build-tools, platform)
-        if: steps.sdk.outputs.cache-hit != 'true'
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "ndk;${NDK_VERSION}" "build-tools;${BT_VERSION}" "platforms;${PLATFORM_VER}" >/dev/null
-
-      # app/debug.keystore is gitignored and Makefile-generated; cache it so
-      # successive CI APKs stay signature-compatible (upgrade-install over
-      # previous dev builds).
-      - name: Cache debug keystore
-        id: ks
-        uses: actions/cache@v4
-        with:
-          path: app/debug.keystore
-          key: anland-debug-keystore-v1
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: libffi (one-time cross-compile bootstrap)
-        run: make libffi
-
-      - name: Build (native + apk + module)
-        run: make
-
-      - name: Upload directly to draft Release
+          g++ -std=c++17 -Wall -Wextra -Werror -I services/waylandbridge \
+            services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \
+            -o /tmp/anland-metadata-test
+          /tmp/anland-metadata-test
+      - name: Check selected signing secrets before creating a draft
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+          SHELL_SELECTED: ${{ needs.plan.outputs.shell }}
+          WAYLAND_SELECTED: ${{ needs.plan.outputs.wayland }}
+          SHELL_KEY: ${{ secrets.ANLAND_SHELL_KEYSTORE_BASE64 }}
+          WAYLAND_KEY: ${{ secrets.ANLAND_WAYLAND_KEYSTORE_BASE64 }}
+          SHELL_CONFIG: ${{ secrets.ANLAND_SHELL_SIGNING_CONFIG }}
+          WAYLAND_CONFIG: ${{ secrets.ANLAND_WAYLAND_SIGNING_CONFIG }}
         run: |
-          set -euo pipefail
-          tag="anland-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          sha256sum build/anland-wayland.apk build/anland-awllib.aar build/module/anland-awl.zip build/anlandx.tar.gz > SHA256SUMS
-          printf 'Anland source: %s\nBuild: %s/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > release-notes.md
-          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland 6.x $tag" --notes-file release-notes.md
-          gh release upload "$tag" build/anland-wayland.apk build/anland-awllib.aar build/module/anland-awl.zip build/anlandx.tar.gz SHA256SUMS
+          if [[ "$SHELL_SELECTED" == true && ( -z "$SHELL_KEY" || -z "$SHELL_CONFIG" ) ]]; then
+            echo 'Missing Shell signing Secrets; sync the repository keystore first' >&2
+            exit 1
+          fi
+          if [[ "$WAYLAND_SELECTED" == true && ( -z "$WAYLAND_KEY" || -z "$WAYLAND_CONFIG" ) ]]; then
+            echo 'Missing Wayland signing Secrets; sync the repository keystore first' >&2
+            exit 1
+          fi
 
-  debian:
-    needs: scope
-    if: needs.scope.outputs.rootfs == 'true'
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 180
+  prepare-release:
+    needs: [plan, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: anland-fixes
-      - uses: actions/checkout@v4
-        with:
-          repository: Goldzxcbug/Droidspaces-rootfs-Desktop-builder
-          ref: ffc712071a04cc50d1aed26aab064f0295b6251d
-          path: rootfs-builder
-          persist-credentials: false
-      - name: Apply Chrome and audio fixes from this dev commit
-        run: python3 anland-fixes/rootfs/apply-builder-fixes.py rootfs-builder
-      - name: Prepare draft Release before building
+      - name: Prepare the shared draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          gh release create "debian-next-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            --draft --target "$GITHUB_SHA" --title "Debian 13 Anland Next + Docker" \
-            --notes "Build in progress; source $GITHUB_SHA"
-      - name: Build Debian ARM64 with Docker
-        working-directory: rootfs-builder
-        env:
-          ANLAND_RELEASE_REPOSITORY: Goldzxcbug/droidspaces-package
-        run: |
-          set -euo pipefail
-          bash build_rootfs-native.sh \
-            -i Debian-13.Dockerfile -v "debian-next-${GITHUB_RUN_ID}" \
-            -K 'Anland Next' -L true -B anland-wayland -P none \
-            -g true -a false -b true -c true -d false -e true \
-            -f true -h true -j false -n false -S false -t false -u seiun
-      - name: Upload directly to draft Release
-        working-directory: rootfs-builder
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          files=(*.tar.xz)
-          test "${#files[@]}" -gt 0
-          mkdir release_assets
-          sha256sum "${files[@]}" > release_assets/ROOTFS-SHA256SUMS
-          for file in "${files[@]}"; do
-            if [ "$(stat -c %s "$file")" -ge 2000000000 ]; then
-              split -b 1900M -d -a 3 "$file" "release_assets/$file.part-"
-            else
-              mv "$file" release_assets/
-            fi
-          done
-          (cd release_assets && sha256sum -- *.tar.xz* > ASSETS-SHA256SUMS)
-          tag="debian-next-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          printf '%s\n' 'Debian 13 ARM64; Anland Next; Docker enabled; user seiun; Chinese locale; Qualcomm Mesa.' 'RootFS source: ffc712071a04cc50d1aed26aab064f0295b6251d' 'If split: concatenate .part-000, .part-001, ... in order, then check ROOTFS-SHA256SUMS.' > notes.md
-          gh release edit "$tag" --draft --notes-file notes.md
-          gh release upload "$tag" release_assets/*
+        run: python3 scripts/ci/release.py prepare
 
   shell:
+    needs: [plan, prepare-release]
+    if: needs.plan.outputs.shell == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/app-shell.yml
+    with:
+      build_plan: ${{ needs.plan.outputs.build_plan }}
+    secrets:
+      signing_key: ${{ secrets.ANLAND_SHELL_KEYSTORE_BASE64 }}
+      signing_config: ${{ secrets.ANLAND_SHELL_SIGNING_CONFIG }}
+
+  wayland:
+    needs: [plan, prepare-release]
+    if: needs.plan.outputs.wayland == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/app-wayland.yml
+    with:
+      build_plan: ${{ needs.plan.outputs.build_plan }}
+    secrets:
+      signing_key: ${{ secrets.ANLAND_WAYLAND_KEYSTORE_BASE64 }}
+      signing_config: ${{ secrets.ANLAND_WAYLAND_SIGNING_CONFIG }}
+
+  rootfs:
+    needs: [plan, prepare-release]
+    if: needs.plan.outputs.rootfs == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/rootfs.yml
+    with:
+      build_plan: ${{ needs.plan.outputs.build_plan }}
+
+  finalize-release:
+    needs: [plan, prepare-release, shell, wayland, rootfs]
+    if: always() && needs.prepare-release.result == 'success'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: shell-app
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: actions/cache@v4
-        with:
-          path: debug.keystore
-          key: anland-shell-signing-v1
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Build Shell with the existing upgrade signing key
-        run: |
-          if [ -f ../debug.keystore ]; then cp ../debug.keystore debug.keystore; fi
-          make
-          cp debug.keystore ../debug.keystore
-      - name: Upload directly to draft Release
+      - name: Verify selected components and finalize the draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag="anland-shell-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          sha256sum build/anland-shell.apk > SHA256SUMS
-          printf '%s\n' "Anland Shell + MaterialDesignTmpl migration: $GITHUB_SHA" > notes.md
-          gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Anland Shell $tag" --notes-file notes.md
-          gh release upload "$tag" build/anland-shell.apk SHA256SUMS
+          BUILD_RESULTS: ${{ toJSON(needs) }}
+        run: python3 scripts/ci/release.py finalize

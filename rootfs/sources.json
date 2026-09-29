@@ -1,0 +1,10 @@
+{
+  "builder_repository": "Goldzxcbug/Droidspaces-rootfs-Desktop-builder",
+  "builder_commit": "ffc712071a04cc50d1aed26aab064f0295b6251d",
+  "xfdesktop_source_version": "4.20.1-1",
+  "session_package": {
+    "version": "0.1.1",
+    "url": "https://github.com/Goldzxcbug/droidspaces-package/releases/download/anland-session-packages/anland-session-debian13-anland-session_0.1.1_arm64.deb",
+    "sha256": "7086fb4d8f3d22330d286e20000df1930caa8976761dda76150cb3fbdabe36b0"
+  }
+}

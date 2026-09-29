@@ -1,0 +1,65 @@
+name: Debian RootFS with integrated fixes
+on:
+  workflow_call:
+    inputs:
+      build_plan:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  BUILD_PLAN: ${{ inputs.build_plan }}
+  ANLAND_VERSION_SUFFIX: ${{ fromJSON(inputs.build_plan).suffix }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve pinned builder
+        id: sources
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          sources = json.loads(Path('rootfs/sources.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              print('repository=' + sources['builder_repository'], file=out)
+              print('commit=' + sources['builder_commit'], file=out)
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.sources.outputs.repository }}
+          ref: ${{ steps.sources.outputs.commit }}
+          path: build/rootfs-builder
+          persist-credentials: false
+      - name: Build patched Xfdesktop, Xwayland and current miniwm
+        run: |
+          git submodule update --init third_party/xserver
+          mkdir -p build/rootfs-inputs
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/src:ro" -v "$PWD/build/rootfs-inputs:/out" \
+            debian:trixie bash /src/rootfs/build-components.sh
+      - name: Pin session package and inject the verified components
+        run: |
+          python3 rootfs/prepare-inputs.py build/rootfs-inputs
+          python3 rootfs/apply-builder-fixes.py build/rootfs-builder
+          python3 rootfs/integrate-builder.py build/rootfs-builder build/rootfs-inputs
+      - name: Build the ready-to-use image
+        working-directory: build/rootfs-builder
+        run: |
+          bash build_rootfs-native.sh \
+            -i Debian-13.Dockerfile -v anland-ci \
+            -K 'Anland Next' -L true -B anland-wayland -P none \
+            -g true -a false -b true -c true -d false -e true \
+            -f true -h true -j false -n false -S false -t false -u seiun
+      - name: Verify exported contents and split large images
+        run: python3 rootfs/package-image.py build/rootfs-builder release
+      - name: Upload to the shared draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 scripts/ci/release.py upload --component rootfs

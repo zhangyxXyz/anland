@@ -1,0 +1,60 @@
+name: Wayland App and Root module
+on:
+  workflow_call:
+    inputs:
+      build_plan:
+        required: true
+        type: string
+    secrets:
+      signing_key:
+        required: true
+      signing_config:
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  BUILD_PLAN: ${{ inputs.build_plan }}
+  ANLAND_VERSION_SUFFIX: ${{ fromJSON(inputs.build_plan).suffix }}
+  ANDROID_HOME: /usr/local/lib/android/sdk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK components
+        run: bash scripts/ci/android-tools.sh native
+      - name: Prepare native build tools
+        run: bash scripts/ci/native-tools.sh
+      - name: Restore the repository signing key
+        env:
+          SIGNING_KEY: ${{ secrets.signing_key }}
+          SIGNING_CONFIG: ${{ secrets.signing_config }}
+        run: python3 scripts/ci/signing.py wayland
+      - name: Build Wayland, AAR, daemon and Root module
+        run: |
+          make libffi
+          make native module
+          python3 scripts/build-apps.py --component wayland --output release
+      - name: Stage and verify Android deliverables
+        run: |
+          mkdir -p release
+          cp build/waylandbridge release/
+          cp build/module/anland-awl.zip release/
+          python3 scripts/ci/verify-android.py wayland
+      - name: Upload to the shared draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 scripts/ci/release.py upload --component wayland
+      - name: Remove signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/anland-signing-wayland"

@@ -1,0 +1,16 @@
+// Shared by both standalone Gradle projects, including local builds.
+def versions = new Properties()
+rootProject.file('../version.properties').withInputStream { versions.load(it) }
+def component = project.ext.anlandComponent
+def name = versions.getProperty("${component}_VERSION_NAME")
+def code = versions.getProperty("${component}_VERSION_CODE")
+if (!name || !(code ==~ /[1-9][0-9]*/) || code.toLong() > 2100000000L) {
+    throw new GradleException("Invalid ${component} version in version.properties")
+}
+def suffix = System.getenv('ANLAND_VERSION_SUFFIX') ?: ''
+if (suffix && !(suffix ==~ /-dev\.[0-9]+\+[0-9a-f]{7,40}/)) {
+    throw new GradleException('Invalid ANLAND_VERSION_SUFFIX')
+}
+android.defaultConfig.versionName = name + suffix
+android.defaultConfig.versionCode = code.toInteger()
+project.version = name + suffix

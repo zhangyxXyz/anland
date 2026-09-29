@@ -1,0 +1,44 @@
+#!/bin/bash
+# Run on the private Xfce session bus, alongside xfsettingsd.
+set -eu
+state="${ANLAND_RUNTIME_DIR:-/run/anland}/appearance/night-mode"
+last=
+set_property() {
+    xfconf-query -c "$1" -p "$2" -s "$4" 2>/dev/null ||
+        xfconf-query -c "$1" -p "$2" -n -t "$3" -s "$4"
+}
+while :; do
+    mode=$(cat "$state" 2>/dev/null || true)
+    scale=$(xfconf-query -c xsettings -p /Gdk/WindowScalingFactor 2>/dev/null || echo 1)
+    appearance="$mode:$scale"
+    if [[ "$appearance" != "$last" && ( "$mode" == dark || "$mode" == light ) ]]; then
+        if [[ "$mode" == dark ]]; then dark=true; variant=Dark; else dark=false; variant=Light; fi
+        set_property xfce4-panel /panels/dark-mode bool "$dark"
+        # Match an installed theme pair, without replacing unrelated themes.
+        current=$(xfconf-query -c xsettings -p /Net/ThemeName 2>/dev/null || true)
+        case "$current" in
+            WhiteSur-Light|WhiteSur-Dark)
+                theme="WhiteSur-$variant"
+                if [[ -d "$HOME/.themes/$theme" || -d "$HOME/.local/share/themes/$theme" || -d "/usr/share/themes/$theme" ]]; then
+                    set_property xsettings /Net/ThemeName string "$theme"
+                    # Xfwm bitmap decorations do not inherit GTK's scale.
+                    # WhiteSur ships native 2x assets for these buttons/borders.
+                    wm_theme="$theme"
+                    if [[ "$scale" =~ ^[0-9]+$ ]] && (( scale >= 2 )); then
+                        candidate="$theme-xhdpi"
+                        if [[ -d "$HOME/.themes/$candidate/xfwm4" || -d "$HOME/.local/share/themes/$candidate/xfwm4" || -d "/usr/share/themes/$candidate/xfwm4" ]]; then
+                            wm_theme="$candidate"
+                        fi
+                    fi
+                    set_property xfwm4 /general/theme string "$wm_theme"
+                    set_property xsettings /Net/IconThemeName string "WhiteSur-$mode"
+                    gsettings set org.gnome.desktop.interface gtk-theme "$theme"
+                    gsettings set org.gnome.desktop.interface icon-theme "WhiteSur-$mode"
+                fi
+                ;;
+        esac
+        gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
+        last=$appearance
+    fi
+    sleep 2
+done

@@ -1,0 +1,17 @@
+#!/bin/bash
+# systemd owns one optional desktop per user. Reopening it must not create
+# another X server or discard the existing session and its documents.
+set -euo pipefail
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+systemctl --user start anland-desktop.service
+for ((i=0;i<150;i++)); do
+    if [[ -f "$XDG_RUNTIME_DIR/anland-desktop/env" ]]; then exit 0; fi
+    systemctl --user is-active --quiet anland-desktop.service || {
+        journalctl --user -u anland-desktop.service -n 12 --no-pager >&2
+        exit 1
+    }
+    sleep .1
+done
+echo 'Desktop startup timed out; check anland-desktop.service' >&2
+exit 1

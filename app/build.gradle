@@ -1,8 +1,5 @@
-// Single-module gradle project: root project IS the application. Pure Java
-// APK — all rendering/protocol lives in the root daemon (waylandbridge), so
-// there are no dependencies and no native libs. Signing uses debug.keystore
-// (gitignored; the Makefile bootstraps it with keytool when missing) so
-// release APKs stay installable over previous dev builds.
+// The root Gradle project is the host App; libawl and ui-common are libraries.
+// Version and private signing configuration are shared with the local/CI tools.
 plugins {
     id 'com.android.application' version '8.7.3'
     id 'com.android.library' version '8.7.3' apply false
@@ -20,8 +17,6 @@ android {
         applicationId 'com.anlandnext'
         minSdk 29
         targetSdk 29
-        versionCode 1
-        versionName '0.1'
         testInstrumentationRunner 'com.anlandnext.awl.TaskIdentityInstrumentation'
     }
 
@@ -30,14 +25,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    signingConfigs {
-        release {
-            storeFile file('debug.keystore')
-            storePassword 'anland'
-            keyAlias 'anland'
-            keyPassword 'anland'
-        }
-    }
+    signingConfigs { release {} }
 
     buildTypes {
         release {
@@ -53,6 +41,10 @@ android {
         disable 'ExpiredTargetSdkVersion'
     }
 }
+
+ext.anlandComponent = 'WAYLAND'
+apply from: '../gradle/component-version.gradle'
+apply from: '../gradle/component-signing.gradle'
 
 dependencies {
     // Window management (list/events/attach/close) goes through the same

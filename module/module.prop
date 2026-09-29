@@ -1,6 +1,7 @@
 id=anland-awl
 name=Anland Wayland Host
-version=0.4
-versionCode=4
+# Generated from version.properties when packaging; do not edit these placeholders.
+version=@MODULE_VERSION_NAME@
+versionCode=@MODULE_VERSION_CODE@
 author=anland
-description=Wayland compositor root daemon waylandbridge (single ELF; contexts generated at flash time from the live system file by customize.sh)
+description=Wayland compositor root daemon waylandbridge (single ELF, contexts generated at flash time from the live system file by customize.sh)

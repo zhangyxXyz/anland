@@ -4,7 +4,7 @@
 #   JAVA_HOME  JDK root (keytool; its bin is prepended to PATH)
 #
 # Usage:
-#   make            # build/anland-shell.apk (release, debug-signed)
+#   make            # build/anland-shell.apk (release, configured repository key)
 #   make clean
 SHELL := /bin/bash
 .ONESHELL:
@@ -20,11 +20,7 @@ OUT := build
 .PHONY: apk clean
 
 apk:
-	if [ ! -f debug.keystore ]; then
-	  keytool -genkeypair -keystore debug.keystore -alias anland \
-	    -storepass anland -keypass anland -keyalg RSA -keysize 2048 \
-	    -validity 10000 -dname "CN=Anland Shell Debug" >/dev/null 2>&1
-	fi
+	python3 ../scripts/ci/signing.py shell --check
 	./gradlew --no-daemon -q assembleRelease
 	mkdir -p "$(OUT)"
 	cp -f build/outputs/apk/release/anland-shell-release.apk "$(OUT)/anland-shell.apk"
