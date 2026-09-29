@@ -300,6 +300,11 @@ public final class Awl {
     /** Same, taking the window from {@link #getWindows} / a created event. */
     public static void attachWindow(Context ctx, WlWindow win, HostCallbacks cbs) {
         if (ctx == null || win == null) return;
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> attachWindow(ctx, win, cbs));
+            return;
+        }
         Intent it = new Intent(ctx, AwlWindowActivity.class);
         it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
@@ -313,7 +318,10 @@ public final class Awl {
             else hostEntries.remove(win.id);   /* a re-attach without hooks clears stale ones */
         }
         try {
-            ctx.startActivity(it);
+            // Classify before launching: a temporary NEW_DOCUMENT Activity
+            // causes an app-switch animation even if onCreate redirects it.
+            if (!AwlWindowActivity.launchDialog(ctx, win.id, win.title))
+                ctx.startActivity(it);
         } catch (Exception e) {
             attachFailed(win.id);
             Log.e(TAG, "attachWindow failed", e);

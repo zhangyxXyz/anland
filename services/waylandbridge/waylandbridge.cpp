@@ -686,6 +686,22 @@ static void shell_quote(const char* in, char* out, size_t n) {
 static void attach_activity(uint64_t id, const char* title) {
     char q[600];
     shell_quote(title ? title : "", q, sizeof(q));
+    awl_presentation_t presentation;
+    awl_window_presentation(id, &presentation);
+    if (presentation.dialog) {
+        /* The parent and committed size hints already exist at first map.
+         * Let the app start the floating host INSIDE that parent's task.
+         * Starting a document Activity first briefly fronts a new task and
+         * runs Android's app-switch animation before the redirect can act. */
+        run_am("am broadcast -a anland.ATTACH_WINDOW "
+               "-n %s/com.anlandnext.awl.AwlWindowLaunchReceiver "
+               "--receiver-foreground --allow-background-activity-starts "
+               "--el id %llu --es title %s >/dev/null 2>&1",
+               AWL_PKG, (unsigned long long)id, q);
+        LOGI("Attach: parent-task dialog id=%llu parent=%llu",
+             (unsigned long long)id, (unsigned long long)presentation.parent);
+        return;
+    }
     /* exactly one am start in document mode (a double start creates two
        instances for the same window, one of which lingers as a placeholder
        after the window is destroyed):

@@ -19,6 +19,11 @@
          with it). A live window whose process was merely killed still
          re-attaches from its card (the ActivityRecord stays, nothing finished). -->
     <application>
+        <!-- Only our process / privileged daemon can request a launch. A
+             receiver has no task or window, so transients never flash a
+             document Activity before being placed in their parent's task. -->
+        <receiver android:name="com.anlandnext.awl.AwlWindowLaunchReceiver"
+            android:exported="false" />
         <!-- A protocol-defined transient shares the parent's task. Closing
              this Activity must never remove that task or its Linux window. -->
         <activity android:name="com.anlandnext.awl.AwlDialogActivity"

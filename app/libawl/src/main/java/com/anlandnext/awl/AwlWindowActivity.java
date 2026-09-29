@@ -321,7 +321,10 @@ public class AwlWindowActivity extends Activity {
      *  FINISH_TASK_WITH_ROOT_ACTIVITY → removeTask(REMOVE_FROM_RECENTS)). */
     private void finishAndDropTask() {
         if (isFinishing()) return;
-        if (this instanceof AwlDialogActivity || !isTaskRoot()) finish();
+        if (this instanceof AwlDialogActivity) {
+            finish();
+            overridePendingTransition(0, 0);
+        } else if (!isTaskRoot()) finish();
         else finishAndRemoveTask();
     }
 
@@ -570,45 +573,58 @@ public class AwlWindowActivity extends Activity {
 
     private boolean redirectDialog(long windowId) {
         if (this instanceof AwlDialogActivity || redirectingDialog) return false;
+        if (!launchDialog(this, windowId, getIntent().getStringExtra("title"))) return false;
+        redirectingDialog = true;
+        // Compatibility for explicit old Activity intents or a relation
+        // added after first map. Normal launches classify before any Activity
+        // is created and do not take this fallback path.
+        finish();
+        overridePendingTransition(0, 0);
+        return true;
+    }
+
+    /** Start a protocol transient directly in its parent task (main thread). */
+    static boolean launchDialog(android.content.Context context, long windowId, String title) {
         AwlClient.Presentation p = AwlClient.presentation(windowId);
         if (!p.dialog) return false;
-        redirectingDialog = true;
         AwlWindowActivity existing = LIVE.get(windowId);
         if (existing instanceof AwlDialogActivity && !existing.isFinishing()) {
-            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            android.app.ActivityManager am = context.getSystemService(android.app.ActivityManager.class);
             if (am != null) for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
                 if (task.getTaskInfo().taskId == existing.getTaskId()) {
                     task.moveToFront();
-                    finish();
+                    Awl.hostArrived(windowId);
                     return true;
                 }
             }
         }
-        android.content.Intent next = new android.content.Intent(this, AwlDialogActivity.class)
+        android.content.Intent next = new android.content.Intent(context, AwlDialogActivity.class)
                 .setData(android.net.Uri.parse("anland://dialog/" + windowId))
-                .putExtra("id", windowId).putExtra("title", getIntent().getStringExtra("title"));
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra("id", windowId).putExtra("title", title);
+        Bundle options = android.app.ActivityOptions.makeCustomAnimation(context, 0, 0).toBundle();
         AwlWindowActivity parent = LIVE.get(p.parent);
         if (parent != null && !parent.isFinishing()) {
-            parent.startActivity(next);
+            parent.startActivity(next, options);
         } else {
             boolean launched = false;
-            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            android.app.ActivityManager am = context.getSystemService(android.app.ActivityManager.class);
             if (am != null && p.parent != 0) {
                 for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
                     android.content.Intent base = task.getTaskInfo().baseIntent;
                     if (base != null && base.getLongExtra("id", -1) == p.parent) {
-                        task.startActivity(this, next, null);
+                        task.startActivity(context, next, options);
                         launched = true;
                         break;
                     }
                 }
             }
-            if (!launched) startActivity(next);
+            if (!launched) {
+                if (!(context instanceof Activity))
+                    next.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(next, options);
+            }
         }
-        // The temporary normal host is never bound; the dialog will own the
-        // id and surface. If it was already bound, generation/host fencing
-        // protects the new attachment from this Activity's later onStop.
-        finish();
         return true;
     }
 
