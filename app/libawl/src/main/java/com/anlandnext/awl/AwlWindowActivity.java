@@ -2009,6 +2009,18 @@ public class AwlWindowActivity extends Activity {
     /** IME-synthesized key (scanCode=0) → evdev code (matches the embedded keymap) */
     private static int fallbackSc(int keyCode) {
         switch (keyCode) {
+        /* Android IMEs can send digits as key events instead of commitText.
+         * These synthetic events have no hardware scan code. */
+        case KeyEvent.KEYCODE_0:            return 0x0b;
+        case KeyEvent.KEYCODE_1:            return 0x02;
+        case KeyEvent.KEYCODE_2:            return 0x03;
+        case KeyEvent.KEYCODE_3:            return 0x04;
+        case KeyEvent.KEYCODE_4:            return 0x05;
+        case KeyEvent.KEYCODE_5:            return 0x06;
+        case KeyEvent.KEYCODE_6:            return 0x07;
+        case KeyEvent.KEYCODE_7:            return 0x08;
+        case KeyEvent.KEYCODE_8:            return 0x09;
+        case KeyEvent.KEYCODE_9:            return 0x0a;
         case KeyEvent.KEYCODE_ENTER:
         case KeyEvent.KEYCODE_NUMPAD_ENTER: return 0x1c;
         case KeyEvent.KEYCODE_DEL:          return 0x0e;   /* Android DEL = backspace */
