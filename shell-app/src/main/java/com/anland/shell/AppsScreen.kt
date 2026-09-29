@@ -24,8 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,59 +88,44 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
     }){Text(stringResource(R.string.pin_shortcut))}},dismissButton={TextButton(onClick={selected=null}){Text(stringResource(R.string.dialog_ok))}}) }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DesktopBanner(desktops:List<AppEntry>) {
-    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
+    val context=LocalContext.current
     Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            if(desktops.isEmpty()) DesktopActions(null)
+        // Keep the original vertical order at every window width. The heading
+        // and both actions share a 38 dp icon column and a 14 dp text gap.
+        Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             desktops.forEach { desktop ->
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    // Use the available card width and text scale, including split
-                    // screen. Both actions share their sizing and content insets.
-                    val heading: @Composable (Modifier)->Unit = { modifier ->
-                        Row(modifier,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                            SettingLeadingIcon(Icons.Outlined.DesktopWindows)
-                            Column(Modifier.weight(1f)) {
-                                Text(if(desktops.size==1)stringResource(R.string.desktop_entry)else desktop.name,style=MaterialTheme.typography.titleMedium)
-                                Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                    if(maxWidth >= 680.dp * fontScale) {
-                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)) {
-                            heading(Modifier.weight(1f))
-                            DesktopActions(desktop)
-                        }
-                    } else {
-                        Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                            heading(Modifier.fillMaxWidth())
-                            DesktopActions(desktop)
-                        }
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                    SettingLeadingIcon(Icons.Outlined.DesktopWindows)
+                    Column(Modifier.weight(1f)) {
+                        Text(if(desktops.size==1)stringResource(R.string.desktop_entry)else desktop.name,style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
                     }
                 }
+                DesktopBannerAction(Icons.Outlined.DesktopWindows,stringResource(R.string.desktop_enter),tonal=true) {
+                    context.startActivity(Shortcuts.launchIntent(context,desktop))
+                }
+            }
+            DesktopBannerAction(Icons.Outlined.OpenInNew,stringResource(R.string.windows_entry)) {
+                openWindows(context)
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DesktopActions(desktop:AppEntry?) {
-    val context=LocalContext.current
-    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp),itemVerticalAlignment=Alignment.CenterVertically) {
-        OutlinedButton(onClick={openWindows(context)},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
-            Icon(Icons.Outlined.OpenInNew,null,Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.windows_entry))
+private fun DesktopBannerAction(icon:ImageVector,label:String,tonal:Boolean=false,onClick:()->Unit) {
+    val content: @Composable RowScope.()->Unit = {
+        Box(Modifier.width(38.dp),contentAlignment=Alignment.Center) {
+            Icon(icon,null,Modifier.size(20.dp))
         }
-        if(desktop!=null) Button(onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
-            Icon(Icons.Outlined.DesktopWindows,null,Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.desktop_enter))
-        }
+        Spacer(Modifier.width(14.dp))
+        Text(label)
     }
+    val padding=PaddingValues(start=0.dp,end=16.dp,top=10.dp,bottom=10.dp)
+    if(tonal) FilledTonalButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
+    else TextButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
 }
 
 @Composable
