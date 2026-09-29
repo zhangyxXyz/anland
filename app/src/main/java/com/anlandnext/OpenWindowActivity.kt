@@ -49,7 +49,7 @@ class OpenWindowActivity : AppCompatActivity() {
         val before = intent.getLongArrayExtra("window_ids")?.toSet()
         val automatic = before != null && intent.getBooleanExtra("auto_attach", false)
         val deadline = SystemClock.uptimeMillis() + 20_000
-        setContent { WithAnlandTheme(manageSystemBars = false) {
+        setContent { WithLaunchTheme(intent.getBundleExtra(LaunchTheme.EXTRA)) {
             if (choosing || failed) AlertDialog(
                 onDismissRequest = { finish() },
                 title = { Text(stringResource(R.string.window_open)) },
@@ -61,7 +61,8 @@ class OpenWindowActivity : AppCompatActivity() {
                     startActivity(android.content.Intent(this, MainActivity::class.java)); finish()
                 }) { Text(stringResource(R.string.windows_title)) } },
                 dismissButton = { TextButton(onClick = { finish() }) { Text(stringResource(android.R.string.cancel)) } })
-            else LaunchStatus(intent.getStringExtra("app_name") ?: stringResource(R.string.window_open)) { finish() }
+            else if (exactId < 0) LaunchStatus(intent.getStringExtra("launch_message")
+                ?: intent.getStringExtra("app_name") ?: stringResource(R.string.window_open)) { finish() }
         } }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {

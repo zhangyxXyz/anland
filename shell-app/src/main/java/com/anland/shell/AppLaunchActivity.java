@@ -128,6 +128,8 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
                                     .putExtra("window_app_id",windowAppId)
                                     .putExtra("app_name",appName)
+                                    .putExtra("launch_message",getString(R.string.launching_fmt, appName))
+                                    .putExtra(com.anland.design.LaunchTheme.EXTRA, com.anland.design.LaunchTheme.capture(this))
                                     .putExtra("window_ids",windows == null ? null : windows.getLongArray("window_ids"))
                                     .putExtra("auto_attach",windows != null && windows.getBoolean("auto_attach"))
                                     .putExtra("desktop_id",showDesktop ? null : getIntent().getStringExtra("id")));
