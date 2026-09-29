@@ -99,10 +99,12 @@ fun AnlandShell(destinations: List<Destination>, appearance: Appearance, initial
                 brand: String="Anland", contextLabel: String="",
                 secondaryTitle:String?=null, onSecondaryBack:()->Unit={},
                 actions: @Composable RowScope.() -> Unit = {}, content: @Composable (Int, (Int) -> Unit) -> Unit) {
-    var tab by rememberSaveable { mutableIntStateOf(initialTab) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(initialTab) }
+    // An upgrade can restore a destination index from an older navigation layout.
+    val tab=selectedTab.coerceIn(destinations.indices)
     val pages=rememberSaveableStateHolder()
     BackHandler(secondaryTitle!=null) { onSecondaryBack() }
-    BackHandler(secondaryTitle==null && tab != 0) { tab=0 }
+    BackHandler(secondaryTitle==null && tab != 0) { selectedTab=0 }
     val surface=MaterialTheme.colorScheme.surface
     val backdrop=rememberLayerBackdrop { drawRect(surface); drawContent() }
     BoxWithConstraints {
@@ -112,16 +114,16 @@ fun AnlandShell(destinations: List<Destination>, appearance: Appearance, initial
         Scaffold(containerColor=surface, bottomBar={
             if (!rail && secondaryTitle==null) {
                 if (appearance.glass) Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal=18.dp, vertical=6.dp), contentAlignment=Alignment.Center) {
-                    LiquidGlassBottomBar(selectedIndex=tab, onSelected={tab=it}, backdrop=backdrop, tabsCount=destinations.size) {
+                    LiquidGlassBottomBar(selectedIndex=tab, onSelected={selectedTab=it}, backdrop=backdrop, tabsCount=destinations.size) {
                         destinations.forEachIndexed { index, d ->
-                            LiquidGlassBottomBarItem(modifier=Modifier.defaultMinSize(minWidth=64.dp), onClick={tab=index}) {
+                            LiquidGlassBottomBarItem(modifier=Modifier.defaultMinSize(minWidth=64.dp), onClick={selectedTab=index}) {
                                 Icon(d.icon,d.title)
                                 Text(d.title,style=MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
                 } else NavigationBar(containerColor=surface,tonalElevation=0.dp) {
-                    destinations.forEachIndexed { index,d -> NavigationBarItem(tab==index,{tab=index},icon={Icon(d.icon,null)},label={Text(d.title)}) }
+                    destinations.forEachIndexed { index,d -> NavigationBarItem(tab==index,{selectedTab=index},icon={Icon(d.icon,null)},label={Text(d.title)}) }
                 }
             }
         }) { padding ->
@@ -137,7 +139,7 @@ fun AnlandShell(destinations: List<Destination>, appearance: Appearance, initial
                             Spacer(Modifier.weight(1f))
                             if(contextLabel.isNotBlank()) Text(contextLabel,Modifier.padding(16.dp),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)
                         }
-                        NavigationDrawerItem(label={Text(d.title)},selected=tab==index,onClick={tab=index},icon={Icon(d.icon,null)},shape=RoundedCornerShape(18.dp),
+                        NavigationDrawerItem(label={Text(d.title)},selected=tab==index,onClick={selectedTab=index},icon={Icon(d.icon,null)},shape=RoundedCornerShape(18.dp),
                             colors=NavigationDrawerItemDefaults.colors(unselectedContainerColor=surface,selectedContainerColor=MaterialTheme.colorScheme.primaryContainer))
                     }
                 }
@@ -147,7 +149,7 @@ fun AnlandShell(destinations: List<Destination>, appearance: Appearance, initial
                         actions={if(secondaryTitle==null)actions()},windowInsets=WindowInsets(0,0,0,0),colors=TopAppBarDefaults.topAppBarColors(containerColor=surface,scrolledContainerColor=surface))
                     Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.TopCenter) {
                         Box(Modifier.widthIn(max=1440.dp).fillMaxSize()) {
-                            pages.SaveableStateProvider(tab) { content(tab) { tab=it } }
+                            pages.SaveableStateProvider(tab) { content(tab) { selectedTab=it } }
                         }
                     }
                 }

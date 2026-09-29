@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,21 +46,7 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
     var listView by rememberSaveable { mutableStateOf(false) }
     var selected by remember {mutableStateOf<AppEntry?>(null)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-          Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            state.apps.filter{it.desktopSession}.forEach{desktop ->
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                    SettingLeadingIcon(Icons.Outlined.DesktopWindows)
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.desktop_entry),style=MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
-                    }
-                }
-                FilledTonalButton(onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))}){Icon(Icons.Outlined.DesktopWindows,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.desktop_enter))}
-            }
-            TextButton(onClick={openWindows(context)}){Icon(Icons.Outlined.OpenInNew,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(stringResource(R.string.windows_entry))}
-          }
-        }
+        DesktopBanner(state.apps.filter{it.desktopSession})
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             WorkspaceSearch(search,{search=it},stringResource(R.string.search_apps),Modifier.weight(1f))
             IconToggleButton(listView,{listView=it}){Icon(if(listView)Icons.Outlined.GridView else Icons.Outlined.ViewList,stringResource(if(listView)R.string.design_grid_view else R.string.design_list_view))}
@@ -67,7 +54,7 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
         if(state.anlandxInstalled==false) Text(stringResource(R.string.tab_apps_no_anlandx),color=MaterialTheme.colorScheme.error)
         val applications=state.apps.filter{!it.desktopSession}
         val filtered=applications.filter{it.name.contains(search,true)||it.id.contains(search,true)}
-        Text(stringResource(R.string.app_count_fmt,filtered.size),style=MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.app_count_fmt,filtered.size),Modifier.padding(horizontal=16.dp),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         val active=state.containers.firstOrNull{it.name==state.active}
         if(active!=null && !active.running()) Button(onClick={state.changeRunning(active)},enabled=!state.busy){Text(stringResource(R.string.start))}
@@ -99,6 +86,61 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
         icons.load(app){_,bitmap->if(!Shortcuts.pin(context,app,bitmap))Toast.makeText(context,R.string.pinned_fallback,Toast.LENGTH_LONG).show()}
         selected=null
     }){Text(stringResource(R.string.pin_shortcut))}},dismissButton={TextButton(onClick={selected=null}){Text(stringResource(R.string.dialog_ok))}}) }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopBanner(desktops:List<AppEntry>) {
+    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            if(desktops.isEmpty()) DesktopActions(null)
+            desktops.forEach { desktop ->
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Use the available card width and text scale, including split
+                    // screen. Both actions share their sizing and content insets.
+                    val heading: @Composable (Modifier)->Unit = { modifier ->
+                        Row(modifier,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                            SettingLeadingIcon(Icons.Outlined.DesktopWindows)
+                            Column(Modifier.weight(1f)) {
+                                Text(if(desktops.size==1)stringResource(R.string.desktop_entry)else desktop.name,style=MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                    if(maxWidth >= 680.dp * fontScale) {
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)) {
+                            heading(Modifier.weight(1f))
+                            DesktopActions(desktop)
+                        }
+                    } else {
+                        Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                            heading(Modifier.fillMaxWidth())
+                            DesktopActions(desktop)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopActions(desktop:AppEntry?) {
+    val context=LocalContext.current
+    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp),itemVerticalAlignment=Alignment.CenterVertically) {
+        OutlinedButton(onClick={openWindows(context)},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
+            Icon(Icons.Outlined.OpenInNew,null,Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.windows_entry))
+        }
+        if(desktop!=null) Button(onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))},modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp)) {
+            Icon(Icons.Outlined.DesktopWindows,null,Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.desktop_enter))
+        }
+    }
 }
 
 @Composable

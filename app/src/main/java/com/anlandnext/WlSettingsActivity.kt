@@ -41,7 +41,11 @@ import kotlinx.coroutines.sync.withLock
  * Swiping away / killing the background is fixed to minimize-and-keep-alive.
  * Explicit Close remains on the window-list menu; window exit policy lives in the daemon.
  */
-class WlSettingsActivity : MainActivity() { override val initialTab=1 }
+class WlSettingsActivity : MainActivity() {
+    override val initialTab=1
+    // Existing window-menu links still enter the display controls directly.
+    override val openWindowSettings=true
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_settings">設定</string>
+    <string name="window_settings_summary">啟動行為、顯示縮放、鍵盤與繪製</string>
     <string name="design_connected">視窗服務已連線</string>
     <string name="design_search_windows">搜尋視窗</string>
     <string name="design_no_results">沒有符合的視窗</string>

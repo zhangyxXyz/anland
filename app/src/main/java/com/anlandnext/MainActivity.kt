@@ -96,6 +96,7 @@ class WindowState : ViewModel() {
 open class MainActivity : AppCompatActivity() {
     private val state:WindowState by viewModels()
     protected open val initialTab=0
+    protected open val openWindowSettings=false
     private val handler=Handler(Looper.getMainLooper())
     private var visible=false
     private val refresher=Runnable { if(visible) state.refresh() }
@@ -112,9 +113,20 @@ open class MainActivity : AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         setContent { WithAnlandTheme { appearance ->
-            AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.settings_title),Icons.Outlined.Tune),Destination(getString(R.string.appearance_title),Icons.Outlined.Palette)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
+            var windowSettings by rememberSaveable { mutableStateOf(openWindowSettings) }
+            AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.app_settings),Icons.Outlined.Settings)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
+                secondaryTitle=if(windowSettings)getString(R.string.settings_title)else null,onSecondaryBack={windowSettings=false},
                 actions={IconButton(onClick=state::refresh){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}}) { tab, _ ->
-                when(tab) { 0->WindowsPage(state); 1->WindowSettings(state); else->Page { AppearanceSettings(appearance) } }
+                when {
+                    windowSettings -> WindowSettings(state)
+                    tab==0 -> WindowsPage(state)
+                    else -> Page {
+                        AppearanceSettings(appearance)
+                        SettingGroup(stringResource(R.string.windows_title)) {
+                            NavigationSettingItem(stringResource(R.string.settings_title),description=stringResource(R.string.window_settings_summary),icon=Icons.Outlined.Tune,onClick={windowSettings=true})
+                        }
+                    }
+                }
             }
             if(state.error) AlertDialog(onDismissRequest={state.error=false},title={Text(stringResource(R.string.setting_write_failed))},confirmButton={TextButton(onClick={state.error=false}){Text(stringResource(R.string.dialog_ok))}})
             if(state.closeFailed||state.closeWaiting) AlertDialog(onDismissRequest={state.closeFailed=false;state.closeWaiting=false},
