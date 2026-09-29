@@ -82,3 +82,48 @@ were checked against both the real EditContext and Wayland trace. The same
 sequence also passed in GTK Entry. See that directory's README for package
 upgrade and rollback details. This incremental container patch does not
 change the previously downloaded rootfs image.
+
+## Dialog launch and IME viewport transitions (2026-09-29)
+
+The daemon classifies protocol transients before asking Android to launch an
+Activity. A private receiver starts the floating dialog directly in its
+parent task, with no intermediate document Activity or task animation. The
+legacy Activity redirect remains only for old explicit intents and parent
+relations received after mapping. Three device open/cancel rounds retained
+the parent's task and GPU attachment; the previous APK fails the same test
+because it first creates an intermediate document task. The user confirmed
+that the visible app-switch effect is gone.
+
+`SurfaceInsetsController` follows actual WindowInsetsAnimation frames. Android
+dispatches the final inset state before the first animated frame, so applying
+that value immediately jumps ahead of the keyboard. Layout callbacks reuse
+the last displayed inset instead of reading a future target; cancellation and
+overlapping navigation/IME animations have explicit completion handling.
+Immersive navigation bars remain overlays, while real cutouts, caption bars
+and ordinary multi-window system bars remain obstructions. The host owns
+viewport resizing instead of also letting Android pan it independently.
+See [Android's inset animation ordering](https://developer.android.com/reference/android/view/WindowInsetsAnimation.Callback).
+
+The native renderer retains the established display scale while a responsive
+Wayland client rebuilds its buffer for a pending size configure. It previously
+stretched the old frame to the new height, then snapped back when the new
+buffer arrived. Configure serials and committed content now distinguish that
+pending response from a fixed-size client that deliberately commits a different
+size. Rendering, pointer conversion and IME cursor coordinates share this
+mapping. This does not change fixed-size Xwayland placement or select clients
+by application name.
+
+Regression sources: `tests/dialog_launch_regression.py`,
+`tests/ime_viewport_regression.py`, `tests/InsetsAnimationProbe.java` and
+`tests/resize_viewport_test.c`. The latter covers delayed/empty acknowledgments,
+superseded resizes, explicit fixed-size responses, zoom and Xwayland mapping;
+it passes under UBSan. The Android probe dispatches actual framework callbacks
+through an isolated View and the candidate APK's production controller.
+
+Signed build 36546025273 (441c4f4) was installed on the tablet. Three real
+Sogou show/hide cycles produced monotonic intermediate viewport heights
+(2136 to 1109 and back), replacing the old 2136/2092/1109 jumps. Recordings
+show the editor retaining its proportions while the keyboard moves. Two
+additional dialog/cancel rounds, the 11 InputConnection cases, installed
+APK animation callback cases and portrait/landscape checks passed. Rotation
+preferences and the original 120-second display timeout were restored.
