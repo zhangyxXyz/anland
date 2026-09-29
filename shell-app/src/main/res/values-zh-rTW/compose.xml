@@ -1,6 +1,7 @@
 <resources>
     <string name="appearance_title">外觀</string>
     <string name="windows_entry">視窗與顯示</string>
+    <string name="windows_entry_summary">視窗管理 · 縮放與顯示</string>
     <string name="windows_entry_help">前往 Wayland 開啟自動顯示視窗、調整縮放和視窗行為。</string>
     <string name="host_missing">尚未安裝 Anland Wayland。</string>
     <string name="search_apps">搜尋應用</string>

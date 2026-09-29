@@ -1,6 +1,7 @@
 <resources>
     <string name="appearance_title">外观</string>
     <string name="windows_entry">窗口与显示</string>
+    <string name="windows_entry_summary">窗口管理 · 缩放与显示</string>
     <string name="windows_entry_help">前往 Wayland 开启自动显示窗口、调整缩放和窗口行为。</string>
     <string name="host_missing">尚未安装 Anland Wayland。</string>
     <string name="search_apps">搜索应用</string>

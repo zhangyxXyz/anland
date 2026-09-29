@@ -1,6 +1,7 @@
 <resources>
     <string name="appearance_title">Appearance</string>
     <string name="windows_entry">Windows &amp; display</string>
+    <string name="windows_entry_summary">Windows · Scaling &amp; display</string>
     <string name="windows_entry_help">Open Wayland to enable automatic window display or adjust scaling.</string>
     <string name="host_missing">Anland Wayland is not installed.</string>
     <string name="search_apps">Search applications</string>

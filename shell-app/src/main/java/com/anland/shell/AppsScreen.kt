@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,26 +93,46 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DesktopBanner(desktops:List<AppEntry>) {
-    val context=LocalContext.current
-    Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-        // Share one action row; wrap only when a narrow window or larger text
-        // cannot fit both actions. Keep every discovered desktop launchable.
-        Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                SettingLeadingIcon(if(desktops.isEmpty())Icons.Outlined.Window else Icons.Outlined.DesktopWindows)
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(if(desktops.isEmpty())R.string.windows_entry else R.string.desktop_entry),style=MaterialTheme.typography.titleMedium)
-                    Text(stringResource(if(desktops.isEmpty())R.string.windows_entry_help else R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
-                }
+    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
+    // Use the available page width, including split screen and enlarged text,
+    // rather than the device orientation. Keep every discovered desktop launchable.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if(desktops.isEmpty()) {
+            WindowDisplayCard(Modifier.fillMaxWidth())
+        } else if(maxWidth >= 840.dp * fontScale) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                DesktopEntryCard(desktops,Modifier.weight(0.62f).fillMaxHeight())
+                WindowDisplayCard(Modifier.weight(0.38f).fillMaxHeight())
             }
-            FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                desktops.forEach { desktop ->
-                    DesktopBannerAction(Icons.Outlined.DesktopWindows,if(desktops.size==1)stringResource(R.string.desktop_enter)else desktop.name,primary=true) {
-                        context.startActivity(Shortcuts.launchIntent(context,desktop))
-                    }
-                }
-                DesktopBannerAction(Icons.Outlined.Tune,stringResource(R.string.windows_entry)) {
-                    openWindows(context)
+        } else {
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                DesktopEntryCard(desktops,Modifier.fillMaxWidth())
+                WindowDisplayCard(Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopEntryCard(desktops:List<AppEntry>,modifier:Modifier) {
+    val context=LocalContext.current
+    val colors=MaterialTheme.colorScheme
+    val fontScale=LocalDensity.current.fontScale.coerceAtLeast(1f)
+    Surface(modifier=modifier,shape=RoundedCornerShape(24.dp),color=colors.primaryContainer.copy(alpha=0.55f),
+        contentColor=colors.onSurface,border=BorderStroke(1.dp,colors.primary.copy(alpha=0.22f))) {
+        // FlowRow keeps the action beside the heading when space permits, then
+        // wraps it naturally without clipping translated labels or larger text.
+        FlowRow(Modifier.heightIn(min=128.dp).padding(20.dp),
+            horizontalArrangement=Arrangement.spacedBy(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp,Alignment.CenterVertically),
+            itemVerticalAlignment=Alignment.CenterVertically) {
+            BannerHeading(Icons.Outlined.DesktopWindows,stringResource(R.string.desktop_entry),
+                stringResource(R.string.desktop_entry_help),Modifier.widthIn(min=240.dp * fontScale).weight(1f))
+            desktops.forEach { desktop ->
+                Button(onClick={context.startActivity(Shortcuts.launchIntent(context,desktop))},
+                    modifier=Modifier.heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=24.dp,vertical=12.dp)) {
+                    Text(if(desktops.size==1)stringResource(R.string.desktop_enter)else desktop.name,
+                        textAlign=TextAlign.Center)
                 }
             }
         }
@@ -118,15 +140,33 @@ private fun DesktopBanner(desktops:List<AppEntry>) {
 }
 
 @Composable
-private fun DesktopBannerAction(icon:ImageVector,label:String,primary:Boolean=false,onClick:()->Unit) {
-    val content: @Composable RowScope.()->Unit = {
-        Icon(icon,null,Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label,textAlign=TextAlign.Center)
+private fun WindowDisplayCard(modifier:Modifier) {
+    val context=LocalContext.current
+    val colors=MaterialTheme.colorScheme
+    Surface(onClick={openWindows(context)},modifier=modifier,shape=RoundedCornerShape(24.dp),
+        color=colors.surfaceContainerLow,contentColor=colors.onSurface,border=BorderStroke(1.dp,colors.outlineVariant)) {
+        Row(Modifier.heightIn(min=128.dp).padding(20.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            BannerHeading(Icons.Outlined.Tune,stringResource(R.string.windows_entry),
+                stringResource(R.string.windows_entry_summary),Modifier.weight(1f))
+            Icon(Icons.Outlined.ChevronRight,null,Modifier.size(24.dp),tint=colors.primary)
+        }
     }
-    val padding=PaddingValues(horizontal=18.dp,vertical=12.dp)
-    if(primary) Button(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
-    else OutlinedButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
+}
+
+@Composable
+private fun BannerHeading(icon:ImageVector,title:String,detail:String,modifier:Modifier) {
+    Row(modifier,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+        Surface(shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.primaryContainer) {
+            Box(Modifier.size(60.dp),contentAlignment=Alignment.Center) {
+                Icon(icon,null,Modifier.size(32.dp),tint=MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Text(title,style=MaterialTheme.typography.titleMedium)
+            Text(detail,style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable
