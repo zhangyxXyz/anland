@@ -66,12 +66,12 @@ class Appearance(context: Context) {
 }
 
 @Composable
-fun WithAnlandTheme(content: @Composable (Appearance) -> Unit) {
+fun WithAnlandTheme(manageSystemBars: Boolean = true, content: @Composable (Appearance) -> Unit) {
     val context=LocalContext.current
     val appearance=remember { Appearance(context) }
     ShellTheme(appearance.mode, appearance.dynamic, appearance.color, appearance.custom, appearance.useCustom) {
         val surface=MaterialTheme.colorScheme.surface
-        SideEffect {
+        if (manageSystemBars) SideEffect {
             var owner=context
             while(owner is ContextWrapper && owner !is Activity)owner=owner.baseContext
             (owner as? Activity)?.window?.let { window ->

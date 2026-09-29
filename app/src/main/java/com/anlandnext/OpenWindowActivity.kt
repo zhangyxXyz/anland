@@ -38,6 +38,7 @@ class OpenWindowActivity : AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         overridePendingTransition(0, 0)
+        window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
         val targets = listOfNotNull(intent.getStringExtra("window_app_id"), intent.getStringExtra("desktop_id"))
             .filter { it.isNotBlank() }.map { it.removeSuffix(".desktop") }
         // The privileged daemon supplies an exact ID, before any document task
@@ -48,7 +49,7 @@ class OpenWindowActivity : AppCompatActivity() {
         val before = intent.getLongArrayExtra("window_ids")?.toSet()
         val automatic = before != null && intent.getBooleanExtra("auto_attach", false)
         val deadline = SystemClock.uptimeMillis() + 20_000
-        setContent { WithAnlandTheme {
+        setContent { WithAnlandTheme(manageSystemBars = false) {
             if (choosing || failed) AlertDialog(
                 onDismissRequest = { finish() },
                 title = { Text(stringResource(R.string.window_open)) },

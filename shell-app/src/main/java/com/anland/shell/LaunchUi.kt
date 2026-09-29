@@ -21,13 +21,14 @@ object LaunchUi {
     @JvmStatic fun progress(activity:AppCompatActivity,initial:String):Progress {
         val state=Progress(initial)
         activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        activity.setContent { WithAnlandTheme {
+        activity.window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+        activity.setContent { WithAnlandTheme(manageSystemBars = false) {
             com.anland.design.LaunchStatus(state.message) { activity.finish() }
         } }
         return state
     }
     @JvmStatic fun blocked(activity: AppCompatActivity, manage: Runnable) {
-        activity.setContent { WithAnlandTheme {
+        activity.setContent { WithAnlandTheme(manageSystemBars = false) {
             AlertDialog(onDismissRequest = { activity.finish() },
                 title = { Text(stringResource(R.string.desktop_close_first_title)) },
                 text = { Text(stringResource(R.string.desktop_close_first)) },
