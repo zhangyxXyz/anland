@@ -68,7 +68,13 @@ class OpenWindowActivity : AppCompatActivity() {
                 changes.trySend(Unit)
                 while (isActive && !opening && !failed) {
                     val remaining = (deadline - SystemClock.uptimeMillis()).coerceAtLeast(1)
-                    if (withTimeoutOrNull(remaining) { changes.receive(); true } != true) {
+                    // Once windows are offered, waiting for the user's choice
+                    // is not a launch timeout. Keep the list live until chosen
+                    // or all its windows disappear.
+                    val changed = if (choosing && matches.isNotEmpty()) {
+                        changes.receive(); true
+                    } else withTimeoutOrNull(remaining) { changes.receive(); true } == true
+                    if (!changed) {
                         failed = true
                         break
                     }
