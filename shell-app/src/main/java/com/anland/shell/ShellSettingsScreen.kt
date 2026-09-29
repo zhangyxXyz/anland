@@ -68,6 +68,7 @@ internal fun ShellSettings(state:ShellState,appearance:Appearance,route:String?,
     }
     Page {
         AppearanceSettings(appearance)
+        com.anland.design.maintenance.MaintenanceEntries(ShellMaintenanceActivity::class.java)
         SettingGroup(stringResource(R.string.credentials_title)) {
             NavigationSettingItem(stringResource(R.string.credentials_manage),description=stringResource(R.string.credentials_summary),icon=Icons.Outlined.Key,onClick={context.startActivity(Intent(context,com.anland.shell.connections.CredentialsActivity::class.java))})
         }

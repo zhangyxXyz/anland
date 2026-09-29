@@ -24,7 +24,7 @@ def build(component, output, keystore_dir, bash):
     verify_key(component, config, store)
     project = 'shell-app' if component == 'shell' else 'app'
     env = dict(os.environ, ANLAND_SIGNING_CONFIG_FILE=str(path))
-    tasks = ['assembleRelease', 'assembleReleaseAndroidTest', 'lintRelease']
+    tasks = ['assembleRelease', 'assembleReleaseAndroidTest', 'lintRelease', ':ui-common:testReleaseUnitTest']
     if component == 'wayland':
         tasks.append(':libawl:assembleRelease')
     subprocess.run([bash, 'gradlew', *tasks, '--console=plain'], cwd=ROOT / project, env=env, check=True)

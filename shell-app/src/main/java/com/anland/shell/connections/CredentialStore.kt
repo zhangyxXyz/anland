@@ -44,6 +44,12 @@ class CredentialStore(context:Context) {
         write(list().filterNot{it.id==profile.id}+profile)
     }
     fun remove(id:String)=synchronized(LOCK){write(list().filterNot{it.id==id})}
+    fun replaceAll(profiles:List<ConnectionProfile>)=synchronized(LOCK) {
+        require(profiles.all{it.valid()} && profiles.map{it.id}.distinct().size==profiles.size){"Invalid connection backup"}
+        // Do not overwrite an unreadable existing vault.
+        list()
+        write(profiles)
+    }
     private fun write(profiles:List<ConnectionProfile>) {
         val array=JSONArray();profiles.forEach{array.put(it.toJson())}
         val clear=array.toString().toByteArray(Charsets.UTF_8)

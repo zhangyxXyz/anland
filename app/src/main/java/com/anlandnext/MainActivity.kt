@@ -129,6 +129,7 @@ open class MainActivity : AppCompatActivity() {
                     tab==0 -> WindowsPage(state)
                     else -> Page {
                         AppearanceSettings(appearance)
+                        com.anland.design.maintenance.MaintenanceEntries(WaylandMaintenanceActivity::class.java)
                         SettingGroup(stringResource(R.string.windows_title)) {
                             NavigationSettingItem(stringResource(R.string.settings_title),description=stringResource(R.string.window_settings_summary),icon=Icons.Outlined.Tune,onClick={windowSettings=true})
                         }

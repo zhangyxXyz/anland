@@ -4,6 +4,8 @@
 
 # Anland
 
+Upstream project: [SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland). [zhangyxXyz](https://github.com/zhangyxXyz) maintains this fork; its source, issue tracker and App updates are provided by [zhangyxXyz/anland](https://github.com/zhangyxXyz/anland).
+
 Run Linux container applications as Android windows on a rooted ARM64 device. Anland provides a Wayland host, an application launcher, a Root module with audio support, and ARM64 Linux images with integrated desktop fixes. RootFS builds support Debian 13 (default), Ubuntu 26.04, Fedora 43/44 and Arch Linux ARM.
 
 This repository's `dev` branch contains the application and image build pipeline. Builds produce draft Releases; ordinary branch pushes do not run the release workflow.
@@ -67,6 +69,16 @@ id
 ```
 
 `/run/anland` must be the shared host directory, not an ordinary empty directory. `wayland-0` and `pulse.sock` must be Unix sockets; `anland-wm.sock` appears when the independent-application session is running. Missing display sockets prevent the session from starting, missing audio sockets prevent Android audio output, and missing GPU access prevents the KGSL rendering path from working. Shell expects this mount to be configured; importing a RootFS or selecting a container in Shell does not create it.
+
+## App backup and updates
+
+Both Apps provide **Settings → Backup and restore** and **Settings → About → Check for updates / Release history**, using the MaterialDesignTmpl layouts. Backup supports a user-selected local directory, WebDAV connection testing, upload/list/restore, independent local and remote retention counts, and AES-encrypted archives. Files are namespaced by application so Shell and Wayland backups do not replace or prune each other.
+
+Shell backups contain its preferences and saved local/SSH connections. Exporting connection secrets or WebDAV credentials requires an archive encryption password; restored connections are encrypted again with the destination device's Android Keystore. Wayland backups contain local App preferences. Container files, the Root module, daemon configuration and command history are not included. WebDAV and encryption passwords are stored encrypted on the device; retain the archive password separately to restore on another device.
+
+The update source is the public `zhangyxXyz/anland` GitHub Releases API. Each App reads `build-manifest.json` from complete, published stable `v*` Releases and compares its own `SHELL_VERSION_CODE` or `WAYLAND_VERSION_CODE`, independently of `RELEASE_VERSION`. Shell selects only `anland-shell.apk`; Wayland selects only `anland-wayland.apk`. A Release containing only other components is skipped. Drafts, development Tags and prereleases are not offered as App updates.
+
+Downloads are checked against the manifest's SHA256, package name, component version and installed signing certificate before opening Android's package installer. If install permission is needed, installation resumes after authorization. To distribute an update, increase the relevant App version name/code in `version.properties`, build the matching version Tag, verify the completed draft and publish it. Keep the manifests and original APK asset names. Creating a draft alone does not make an update available to users.
 
 ## Release pipeline
 

@@ -54,6 +54,12 @@ class Appearance(context: Context) {
     var color by mutableStateOf(runCatching { ThemeColor.valueOf(prefs.getString("color", "Teal")!!) }.getOrDefault(ThemeColor.Teal)); private set
     var custom by mutableStateOf(prefs.getString("custom", "#6750A4").orEmpty()); private set
     var useCustom by mutableStateOf(prefs.getBoolean("useCustom", false)); private set
+    fun refresh() {
+        mode=runCatching { ThemeMode.valueOf(prefs.getString("mode","System")!!) }.getOrDefault(ThemeMode.System)
+        dynamic=prefs.getBoolean("dynamic",true); glass=prefs.getBoolean("glass",true)
+        color=runCatching { ThemeColor.valueOf(prefs.getString("color","Teal")!!) }.getOrDefault(ThemeColor.Teal)
+        custom=prefs.getString("custom","#6750A4").orEmpty(); useCustom=prefs.getBoolean("useCustom",false)
+    }
     fun mode(value: ThemeMode) { mode=value; prefs.edit().putString("mode",value.name).apply(); AppCompatDelegate.setDefaultNightMode(value.appCompatNightMode) }
     fun dynamic(value: Boolean) { dynamic=value; prefs.edit().putBoolean("dynamic",value).apply() }
     fun glass(value: Boolean) { glass=value; prefs.edit().putBoolean("glass",value).apply() }
@@ -69,6 +75,7 @@ class Appearance(context: Context) {
 fun WithAnlandTheme(manageSystemBars: Boolean = true, content: @Composable (Appearance) -> Unit) {
     val context=LocalContext.current
     val appearance=remember { Appearance(context) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { appearance.refresh() }
     ShellTheme(appearance.mode, appearance.dynamic, appearance.color, appearance.custom, appearance.useCustom) {
         val surface=MaterialTheme.colorScheme.surface
         if (manageSystemBars) SideEffect {

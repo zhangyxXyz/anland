@@ -32,5 +32,6 @@
         <activity android:name=".AppLaunchActivity" android:exported="true"
                   android:theme="@style/Theme.AnlandLaunch"
                   android:excludeFromRecents="true"/>
+        <activity android:name=".ShellMaintenanceActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell" />
     </application>
 </manifest>

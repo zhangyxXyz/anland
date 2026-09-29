@@ -1,5 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:localeConfig="@xml/anland_locales">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <application android:usesCleartextTraffic="true" android:localeConfig="@xml/anland_locales">
         <activity android:name="com.anland.design.LanguageActivity" android:exported="false" android:theme="@style/Theme.MaterialDesignShell" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.updates"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/anland_update_paths" />
+        </provider>
     </application>
 </manifest>

@@ -9,7 +9,18 @@ actionlint
 
 The release tests cover tag/version agreement, component and distribution selection, retry identity, draft ownership, partial failures, skipped components, asset verification, split-image completeness, generated module versions and exported RootFS bytes. RootFS integration tests cover each target's native package installer and isolated build/export stages. They do not call GitHub or create Releases.
 
-The local build wrapper and CI both execute `assembleRelease`, `assembleReleaseAndroidTest` and `lintRelease`. Wayland additionally produces the client AAR. Final APKs are checked against public certificate fingerprints and `version.properties`. The module ZIP is checked for its version, boot scripts, audio binary and matching daemon.
+The local build wrapper and CI both execute `assembleRelease`, `assembleReleaseAndroidTest`, `lintRelease` and `:ui-common:testReleaseUnitTest`. Wayland additionally produces the client AAR. Final APKs are checked against public certificate fingerprints and `version.properties`. The module ZIP is checked for its version, boot scripts, audio binary and matching daemon.
+
+App backup and update checks:
+
+```sh
+cd shell-app
+./gradlew :ui-common:testDebugUnitTest
+adb -s DEVICE_SERIAL shell am instrument -w -e mode maintenance \
+  com.anland.shell.test/com.anland.shell.ui.IconInstrumentation
+```
+
+The unit tests cover encrypted archives, path traversal, WebDAV authentication and app-specific retention, restored preference types, and release selection against component manifests. The instrumentation requires the matching Shell app and test APK; it uses disposable preferences to verify backup restoration, preserved command history, rejection of another app's backup, and Keystore-backed secrets. It does not replace the user's settings or connection vault. Publishing and installing a real GitHub update require a public stable Release with its completed manifest and matching signed APK.
 
 Linux-only session tests:
 

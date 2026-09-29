@@ -4,6 +4,8 @@
 
 # Anland
 
+上游项目：[SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland)。[zhangyxXyz](https://github.com/zhangyxXyz) 是本分支维护者；本分支的源码、问题反馈和 App 更新由 [zhangyxXyz/anland](https://github.com/zhangyxXyz/anland) 提供。
+
 在已 root 的 ARM64 Android 设备上，以 Android 窗口运行 Linux 容器应用。Anland 包含 Wayland 宿主、应用启动器、带音频支持的 Root 模块，以及集成桌面修复的 ARM64 Linux 镜像。RootFS 构建支持 Debian 13（默认）、Ubuntu 26.04、Fedora 43/44 和 Arch Linux ARM。
 
 本仓库 `dev` 分支维护应用与镜像构建流水线。构建产物进入草稿 Release；普通分支推送不会运行发布流水线。
@@ -67,6 +69,16 @@ id
 ```
 
 `/run/anland` 必须指向宿主共享目录，不能只是普通空目录。`wayland-0`、`pulse.sock` 应为 Unix socket；独立应用会话运行后会出现 `anland-wm.sock`。缺少显示 socket 会导致会话无法启动，缺少音频 socket 会导致声音无法输出到 Android，缺少 GPU 访问权限会导致 KGSL 渲染不可用。Shell 依赖这条预先配置的挂载；导入 RootFS 或在 Shell 中选择容器不会自动创建它。
+
+## App 备份与更新
+
+两款 App 均提供 **设置 → 备份与恢复** 和 **设置 → 关于 → 检查更新 / 版本历史**，界面沿用 MaterialDesignTmpl 的布局。备份支持选择本地目录、WebDAV 连接测试、上传/列表/恢复、本地与远端独立保留数量，以及 AES 加密压缩包。文件按 App 区分，Shell 与 Wayland 的备份不会互相覆盖或清理。
+
+Shell 备份包含 App 配置及已保存的本地/SSH 登录凭据。导出登录秘密或 WebDAV 密码需要先设置备份加密密码；恢复的登录凭据会使用目标设备的 Android Keystore 重新加密。Wayland 备份包含本机 App 配置。容器文件、Root 模块、守护进程配置和命令历史不在备份范围内。WebDAV 密码与备份加密密码在本机加密保存；跨设备恢复时，需要另外保存好备份密码。
+
+更新源为 `zhangyxXyz/anland` 的公开 GitHub Releases API。每款 App 从构建完整、已公开的稳定 `v*` Release 读取 `build-manifest.json`，比较自己的 `SHELL_VERSION_CODE` 或 `WAYLAND_VERSION_CODE`，与整套发布的 `RELEASE_VERSION` 独立。Shell 只匹配 `anland-shell.apk`，Wayland 只匹配 `anland-wayland.apk`；只包含其他组件的 Release 会被跳过。草稿、开发 Tag 和预发布版本不作为 App 更新提供。
+
+下载完成后校验清单中的 SHA256、包名、组件版本及当前安装签名，再打开 Android 系统安装器。需要安装权限时，授权返回后继续安装。发布更新时，在 `version.properties` 中提高对应 App 的版本名和版本代码，构建匹配的版本 Tag，检查完成的草稿后再公开发布。保留发布清单及原始 APK 文件名；仅创建草稿不会向用户提供更新。
 
 ## 发布流水线
 
