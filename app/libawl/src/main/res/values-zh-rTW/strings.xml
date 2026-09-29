@@ -1,0 +1,5 @@
+<resources>
+    <string name="awl_task_channel">視窗工作操作</string>
+    <string name="awl_task_title">上滑卡片時關閉視窗</string>
+    <string name="awl_task_text">同樣適用於 Linux 桌面。點按管理視窗。</string>
+</resources>

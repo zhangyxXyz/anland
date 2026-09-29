@@ -39,6 +39,8 @@ internal fun ShellSettings(state:ShellState,appearance:Appearance,route:String?,
     if(route=="user") {
         Page {
             SettingGroup(stringResource(R.string.user_settings)) {
+                Text(stringResource(if(Prefs.launchCredential(context,state.active).isEmpty())R.string.user_local_help else R.string.credential_launch_help),Modifier.padding(horizontal=20.dp,vertical=12.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                NavigationSettingItem(stringResource(R.string.credentials_title),icon=Icons.Outlined.Key,onClick={context.startActivity(Intent(context,com.anland.shell.connections.CredentialsActivity::class.java))})
                 (listOf("")+state.users).distinct().forEach { name->
                     SettingItem(name.ifBlank{stringResource(R.string.user_auto)},icon=Icons.Outlined.Person,onClick={state.user(name)},trailingContent={RadioButton(state.user==name,{state.user(name)})})
                 }
@@ -66,6 +68,9 @@ internal fun ShellSettings(state:ShellState,appearance:Appearance,route:String?,
     }
     Page {
         AppearanceSettings(appearance)
+        SettingGroup(stringResource(R.string.credentials_title)) {
+            NavigationSettingItem(stringResource(R.string.credentials_manage),description=stringResource(R.string.credentials_summary),icon=Icons.Outlined.Key,onClick={context.startActivity(Intent(context,com.anland.shell.connections.CredentialsActivity::class.java))})
+        }
         SettingGroup(state.active.ifBlank{stringResource(R.string.no_container_selected)}) {
             NavigationSettingItem(stringResource(R.string.windows_entry),description=stringResource(R.string.windows_entry_help),icon=Icons.Outlined.Window,onClick={openWindows(context)})
             NavigationSettingItem(stringResource(R.string.user_settings),value=state.user.ifBlank{stringResource(R.string.user_auto)},icon=Icons.Outlined.Person,enabled=state.active.isNotBlank(),onClick={navigate("user")})

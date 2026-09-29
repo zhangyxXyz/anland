@@ -55,6 +55,11 @@ public final class RootExec {
     }
 
     public static Result exec(String cmd, long timeoutMs) {
+        return exec(cmd, timeoutMs, null);
+    }
+
+    /** Sensitive input travels over stdin, never shell arguments, environment or logs. */
+    public static Result exec(String cmd, long timeoutMs, byte[] input) {
         Process p = null;
         try {
             p = new ProcessBuilder("su", "-c", cmd).start();
@@ -64,6 +69,10 @@ public final class RootExec {
             final StringBuilder err = new StringBuilder();
             Thread tOut = reader(proc.getInputStream(), out);
             Thread tErr = reader(proc.getErrorStream(), err);
+
+            try (java.io.OutputStream stdin = proc.getOutputStream()) {
+                if (input != null) stdin.write(input);
+            }
 
             boolean finished = proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
             tOut.join(2_000);

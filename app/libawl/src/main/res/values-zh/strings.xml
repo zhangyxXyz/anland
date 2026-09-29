@@ -1,0 +1,5 @@
+<resources>
+    <string name="awl_task_channel">窗口任务操作</string>
+    <string name="awl_task_title">上划卡片时关闭窗口</string>
+    <string name="awl_task_text">同样适用于 Linux 桌面。点按管理窗口。</string>
+</resources>

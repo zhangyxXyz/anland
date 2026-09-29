@@ -1231,6 +1231,7 @@ static std::mutex g_cfg_lock;
 static int g_cfg_zoom = 100;       /* persisted mirror (real state lives in the logic layer's g_srv.zoom_pct) */
 static int g_cfg_init_w = 800;     /* initial-configure placeholder (#33; mirror of g_srv.init_conf_*) */
 static int g_cfg_init_h = 600;
+static int g_cfg_hide_decorations = 0;
 static int g_cfg_scale_mode = 0;   /* view mapping mode (#34; mirror of g_srv.scale_mode, AWL_SCALE_*) */
 static char g_sock_dir[256] = "/data/local/tmp/awl";   /* runtime_dir (startup-loaded; see above) */
 static bool g_sock_listen = true;                      /* socket_listen (same) */
@@ -1247,6 +1248,7 @@ static bool cfg_domain(const std::string& key, int* lo, int* hi) {
     if (key == "xwayland_scale") { *lo = 0; *hi = 1; return true; }
     if (key == "auto_attach") { *lo = 0; *hi = 1; return true; }
     if (key == "sc_enabled") { *lo = 0; *hi = 1; return true; }
+    if (key == "hide_decorations") { *lo = 0; *hi = 1; return true; }
     return false;
 }
 
@@ -1308,10 +1310,12 @@ static void cfg_save_locked(void) {
     fprintf(f, "{\n  \"zoom\": %d,\n  \"init_w\": %d,\n  \"init_h\": %d,\n"
                "  \"scale_mode\": %d,\n  \"xwayland_scale\": %d,\n"
                "  \"auto_attach\": %d,\n  \"sc_enabled\": %d,\n"
+               "  \"hide_decorations\": %d,\n"
                "  \"runtime_dir\": \"%s\",\n  \"socket_listen\": %d\n}\n",
             g_cfg_zoom, g_cfg_init_w, g_cfg_init_h, g_cfg_scale_mode,
             g_cfg_xwayland_scale.load(std::memory_order_relaxed) ? 1 : 0,
             g_cfg_auto_attach ? 1 : 0, g_cfg_sc.load(std::memory_order_relaxed) ? 1 : 0,
+            g_cfg_hide_decorations,
             rt, sl);
     if (fclose(f) != 0)
         LOGE("config save flush: %s", strerror(errno));
@@ -1409,6 +1413,11 @@ static void cfg_load_and_apply(void) {
         LOGE("config: auto_attach=%d out of range (0..1), ignored", aa);
     }
     int sc = cfg_parse_int(buf, "sc_enabled");
+    int decor = cfg_parse_int(buf, "hide_decorations");
+    if (decor == 0 || decor == 1) {
+        g_cfg_hide_decorations = decor;
+        awl_display_set_hide_decorations(decor);
+    }
     if (sc == 0 || sc == 1) {
         g_cfg_sc.store(sc != 0, std::memory_order_relaxed);
         LOGI("config: sc_enabled=%s (applied at startup — windows attaching from now on)",
@@ -1425,7 +1434,12 @@ static int cfg_set(const std::string& key, int32_t val) {
         LOGE("config set: key='%s' val=%d rejected", key.c_str(), val);
         return -1;
     }
-    if (key == "zoom") {
+    if (key == "hide_decorations") {
+        awl_display_set_hide_decorations(val);
+        std::lock_guard<std::mutex> lk(g_cfg_lock);
+        g_cfg_hide_decorations = val;
+        cfg_save_locked();
+    } else if (key == "zoom") {
         awl_display_set_zoom(val);
         std::lock_guard<std::mutex> lk(g_cfg_lock);
         g_cfg_zoom = val;
@@ -2129,6 +2143,7 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
             v = g_cfg_auto_attach ? 1 : 0;
         }
         else if (key == "sc_enabled") v = g_cfg_sc.load(std::memory_order_relaxed) ? 1 : 0;
+        else if (key == "hide_decorations") v = awl_display_hide_decorations();
         else LOGE("config get: unknown key '%s'", key.c_str());
         AParcel_writeInt32(out, v);
         return STATUS_OK;

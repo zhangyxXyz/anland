@@ -32,6 +32,11 @@
     <string name="init_size_tip">Initial window size (first-frame placeholder before Android sizes the window, applies to new windows):</string>
     <string name="init_size_w">Width</string>
     <string name="init_size_h">Height</string>
+    <string name="init_size_screen">Screen size · %1$d×%2$d</string>
     <string name="sc_backend_tip">Compositor backend (on = SC/HWC: wayland layers are composed by SurfaceFlinger, zero-copy scanout when possible; off = per-window GL renderer fallback. Applies to windows attached from now on):</string>
     <string name="sc_backend">SC compositor backend (HWC)</string>
+    <string name="close_on_swipe">Close windows when swiping away</string>
+    <string name="close_on_swipe_help">When a recent-task card is removed, request a normal window close, including the Linux desktop session. Unsaved-content prompts remain. Turning this off keeps apps running. A notification keeps task-removal handling active.</string>
+    <string name="hide_titlebars">Hide independent-window titlebars</string>
+    <string name="hide_titlebars_help">Ask apps supporting Wayland decorations to hide the extra titlebar. Close windows from the window list or enable swipe-to-close. Apps drawing their own bars may keep them; menus, tabs and desktop panels are preserved.</string>
 </resources>

@@ -36,7 +36,16 @@ public final class Prefs {
 
     public static void setLaunchUser(Context c, String container, String user) {
         sp(c).edit().putString("launch_user." + container,
-                user == null ? "" : user).apply();
+                user == null ? "" : user).remove("launch_credential." + container).apply();
+    }
+
+    /** Profile references only; all secrets live in the Keystore-encrypted vault. */
+    public static String launchCredential(Context c, String container) {
+        return sp(c).getString("launch_credential." + container, "");
+    }
+
+    public static void setLaunchCredential(Context c, String container, String id) {
+        sp(c).edit().putString("launch_credential." + container, id).apply();
     }
 
     /** Custom launch environment for a container: KEY=VALUE lines merged

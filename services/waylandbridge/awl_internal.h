@@ -98,6 +98,7 @@ struct awl_frame_cb {
  *   - a 1-bit flag → the W1/W2 word matching its writer threads;
  *   - everything else → the group matching its size. */
 struct awl_surface {
+    struct wl_resource* decoration_res; /* xdg-decoration, protected by ev_lock */
     uint64_t id;                     /* window id (globally unique; same id on the Java side) */
     struct wl_resource* resource;
     struct wl_list link;             /* server.surfaces */

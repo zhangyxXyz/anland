@@ -43,7 +43,7 @@ import kotlinx.coroutines.*
 internal fun AppsPage(state:ShellState,icons:IconLoader) {
     val context=LocalContext.current
     var search by rememberSaveable { mutableStateOf("") }
-    var listView by rememberSaveable { mutableStateOf(false) }
+    var listView by rememberSaveable { mutableStateOf(true) }
     var selected by remember {mutableStateOf<AppEntry?>(null)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         DesktopBanner(state.apps.filter{it.desktopSession})
@@ -88,44 +88,45 @@ internal fun AppsPage(state:ShellState,icons:IconLoader) {
     }){Text(stringResource(R.string.pin_shortcut))}},dismissButton={TextButton(onClick={selected=null}){Text(stringResource(R.string.dialog_ok))}}) }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DesktopBanner(desktops:List<AppEntry>) {
     val context=LocalContext.current
     Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.secondaryContainer)) {
-        // Keep the original vertical order at every window width. The heading
-        // and both actions share a 38 dp icon column and a 14 dp text gap.
+        // Share one action row; wrap only when a narrow window or larger text
+        // cannot fit both actions. Keep every discovered desktop launchable.
         Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            desktops.forEach { desktop ->
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                    SettingLeadingIcon(Icons.Outlined.DesktopWindows)
-                    Column(Modifier.weight(1f)) {
-                        Text(if(desktops.size==1)stringResource(R.string.desktop_entry)else desktop.name,style=MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
-                    }
-                }
-                DesktopBannerAction(Icons.Outlined.DesktopWindows,stringResource(R.string.desktop_enter),tonal=true) {
-                    context.startActivity(Shortcuts.launchIntent(context,desktop))
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                SettingLeadingIcon(if(desktops.isEmpty())Icons.Outlined.Window else Icons.Outlined.DesktopWindows)
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(if(desktops.isEmpty())R.string.windows_entry else R.string.desktop_entry),style=MaterialTheme.typography.titleMedium)
+                    Text(stringResource(if(desktops.isEmpty())R.string.windows_entry_help else R.string.desktop_entry_help),style=MaterialTheme.typography.bodySmall)
                 }
             }
-            DesktopBannerAction(Icons.Outlined.OpenInNew,stringResource(R.string.windows_entry)) {
-                openWindows(context)
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                desktops.forEach { desktop ->
+                    DesktopBannerAction(Icons.Outlined.DesktopWindows,if(desktops.size==1)stringResource(R.string.desktop_enter)else desktop.name,primary=true) {
+                        context.startActivity(Shortcuts.launchIntent(context,desktop))
+                    }
+                }
+                DesktopBannerAction(Icons.Outlined.Tune,stringResource(R.string.windows_entry)) {
+                    openWindows(context)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun DesktopBannerAction(icon:ImageVector,label:String,tonal:Boolean=false,onClick:()->Unit) {
+private fun DesktopBannerAction(icon:ImageVector,label:String,primary:Boolean=false,onClick:()->Unit) {
     val content: @Composable RowScope.()->Unit = {
-        Box(Modifier.width(38.dp),contentAlignment=Alignment.Center) {
-            Icon(icon,null,Modifier.size(20.dp))
-        }
-        Spacer(Modifier.width(14.dp))
-        Text(label)
+        Icon(icon,null,Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label,textAlign=TextAlign.Center)
     }
-    val padding=PaddingValues(start=0.dp,end=16.dp,top=10.dp,bottom=10.dp)
-    if(tonal) FilledTonalButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
-    else TextButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
+    val padding=PaddingValues(horizontal=18.dp,vertical=12.dp)
+    if(primary) Button(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
+    else OutlinedButton(onClick=onClick,modifier=Modifier.heightIn(min=48.dp),contentPadding=padding,content=content)
 }
 
 @Composable

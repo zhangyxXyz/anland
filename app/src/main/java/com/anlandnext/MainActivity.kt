@@ -29,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anland.design.*
 import com.anlandnext.awl.Awl
+import com.anlandnext.awl.AwlWindowActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -46,7 +47,7 @@ class WindowState : ViewModel() {
     var closeWaiting by mutableStateOf(false)
     var closing by mutableStateOf<Set<Long>>(emptySet()); private set
     private val gate=Mutex()
-    private val keys=listOf("auto_attach","zoom","scale_mode","xwayland_scale","init_w","init_h","sc_enabled")
+    private val keys=listOf("auto_attach","zoom","scale_mode","xwayland_scale","init_w","init_h","sc_enabled","hide_decorations")
     fun refresh() { viewModelScope.launch { gate.withLock {
             val snapshot=withContext(Dispatchers.IO) {
                 val windows=Awl.getWindows()
@@ -105,7 +106,10 @@ open class MainActivity : AppCompatActivity() {
     private fun scheduleRefresh() { handler.post { if(visible) { handler.removeCallbacks(refresher); handler.postDelayed(refresher,60) } } }
     private val events=object:Awl.Callback {
         override fun onWindowCreated(id:Long,title:String?)=scheduleRefresh()
-        override fun onWindowDestroyed(id:Long)=scheduleRefresh()
+        override fun onWindowDestroyed(id:Long) {
+            AwlWindowActivity.finishById(this@MainActivity,id)
+            scheduleRefresh()
+        }
         override fun onWindowAttached(id:Long)=scheduleRefresh()
         override fun onWindowDetached(id:Long)=scheduleRefresh()
     }
@@ -113,6 +117,9 @@ open class MainActivity : AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         setContent { WithAnlandTheme { appearance ->
+            LaunchedEffect(state.connected,state.windows) {
+                if(state.connected)AwlWindowActivity.reconcileTasks(this@MainActivity,state.windows)
+            }
             var windowSettings by rememberSaveable { mutableStateOf(openWindowSettings) }
             AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.app_settings),Icons.Outlined.Settings)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
                 secondaryTitle=if(windowSettings)getString(R.string.settings_title)else null,onSecondaryBack={windowSettings=false},

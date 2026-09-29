@@ -350,6 +350,28 @@ public class AwlWindowActivity extends Activity {
         removeTaskById(ctx, id);
     }
 
+    /** Reconcile retained Android document tasks with an authoritative daemon
+     * snapshot. Null means disconnected, never "all clients have exited". This
+     * also repairs missed one-way CLOSE delivery to a stopped/frozen host. */
+    public static void reconcileTasks(android.content.Context ctx, java.util.List<Awl.WlWindow> windows) {
+        if (ctx == null || windows == null) return;
+        android.app.ActivityManager manager = ctx.getSystemService(android.app.ActivityManager.class);
+        if (manager == null) return;
+        java.util.List<android.app.ActivityManager.AppTask> tasks = manager.getAppTasks();
+        // Snapshot tasks first, then re-read the daemon: a newly created window
+        // must not be mistaken for an orphan because the UI snapshot was older.
+        java.util.List<Awl.WlWindow> current = Awl.getWindows();
+        if (current == null) return;
+        java.util.Set<Long> alive = new java.util.HashSet<>();
+        for (Awl.WlWindow window : current) alive.add(window.id);
+        for (android.app.ActivityManager.AppTask task : tasks) {
+            try {
+                long windowId = WindowTaskService.windowId(task.getTaskInfo().baseIntent);
+                if (windowId >= 0 && !alive.contains(windowId)) finishById(ctx, windowId);
+            } catch (RuntimeException e) { Log.w(TAG, "Task changed during reconciliation", e); }
+        }
+    }
+
     private static void removeTaskById(android.content.Context ctx, long id) {
         if (ctx == null || id < 0) return;
         android.app.ActivityManager am =
@@ -568,6 +590,7 @@ public class AwlWindowActivity extends Activity {
 
         setupFullscreen();   /* immersive */
         updatePresentation();
+        WindowTaskService.sync(this);
     }
 
     private boolean redirectDialog(long windowId) {

@@ -169,6 +169,15 @@ add_custom_command(
 # awl_icon.c in this dir — applied icon → C_ICON, the Activity pulls the
 # pixels over AWL_T_ICON and puts them in the task description)
 set(XTI_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/xdg-toplevel-icon-v1.xml)
+set(DECOR_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/xdg-decoration-unstable-v1.xml)
+add_custom_command(
+  OUTPUT ${AWL_GENERATED}/xdg-decoration-unstable-v1-server-protocol.h
+  COMMAND ${WAYLAND_SCANNER} server-header ${DECOR_XML} ${AWL_GENERATED}/xdg-decoration-unstable-v1-server-protocol.h
+  DEPENDS ${DECOR_XML})
+add_custom_command(
+  OUTPUT ${AWL_GENERATED}/xdg-decoration-unstable-v1-protocol.c
+  COMMAND ${WAYLAND_SCANNER} private-code ${DECOR_XML} ${AWL_GENERATED}/xdg-decoration-unstable-v1-protocol.c
+  DEPENDS ${DECOR_XML})
 add_custom_command(
   OUTPUT ${AWL_GENERATED}/xdg-toplevel-icon-v1-server-protocol.h
   COMMAND ${WAYLAND_SCANNER} server-header ${XTI_XML}
@@ -349,6 +358,8 @@ add_executable(waylandbridge
   ${AWL_GENERATED}/idle-inhibit-unstable-v1-server-protocol.h
   ${AWL_GENERATED}/xdg-toplevel-icon-v1-protocol.c
   ${AWL_GENERATED}/xdg-toplevel-icon-v1-server-protocol.h
+  ${AWL_GENERATED}/xdg-decoration-unstable-v1-server-protocol.h
+  ${AWL_GENERATED}/xdg-decoration-unstable-v1-protocol.c
   ${AWL_GENERATED}/viewporter-protocol.c
   ${AWL_GENERATED}/viewporter-server-protocol.h
   ${AWL_GENERATED}/fractional-scale-v1-protocol.c

@@ -2,6 +2,9 @@ package com.anlandnext
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Build
+import android.util.DisplayMetrics
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -17,12 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anland.design.*
 import com.anlandnext.awl.Awl
+import com.anlandnext.awl.WindowTaskService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,8 +43,8 @@ import kotlinx.coroutines.sync.withLock
  * Opening this page only reads settings. Switch/slider callbacks represent user
  * actions; the initial state must never write back to the daemon.
  *
- * Swiping away / killing the background is fixed to minimize-and-keep-alive.
- * Explicit Close remains on the window-list menu; window exit policy lives in the daemon.
+ * Task removal can request a graceful close. Backgrounding, process death and
+ * configuration changes still keep Linux windows alive; they are not Close.
  */
 class WlSettingsActivity : MainActivity() {
     override val initialTab=1
@@ -50,11 +55,23 @@ class WlSettingsActivity : MainActivity() {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WindowSettings(state:WindowState) {
-    val prefs=LocalContext.current.getSharedPreferences("awl",Context.MODE_PRIVATE)
+    val context=LocalContext.current
+    val prefs=context.getSharedPreferences("awl",Context.MODE_PRIVATE)
+    // Re-read on display/configuration changes, including rotation. These are
+    // pixels on this Activity's display, not dp or the IME-reduced content area.
+    val configuration=LocalConfiguration.current
+    val screenSize=remember(context,configuration) { screenSizePixels(context) }
     var ime by remember { mutableIntStateOf(prefs.getInt("ime_mode",0)) }
+    var closeOnSwipe by remember { mutableStateOf(prefs.getBoolean(WindowTaskService.PREF,false)) }
     Page {
         if(!state.connected) Text(stringResource(R.string.status_daemon_unreachable),color=MaterialTheme.colorScheme.error)
-        SettingGroup(stringResource(R.string.launch_behavior)) { AutoLaunch(state) }
+        SettingGroup(stringResource(R.string.launch_behavior)) {
+            AutoLaunch(state)
+            SettingItem(stringResource(R.string.hide_titlebars),description=stringResource(R.string.hide_titlebars_help),descriptionMaxLines=8,
+                trailingContent={Switch(state.config["hide_decorations"]==1,{state.set("hide_decorations",if(it)1 else 0)},enabled=state.connected && !state.writing && (state.config["hide_decorations"]?:-1)>=0)})
+            SettingItem(stringResource(R.string.close_on_swipe),description=stringResource(R.string.close_on_swipe_help),descriptionMaxLines=8,
+                trailingContent={Switch(closeOnSwipe,{closeOnSwipe=it;prefs.edit().putBoolean(WindowTaskService.PREF,it).apply();WindowTaskService.sync(context)})})
+        }
         // #31: arbitrary daemon-side ratio, broadcast as preferred_scale to clients.
         // Preserve the original 200 ms drag debounce plus immediate release/preset.
         // Reading back config during a drag must not reset the user's current thumb position.
@@ -94,6 +111,27 @@ internal fun WindowSettings(state:WindowState) {
                 listOf(800 to 600,1024 to 768,1280 to 720,1920 to 1080).forEach { (w,h) ->
                     FilterChip(width==w.toString() && height==h.toString(),{width=w.toString();height=h.toString();state.set(mapOf("init_w" to w,"init_h" to h))},label={Text("$w×$h")},enabled=state.connected && !state.writing)
                 }
+                val (screenWidth,screenHeight)=screenSize
+                FilterChip(
+                    selected=width==screenWidth.toString() && height==screenHeight.toString(),
+                    onClick={
+                        // Resolve again at the tap; setting this preset is a one-off
+                        // write, never automatic synchronization with the display.
+                        val (w,h)=screenSizePixels(context)
+                        if(w in 100..7680 && h in 100..4320) {
+                            width=w.toString();height=h.toString()
+                            state.set(mapOf("init_w" to w,"init_h" to h))
+                        }
+                    },
+                    label={Text(stringResource(R.string.init_size_screen,screenWidth,screenHeight))},
+                    leadingIcon={Icon(Icons.Outlined.FitScreen,null,Modifier.size(18.dp))},
+                    colors=FilterChipDefaults.filterChipColors(
+                        containerColor=MaterialTheme.colorScheme.tertiaryContainer,
+                        labelColor=MaterialTheme.colorScheme.onTertiaryContainer,
+                        iconColor=MaterialTheme.colorScheme.onTertiaryContainer
+                    ),
+                    enabled=state.connected && !state.writing && screenWidth in 100..7680 && screenHeight in 100..4320
+                )
             }
             TextButton(onClick={state.set(mapOf("init_w" to width.toInt(),"init_h" to height.toInt()))},enabled=state.connected && !state.writing && (width.toIntOrNull()?:0) in 100..7680 && (height.toIntOrNull()?:0) in 100..4320,modifier=Modifier.padding(horizontal=16.dp)){Text(stringResource(R.string.apply))}
             // SC/HWC hands Wayland layers to SurfaceFlinger; GL renders per window.
@@ -101,4 +139,16 @@ internal fun WindowSettings(state:WindowState) {
             SettingItem(stringResource(R.string.sc_backend),description=stringResource(R.string.sc_backend_tip),descriptionMaxLines=6,trailingContent={Switch(state.config["sc_enabled"]==1,{state.set("sc_enabled",if(it)1 else 0)},enabled=state.connected && !state.writing)})
         }
     }
+}
+
+@Suppress("DEPRECATION")
+private fun screenSizePixels(context:Context):Pair<Int,Int> {
+    val manager=context.getSystemService(WindowManager::class.java)
+    if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R) {
+        val bounds=manager.maximumWindowMetrics.bounds
+        return bounds.width() to bounds.height()
+    }
+    val metrics=DisplayMetrics()
+    manager.defaultDisplay.getRealMetrics(metrics)
+    return metrics.widthPixels to metrics.heightPixels
 }

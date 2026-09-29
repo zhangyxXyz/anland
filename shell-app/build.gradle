@@ -1,6 +1,6 @@
-// Single-module pure-Java APK: the Anland shell (launcher) for Droidspaces
-// containers. No dependencies, no AndroidX, no native code — all privileged
-// work goes through `su -c` + the droidspaces CLI; window hosting lives in
+// Anland shell (launcher) for Droidspaces containers. Compose presents the UI;
+// local privileged work goes through `su -c` + the droidspaces CLI, while SSH
+// connections authenticate directly from the APK. Window hosting lives in
 // the anland daemon and the com.anlandnext host APK (auto-attach).
 //
 // Signing uses debug.keystore (gitignored; the Makefile bootstraps it with
@@ -14,6 +14,9 @@ plugins {
 }
 
 android {
+    packaging {
+        resources.excludes += ['META-INF/versions/**/OSGI-INF/MANIFEST.MF']
+    }
     buildFeatures { compose true }
     kotlinOptions { jvmTarget = '17' }
     namespace 'com.anland.shell'
@@ -62,6 +65,10 @@ android {
 dependencies {
     implementation project(':ui-common')
     implementation 'com.caverock:androidsvg-aar:1.4'
+    implementation 'com.github.mwiede:jsch:2.28.7'
+    // JSch uses the lightweight BC implementations for Ed25519/Curve25519 on
+    // Android, without replacing Android's system cryptography provider.
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.85.2'
 }
 
 // Same Kotlin 2.2 / lint compatibility exclusions as MaterialDesignTmpl.

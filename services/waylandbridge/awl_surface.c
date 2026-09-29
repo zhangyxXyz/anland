@@ -594,6 +594,10 @@ static void surface_destroy_impl(struct wl_resource* res) {
     uint64_t idle_win = awl_idle_surface_gone(s);
     /* the toplevel icon (pending + applied) dies with its surface */
     awl_icon_surface_gone(s);
+    if (s->decoration_res) {
+        wl_resource_set_user_data(s->decoration_res, NULL);
+        s->decoration_res = NULL;
+    }
 
     struct awl_frame_cb* cb;
     struct awl_frame_cb* tmp;

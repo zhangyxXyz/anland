@@ -1,0 +1,5 @@
+<resources>
+    <string name="awl_task_channel">Window task actions</string>
+    <string name="awl_task_title">Swipe-away closes windows</string>
+    <string name="awl_task_text">Includes Linux desktop sessions. Tap to manage windows.</string>
+</resources>

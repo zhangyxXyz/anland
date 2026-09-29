@@ -239,6 +239,9 @@ int awl_display_scale_mode(void);            /* current mode (daemon config read
  * awl_window_resize once the Activity surface is ready). Applies to new
  * windows only. Any thread. */
 void awl_display_set_init_size(int32_t w, int32_t h);
+/* Negotiate titlebar ownership for independent xdg-decoration clients. */
+void awl_display_set_hide_decorations(int enabled);
+int awl_display_hide_decorations(void);
 void awl_display_init_size(int32_t* w, int32_t* h);   /* current value (config reads) */
 
 /* ---- Input (Activity → binder → straight to the client, bypassing the

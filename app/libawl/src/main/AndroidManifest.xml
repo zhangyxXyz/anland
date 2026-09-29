@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!-- Window host, merged into the CONSUMING app's manifest: the wayland
          window renders inside the third-party app's own task/process (Recents
@@ -19,6 +20,7 @@
          with it). A live window whose process was merely killed still
          re-attaches from its card (the ActivityRecord stays, nothing finished). -->
     <application>
+        <service android:name="com.anlandnext.awl.WindowTaskService" android:exported="false" android:stopWithTask="false" />
         <!-- Only our process / privileged daemon can request a launch. A
              receiver has no task or window, so transients never flash a
              document Activity before being placed in their parent's task. -->

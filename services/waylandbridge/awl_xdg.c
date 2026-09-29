@@ -10,12 +10,27 @@
  * flushes explicitly.
  */
 #include "awl_internal.h"
+#include "xdg-decoration-unstable-v1-server-protocol.h"
 
 #include <math.h>
 #include <string.h>
 
 #define AWL_XDG_VERSION 3
 static int32_t phys_to_logical(int32_t v);
+static atomic_int hide_decorations = 0;
+
+/* The Android task already supplies window management. Negotiate decoration
+ * ownership instead of cropping a client's pixels or pretending it pressed F11.
+ * Protocol-defined transients retain their own controls. Apps without this
+ * optional protocol remain responsible for their client-side decorations. */
+static void decoration_configure_locked(struct awl_surface* s) {
+    if (!s->decoration_res) return;
+    int independent = !s->u.xdg.parent_id && !(s->u.xdg.max_w > 0 && s->u.xdg.max_h > 0);
+    uint32_t mode = atomic_load(&hide_decorations) && independent
+        ? ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+        : ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE;
+    zxdg_toplevel_decoration_v1_send_configure(s->decoration_res, mode);
+}
 
 void awl_xdg_presentation_changed(struct awl_surface* s) {
     if (s->mapped && g_srv.cbs.window_presentation)
@@ -88,6 +103,7 @@ static void send_configure_locked(struct awl_surface* s,
     s->u.xdg.conf_h = h;
     s->u.xdg.conf_serial = serial;
     s->configured = 1;
+    decoration_configure_locked(s); /* same configure transaction, before xdg_surface serial */
     xdg_toplevel_send_configure(s->u.xdg.role_res, w, h, &arr);
     wl_array_release(&arr);
     xdg_surface_send_configure(s->xdg_surface_res, serial);
@@ -98,6 +114,12 @@ static void send_configure_locked(struct awl_surface* s,
 /* ---------------- xdg_toplevel ---------------- */
 
 static void toplevel_destroy(struct wl_client* c, struct wl_resource* res) {
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (s && s->decoration_res) {
+        wl_resource_post_error(s->decoration_res, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ORPHANED,
+                               "destroy decoration before toplevel");
+        return;
+    }
     wl_resource_destroy(res);
 }
 
@@ -243,6 +265,10 @@ static void toplevel_res_destroy(struct wl_resource* res) {
     if (!s) return;
     awl_foreign_surface_gone(s);
     pthread_mutex_lock(&s->ev_lock);   /* binder thread reads fields concurrently */
+    if (s->decoration_res) {
+        wl_resource_set_user_data(s->decoration_res, NULL);
+        s->decoration_res = NULL;
+    }
     s->u.xdg.role_res = NULL;
     s->role = AWL_ROLE_NONE;
     bool gone = s->window_live;
@@ -273,6 +299,73 @@ static const struct xdg_toplevel_interface toplevel_iface = {
     .unset_fullscreen = toplevel_unset_fullscreen,
     .set_minimized = toplevel_set_minimized,
 };
+
+static void decoration_destroy(struct wl_client* c, struct wl_resource* res) { wl_resource_destroy(res); }
+static void decoration_res_destroy(struct wl_resource* res) {
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (!s) return;
+    pthread_mutex_lock(&s->ev_lock);
+    if (s->decoration_res == res) s->decoration_res = NULL;
+    pthread_mutex_unlock(&s->ev_lock);
+}
+static void decoration_set_mode(struct wl_client* c, struct wl_resource* res, uint32_t mode) {
+    if (mode != ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE && mode != ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE) {
+        wl_resource_post_error(res, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_INVALID_MODE, "invalid decoration mode");
+        return;
+    }
+    struct awl_surface* s = wl_resource_get_user_data(res);
+    if (!s) return;
+    pthread_mutex_lock(&s->ev_lock);
+    send_configure_locked(s, s->u.xdg.conf_w, s->u.xdg.conf_h);
+    pthread_mutex_unlock(&s->ev_lock);
+}
+static void decoration_unset_mode(struct wl_client* c, struct wl_resource* res) {
+    decoration_set_mode(c, res, ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
+}
+static const struct zxdg_toplevel_decoration_v1_interface decoration_iface = {
+    .destroy = decoration_destroy, .set_mode = decoration_set_mode, .unset_mode = decoration_unset_mode,
+};
+static void decoration_get(struct wl_client* c, struct wl_resource* manager, uint32_t id, struct wl_resource* toplevel) {
+    struct awl_surface* s = wl_resource_get_user_data(toplevel);
+    if (!s || !wl_resource_instance_of(toplevel, &xdg_toplevel_interface, &toplevel_iface)) return;
+    pthread_mutex_lock(&s->ev_lock);
+    if (s->decoration_res || s->current_buffer_res || s->pending_buffer_res) {
+        wl_resource_post_error(manager, s->decoration_res ? ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ALREADY_CONSTRUCTED
+            : ZXDG_TOPLEVEL_DECORATION_V1_ERROR_UNCONFIGURED_BUFFER, "decoration must be unique and created before buffers");
+        pthread_mutex_unlock(&s->ev_lock);
+        return;
+    }
+    struct wl_resource* res = wl_resource_create(c, &zxdg_toplevel_decoration_v1_interface, 1, id);
+    if (!res) { pthread_mutex_unlock(&s->ev_lock); wl_client_post_no_memory(c); return; }
+    s->decoration_res = res;
+    wl_resource_set_implementation(res, &decoration_iface, s, decoration_res_destroy);
+    send_configure_locked(s, s->u.xdg.conf_w, s->u.xdg.conf_h);
+    pthread_mutex_unlock(&s->ev_lock);
+}
+static const struct zxdg_decoration_manager_v1_interface decoration_manager_iface = {
+    .destroy = decoration_destroy, .get_toplevel_decoration = decoration_get,
+};
+static void decoration_bind(struct wl_client* c, void* data, uint32_t version, uint32_t id) {
+    struct wl_resource* res = wl_resource_create(c, &zxdg_decoration_manager_v1_interface, 1, id);
+    if (!res) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(res, &decoration_manager_iface, NULL, NULL);
+}
+
+void awl_display_set_hide_decorations(int enabled) {
+    atomic_store(&hide_decorations, enabled != 0);
+    pthread_rwlock_rdlock(&g_srv.rwl);
+    struct awl_surface* s;
+    wl_list_for_each(s, &g_srv.surfaces, link) {
+        pthread_mutex_lock(&s->ev_lock);
+        if (s->role == AWL_ROLE_TOPLEVEL && s->decoration_res && s->u.xdg.role_res) {
+            send_configure_locked(s, s->u.xdg.conf_w, s->u.xdg.conf_h);
+            wl_client_flush(wl_resource_get_client(s->resource));
+        }
+        pthread_mutex_unlock(&s->ev_lock);
+    }
+    pthread_rwlock_unlock(&g_srv.rwl);
+}
+int awl_display_hide_decorations(void) { return atomic_load(&hide_decorations); }
 
 /* ---------------- xdg_popup (composited as a layer of the parent window —
  * same pipeline as subsurface: render layer snapshot / input hit / frame_done
@@ -762,6 +855,8 @@ static void wm_base_bind(struct wl_client* client, void* data,
 }
 
 void awl_xdg_setup(void) {
+    if (!wl_global_create(g_srv.display, &zxdg_decoration_manager_v1_interface, 1, NULL, decoration_bind))
+        LOGE("xdg_decoration global create failed");
     g_srv.init_conf_w = 800;   /* #33 defaults; cfg_load_and_apply overrides at startup */
     g_srv.init_conf_h = 600;
     if (!wl_global_create(g_srv.display,

@@ -37,6 +37,7 @@ import androidx.lifecycle.viewModelScope
 import com.anland.design.*
 import com.anland.shell.ds.DsCli
 import com.anland.shell.ds.EnvVars
+import com.anland.shell.connections.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,25 +58,54 @@ class ConsoleSession(app:Application):AndroidViewModel(app) {
     var ready by mutableStateOf(false);private set
     var dead by mutableStateOf(false);private set
     var user by mutableStateOf("");private set
+    var title by mutableStateOf("");private set
+    var hostChallenge by mutableStateOf<HostTrustRequired?>(null);private set
     var font by mutableIntStateOf(Prefs.consoleFontSp(app));private set
     private var started=false
     private val lifecycle=Any()
     private var closed=false
     private var proc:Process?=null
     private var stdin:OutputStream?=null
+    private var ssh:SshLogin.Console?=null
+    private var requestedContainer=""
+    private var requestedCredential=""
     private val writer=Mutex()
     fun font(delta:Int){Prefs.setConsoleFontSp(context,font+delta);font=Prefs.consoleFontSp(context)}
     private fun append(text:String){output=(output+text).takeLast(128*1024)}
-    fun start(container:String) {
+    fun start(container:String,credentialId:String="") {
         if(started)return
         started=true
+        requestedContainer=container;requestedCredential=credentialId
         viewModelScope.launch {
             try {
+                val profile=withContext(Dispatchers.IO){if(credentialId.isEmpty())null else CredentialStore(context).get(credentialId)}
+                title=profile?.name?:container
+                if(profile?.kind=="ssh") {
+                    user=profile.username
+                    val connection=withContext(Dispatchers.IO){
+                        val created=SshLogin.console(profile)
+                        synchronized(lifecycle) {
+                            if(closed){created.close();throw CancellationException("Console closed")}
+                            ssh=created;stdin=created.output
+                        }
+                        created
+                    }
+                    ready=true
+                    readOutput(connection.input)
+                    append("\n${context.getString(R.string.console_ended)}\n")
+                    return@launch
+                }
+                val localContainer=profile?.container?:container
                 // Resolve the launch user first: home, environment and X access
                 // must agree with normal app launches, including auto selection.
-                user=withContext(Dispatchers.IO){Prefs.launchUser(context,container).ifEmpty{DsCli.autoUser(container)}}
+                user=withContext(Dispatchers.IO){
+                    val selected=profile?.username?:Prefs.launchUser(context,localContainer).ifEmpty{DsCli.autoUser(localContainer)}
+                    if(profile!=null)LocalLogin.authenticate(context,profile)
+                    else LocalLogin.authenticateLaunch(context,localContainer,selected)
+                    selected
+                }
                 val child=withContext(Dispatchers.IO){
-                    val created=ProcessBuilder(*DsCli.consoleArgv(container,user)).redirectErrorStream(true).start()
+                    val created=ProcessBuilder(*DsCli.consoleArgv(localContainer,user)).redirectErrorStream(true).start()
                     // Creation may finish after the activity was closed. Publish the
                     // child under the same lock as cleanup so cancellation cannot leak it.
                     synchronized(lifecycle) {
@@ -84,31 +114,51 @@ class ConsoleSession(app:Application):AndroidViewModel(app) {
                     }
                     created
                 }
-                val custom=EnvVars.parse(Prefs.launchEnv(context,container))
+                val custom=EnvVars.parse(Prefs.launchEnv(context,localContainer))
                 val merged=EnvVars.merge(DsCli.defaultEnvPairs(),custom)
                 append(context.getString(R.string.console_env_note,EnvVars.format(merged).replace("\n"," "))+"\n")
                 // Preamble: cd ~ + built-ins/customizations + session env and
                 // DISPLAY. Echo locally; the non-tty shell has no prompt.
                 write(DsCli.consolePreamble(custom))
                 ready=true
+                readOutput(child.inputStream)
                 withContext(Dispatchers.IO) {
-                    child.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
-                        val chunk=CharArray(4096)
-                        while(true){val n=reader.read(chunk);if(n<0)break;val text=String(chunk,0,n);withContext(Dispatchers.Main){append(text)}}
-                    }
                     val code=child.waitFor()
                     withContext(Dispatchers.Main){append("\n${context.getString(R.string.console_ended)} (exit $code)\n")}
                 }
             } catch(e:CancellationException){throw e}
-            catch(e:Exception){append("\n${e.message}\n")}
-            finally {ready=false;dead=true}
+            catch(e:HostTrustRequired){hostChallenge=e}
+            catch(e:Exception){append("\n${context.getString(R.string.credential_connection_failed)}\n${e.message}\n")}
+            finally {ready=false;dead=true;synchronized(lifecycle){ssh?.close();ssh=null;proc?.destroy();proc=null;stdin=null}}
+        }
+    }
+    private suspend fun readOutput(input:java.io.InputStream)=withContext(Dispatchers.IO) {
+        input.bufferedReader(Charsets.UTF_8).use { reader ->
+            val chunk=CharArray(4096)
+            while(true){val n=reader.read(chunk);if(n<0)break;val text=String(chunk,0,n);withContext(Dispatchers.Main){append(text)}}
+        }
+    }
+    fun dismissHost(){hostChallenge=null;append(context.getString(R.string.credential_host_cancelled)+"\n")}
+    fun trustHost() {
+        val challenge=hostChallenge?:return
+        hostChallenge=null
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val store=CredentialStore(context)
+                    val latest=store.get(challenge.profile.id)
+                    check(latest.host==challenge.profile.host && latest.port==challenge.profile.port){"Connection changed"}
+                    store.put(latest.copy(hostKey=challenge.presentedKey))
+                }
+                started=false;dead=false;start(requestedContainer,requestedCredential)
+            } catch(e:Exception){append(context.getString(R.string.credential_connection_failed)+"\n")}
         }
     }
     private suspend fun write(line:String)=writer.withLock { withContext(Dispatchers.IO){stdin?.let{it.write((line+"\n").toByteArray(Charsets.UTF_8));it.flush()}} }
     fun send(command:String){if(!ready)return;append("$ $command\n");if(command.isNotBlank())Prefs.addHistory(context,command)
         viewModelScope.launch{try{write(command)}catch(e:Exception){ready=false;dead=true;append("\n${e.message}\n")}}
     }
-    override fun onCleared(){synchronized(lifecycle){closed=true;proc?.destroyForcibly();runCatching{stdin?.close()}};super.onCleared()}
+    override fun onCleared(){synchronized(lifecycle){closed=true;ssh?.close();proc?.destroyForcibly();runCatching{stdin?.close()}};super.onCleared()}
 }
 
 class ConsoleActivity:AppCompatActivity() {
@@ -118,8 +168,9 @@ class ConsoleActivity:AppCompatActivity() {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
         val container=intent.getStringExtra("container").orEmpty()
-        if(container.isBlank()){finish();return}
-        session.start(container)
+        val credential=intent.getStringExtra("credential_id").orEmpty()
+        if(container.isBlank()&&credential.isBlank()){finish();return}
+        session.start(container,credential)
         setContent{WithAnlandTheme{
             var command by rememberSaveable{mutableStateOf("")}
             var history by rememberSaveable{mutableStateOf(false)}
@@ -139,7 +190,7 @@ class ConsoleActivity:AppCompatActivity() {
             BoxWithConstraints {
                 val wide=maxWidth>=840.dp
                 Scaffold(containerColor=MaterialTheme.colorScheme.surface,topBar={TopAppBar(
-                    title={Column {Text(stringResource(R.string.enter_console));Text(container+if(session.user.isNotBlank())" / ${session.user}" else "",style=MaterialTheme.typography.labelMedium)}},
+                    title={Column {Text(stringResource(R.string.enter_console));Text(session.title+if(session.user.isNotBlank())" / ${session.user}" else "",style=MaterialTheme.typography.labelMedium)}},
                     navigationIcon={IconButton(onClick=back){Icon(Icons.AutoMirrored.Outlined.ArrowBack,stringResource(com.anland.design.R.string.design_back))}},
                     actions={
                         IconButton(onClick={clipboard.setText(AnnotatedString(session.output))}){Icon(Icons.Outlined.ContentCopy,stringResource(R.string.design_copy_output))}
@@ -157,7 +208,7 @@ class ConsoleActivity:AppCompatActivity() {
                         Column(Modifier.fillMaxSize()) {
                             Row(Modifier.fillMaxWidth().padding(horizontal=18.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                                 Icon(Icons.Outlined.Terminal,null)
-                                Text(container,Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
+                                Text(session.title,Modifier.weight(1f),style=MaterialTheme.typography.labelLarge)
                                 StatusPill(stringResource(if(session.dead)R.string.console_ended else if(session.ready)R.string.design_session_ready else R.string.design_connecting),active=session.ready)
                             }
                             HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
@@ -183,6 +234,18 @@ class ConsoleActivity:AppCompatActivity() {
                 }
             }
             if(exit)AlertDialog(onDismissRequest={exit=false},text={Text(stringResource(R.string.console_exit_confirm))},confirmButton={TextButton(onClick={finish()}){Text(stringResource(R.string.dialog_ok))}},dismissButton={TextButton(onClick={exit=false}){Text(stringResource(android.R.string.cancel))}})
+            session.hostChallenge?.let { challenge ->
+                AlertDialog(onDismissRequest=session::dismissHost,
+                    title={Text(stringResource(if(challenge.changed)R.string.credential_host_changed else R.string.credential_host_new))},
+                    text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Text("${challenge.profile.host}:${challenge.profile.port}")
+                        Text(stringResource(R.string.credential_host_check))
+                        SelectionContainer{Text(challenge.fingerprint,fontFamily=FontFamily.Monospace)}
+                        if(challenge.changed)Text(stringResource(R.string.credential_host_previous,HostTrustRequired.fingerprint(challenge.profile.hostKey)))
+                    }},
+                    confirmButton={TextButton(onClick=session::trustHost){Text(stringResource(if(challenge.changed)R.string.credential_host_replace else R.string.credential_host_trust))}},
+                    dismissButton={TextButton(onClick=session::dismissHost){Text(stringResource(android.R.string.cancel))}})
+            }
         }}
     }
     /** Volume keys adjust the console font size (persisted), as before. */
