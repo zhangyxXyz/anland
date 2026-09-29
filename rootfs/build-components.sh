@@ -11,7 +11,7 @@ case "$ID" in
         apt-get install -y --no-install-recommends build-essential patch meson ninja-build \
             pkg-config python3 bzip2 xz-utils gettext intltool libtool \
             libgtk-3-dev libxfce4ui-2-dev libxfce4util-dev libxfce4windowing-0-dev \
-            libxfconf-0-dev libexo-2-dev libgarcon-1-0-dev libgarcon-gtk3-1-dev \
+            libxfconf-0-dev libexo-2-dev libgarcon-1-dev libgarcon-gtk3-1-dev \
             libthunarx-3-dev libnotify-dev libyaml-dev libx11-dev libxcomposite-dev \
             xutils-dev x11proto-dev libpixman-1-dev libxkbfile-dev libxfont-dev \
             libxcvt-dev libwayland-dev wayland-protocols libxshmfence-dev libdrm-dev \
