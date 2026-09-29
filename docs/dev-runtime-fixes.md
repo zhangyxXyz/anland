@@ -127,3 +127,13 @@ show the editor retaining its proportions while the keyboard moves. Two
 additional dialog/cancel rounds, the 11 InputConnection cases, installed
 APK animation callback cases and portrait/landscape checks passed. Rotation
 preferences and the original 120-second display timeout were restored.
+
+Further frame-by-frame review exposed a remaining vertical shift/black strip
+while dismissing the keyboard. The GL renderer cached ANativeWindow's requested
+size even though EGL could still have a dequeued drawable of the prior size.
+Build 36548360133 (41fd555) now queries the actual EGL drawable for each frame's
+viewport and projection. Its native syntax/build checks passed and the daemon
+was incrementally deployed with the same 441c4f4 APK. The tablet is locked;
+visual verification of this final drawable correction is still pending unlock.
+The apps workflow supports `native_only` for daemon changes without repeating
+APK builds or changing their signing caches.
