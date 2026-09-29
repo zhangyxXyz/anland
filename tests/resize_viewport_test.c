@@ -2,6 +2,14 @@
  * geometry. Exercise asynchronous configure/ack/buffer-commit ordering. */
 #include "../services/waylandbridge/awl_viewport.c"
 #include <assert.h>
+#include <fcntl.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
+
+int __android_log_print(int priority, const char* tag, const char* format, ...) {
+    (void)priority; (void)tag; (void)format;
+    return 0;
+}
 
 struct awl_server g_srv;
 
@@ -49,6 +57,41 @@ static void frame_sampling(void) {
     assert(fabs(layer.sv * old.height - 1194) < .001);
     frame_view_locked(NULL, &old, &layer); // surface died after frame ref
     assert(layer.h == 597);
+
+    // Drive the actual mailbox, with a pollable gate standing in for the
+    // new frame's acquire fence. This is the device's delayed-buffer order.
+    struct awl_bufferqueue* q = awl_bufferqueue_create(NULL, NULL);
+    int gate = eventfd(0, EFD_CLOEXEC);
+    assert(q && gate >= 0);
+    old.dmabuf_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    old.acquire_fd = old.release_fd = -1;
+    fresh.dmabuf_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    fresh.acquire_fd = dup(gate); fresh.release_fd = -1;
+    assert(old.dmabuf_fd >= 0 && fresh.dmabuf_fd >= 0 && fresh.acquire_fd >= 0);
+    assert(awl_bufferqueue_push(q, &old) && awl_bufferqueue_push(q, &fresh));
+    s.vp_has_src = 0; s.vp_dst_h = 597; s.buf_transform = 0;
+    awl_bufferqueue_lock(q);
+    assert(awl_bufferqueue_drain(q) == 0);
+    struct awl_bq_buffer* held = awl_bufferqueue_gethead(q, 0);
+    assert(held && held->content_generation == 1);
+    frame_view_locked(&s, held, &layer);
+    assert(fabs(layer.sv * held->height - 1194) < .001);
+    uint64_t ready = 1;
+    assert(write(gate, &ready, sizeof(ready)) == sizeof(ready));
+    assert(awl_bufferqueue_drain(q) == 1);
+    struct awl_bq_buffer* next = awl_bufferqueue_gethead(q, 0);
+    assert(next && next->content_generation == 2);
+    frame_view_locked(&s, next, &layer);
+    assert(layer.sv == 1 && layer.h == 597);
+    frame_view_locked(&s, held, &layer); // ref stays valid after mailbox moved
+    assert(fabs(layer.sv * held->height - 1194) < .001);
+    awl_bufferqueue_flush(q);
+    awl_bufferqueue_unlock(q);
+    awl_bufferqueue_put(held, -1);
+    awl_bufferqueue_put(next, -1);
+    awl_bufferqueue_unref(q);
+    close(gate);
+    puts("PASS delayed acquire fence/old head/new head/retained frame metadata");
     puts("PASS padded frame/new viewport/metadata-only commit/retired surface sampling");
 }
 

@@ -3,6 +3,8 @@
 Re-enter the existing Android document to request its keyboard, then tap the
 IME's hide button. Does not type, modify preferences or close the Linux window.
 Use coordinates and --height from a fresh screenshot, with system animations on.
+This checks viewport callbacks only; record and inspect the full settled tail
+as well. A correct inset trace cannot detect a mismatched GPU sampling frame.
 """
 import argparse
 from pathlib import Path
@@ -19,6 +21,8 @@ def main():
     p.add_argument('--height', type=int, required=True)
     p.add_argument('--hide-tap', type=int, nargs=2, required=True)
     p.add_argument('--rounds', type=int, default=3)
+    p.add_argument('--settle-seconds', type=float, default=2,
+                   help='Observe after each transition; use 5+ with recording for delayed buffer trims')
     p.add_argument('--output', type=Path, required=True)
     args = p.parse_args()
     adb = [args.adb, '-s', args.serial]
@@ -33,10 +37,10 @@ def main():
         run('shell', 'am', 'start', '-W', '-n',
             'com.anlandnext/com.anlandnext.awl.AwlWindowActivity',
             '-d', f'anland://win/{args.window}', '--el', 'id', str(args.window), '-f', '0x10080000')
-        time.sleep(2)
+        time.sleep(args.settle_seconds)
         run('shell', 'log', '-t', 'anland-test', f'{marker}-hide-{n}')
         run('shell', 'input', 'tap', *map(str, args.hide_tap))
-        time.sleep(2)
+        time.sleep(args.settle_seconds)
     log = run('shell', 'logcat', '-d', '-v', 'threadtime', '-s',
               'anland-awlwin:I', 'anland-test:I', '*:S')
     assert marker in log, 'Log marker lost'

@@ -133,7 +133,33 @@ while dismissing the keyboard. The GL renderer cached ANativeWindow's requested
 size even though EGL could still have a dequeued drawable of the prior size.
 Build 36548360133 (41fd555) now queries the actual EGL drawable for each frame's
 viewport and projection. Its native syntax/build checks passed and the daemon
-was incrementally deployed with the same 441c4f4 APK. The tablet is locked;
-visual verification of this final drawable correction is still pending unlock.
+was incrementally deployed with the same 441c4f4 APK. After unlock, recordings
+still exposed an isolated compressed frame/black strip about one second after
+the IME settled, so passing inset-size traces alone did not establish a fix.
 The apps workflow supports `native_only` for daemon changes without repeating
 APK builds or changing their signing caches.
+
+The subsequent Wayland trace explains that delayed frame: VS Code/Electron
+first renders into oversized buffers with a viewport crop during live resize,
+then trims the allocation and resets that crop 998–1041 ms after the final
+size. The renderer read the latest surface sampling state separately from the
+newest **ready** buffer. If the new frame's acquire fence was still pending,
+its whole-image crop was applied to the previous padded buffer, exposing its
+black tail and compressing the visible editor.
+
+GPU queue elements now carry their own logical size, viewport sample region,
+transform and surface-local content generation. Both GL and SurfaceControl
+resolve sampling against the selected frame. A viewport-only commit can still
+update the current buffer; it cannot mutate the sampling state of an older
+frame retained by a renderer. No application IDs, timeout delays, reconnects or
+software-rendering fallback are involved. `resize_viewport_test.c` exercises
+the production mapping and mailbox with a gated acquire fence, including old
+and new heads and a retained reference after the queue advances. It passes
+under UBSan; link `awl_bufferqueue.c` when compiling this test.
+
+Candidate cd7db01 is building as run 36550740272. Real-device deployment and
+visual verification remain pending confirmation about new unsaved content in
+the user's VS Code window; the earlier discard permission covered a separate
+disposable test file. Do not mark the delayed flicker resolved before that
+device check. Optional `native_debug` builds publish a separate diagnostic
+binary with per-frame geometry logging; release builds keep it compiled out.
