@@ -559,6 +559,8 @@ static void xdg_surface_get_toplevel(struct wl_client* c,
      * pend_w/pend_h zeroing below is belt-and-braces, not state repair. */
     AWL_ASSERT(!s->has_pending);
     s->u.xdg.conf_w = s->u.xdg.conf_h = 0;
+    s->u.xdg.conf_serial = s->u.xdg.ack_serial = 0;
+    s->u.xdg.follows_configure = false;
     s->u.xdg.pend_w = s->u.xdg.pend_h = 0;
     s->u.xdg.fullscreen = s->u.xdg.maximized = false;
     s->u.xdg.app_id[0] = 0;
@@ -622,6 +624,8 @@ static void xdg_surface_get_popup(struct wl_client* c, struct wl_resource* res,
     pthread_rwlock_wrlock(&g_srv.rwl);
     /* fresh xdg branch (role union) — see get_toplevel */
     s->u.xdg.conf_w = s->u.xdg.conf_h = 0;
+    s->u.xdg.conf_serial = s->u.xdg.ack_serial = 0;
+    s->u.xdg.follows_configure = false;
     s->u.xdg.pend_w = s->u.xdg.pend_h = 0;
     s->role = AWL_ROLE_POPUP;
     s->u.xdg.role_res = pr;
