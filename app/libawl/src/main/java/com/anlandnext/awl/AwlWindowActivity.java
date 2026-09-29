@@ -122,6 +122,7 @@ public class AwlWindowActivity extends Activity {
     private String taskTitle;          /* last known client title (Recents label) */
     private String taskDesktopName;
     private String taskAppId;
+    private boolean taskIdentityReady, taskPublished;
     private boolean iconFetchRunning, iconFetchPending;
     private final java.util.concurrent.atomic.AtomicInteger iconRequest =
             new java.util.concurrent.atomic.AtomicInteger();
@@ -399,6 +400,12 @@ public class AwlWindowActivity extends Activity {
         long nid = intent.getLongExtra("id", id);
         if (nid != id)
             bindWindowId(nid, intent.getStringExtra("title"), null, true);
+        else if (id >= 0) {
+            Awl.hostArrived(id); // an existing document also completes the pending launch
+            taskPublished = false;
+            applyTaskDescription();
+            applyTaskIconAsync();
+        }
     }
 
     /* ---- window binding ----
@@ -424,6 +431,8 @@ public class AwlWindowActivity extends Activity {
         taskDesktopName = null;
         taskAppId = null;
         taskIcon = null;
+        taskIdentityReady = false;
+        taskPublished = false;
         if (root != null) root.requestApplyInsets();
         host = HOST_SEQ.incrementAndGet();
         surfaceGeneration = 0;
@@ -446,6 +455,7 @@ public class AwlWindowActivity extends Activity {
             hostCbs = he != null ? he.cbs : null;
             hostWin = he != null ? he.win : null;
             if (he != null && he.identity != null) {
+                taskIdentityReady = true;
                 taskTitle = he.identity.title;
                 taskIcon = he.identity.icon;
                 if (he.identity.desktop != null) {
@@ -705,12 +715,29 @@ public class AwlWindowActivity extends Activity {
      *  or it is silently dropped. */
     private void applyTaskDescription() {
         if (this instanceof AwlDialogActivity) return; // retain the parent's task identity
-        if (taskTitle == null && taskIcon == null) return;
+        if (!taskIdentityReady) return;
         String label = TaskIdentity.label(taskDesktopName, taskTitle);
         android.app.ActivityManager.TaskDescription td = taskIcon != null
                 ? new android.app.ActivityManager.TaskDescription(label, taskIcon)
                 : new android.app.ActivityManager.TaskDescription(label);
         setTaskDescription(td);
+        // Direct daemon launches and process recreation have no prefetched
+        // registry entry. The manifest initially excludes the document from
+        // Recents; publish it only after its first identity snapshot is ready.
+        // This prevents a launcher from caching the host icon in the gap before
+        // our asynchronous load, without delaying rendering or stealing focus.
+        if (!taskPublished) {
+            android.app.ActivityManager manager = getSystemService(android.app.ActivityManager.class);
+            if (manager != null) for (android.app.ActivityManager.AppTask task : manager.getAppTasks()) {
+                try {
+                    if (task.getTaskInfo().taskId == getTaskId()) {
+                        task.setExcludeFromRecents(false);
+                        taskPublished = true;
+                        break;
+                    }
+                } catch (IllegalArgumentException gone) { /* task removed during snapshot */ }
+            }
+        }
     }
 
     /** Pull the daemon's stored toplevel icon (xdg-toplevel-icon-v1 pixels)
@@ -732,6 +759,7 @@ public class AwlWindowActivity extends Activity {
                 iconFetchRunning = false;
                 if (isFinishing() || isDestroyed()) return;
                 if (request == iconRequest.get() && fid == id) {
+                    taskIdentityReady = true; // absent client icons retain the normal host fallback
                     // Refresh title changes made before attachment / while
                     // stopped, without overwriting a newer control event.
                     if (identity != null && java.util.Objects.equals(taskTitle, requestedTitle))

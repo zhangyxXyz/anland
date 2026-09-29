@@ -21,6 +21,16 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
             long id = Long.parseLong(args.getString("window_id", "-1"));
             String expected = args.getString("label");
             if (id < 0 || expected == null) throw new AssertionError("window_id and label are required");
+            // Exercise a foreground user launch. Some OEMs deny background
+            // starts even to an instrumented process; the shell opens the
+            // exported main page first, without changing device permissions.
+            try (android.os.ParcelFileDescriptor descriptor = getUiAutomation().executeShellCommand(
+                    "am start -W -n com.anlandnext/.MainActivity");
+                 java.io.InputStream input = new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+                byte[] buffer = new byte[1024];
+                while (input.read(buffer) != -1) { }
+            }
+            waitForIdleSync();
             ActivityManager manager = getTargetContext().getSystemService(ActivityManager.class);
             for (ActivityManager.AppTask task : manager.getAppTasks()) {
                 if (WindowTaskService.windowId(task.getTaskInfo().baseIntent) == id)

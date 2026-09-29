@@ -33,13 +33,15 @@
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.Dialog.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
+        <!-- Publish to Recents after the initial task identity is ready, so
+             direct daemon launches cannot seed a cached placeholder icon. -->
         <activity android:name="com.anlandnext.awl.AwlWindowActivity"
             android:exported="false"
             android:launchMode="standard"
             android:documentLaunchMode="intoExisting"
             android:autoRemoveFromRecents="true"
             android:persistableMode="persistNever"
-            android:excludeFromRecents="false"
+            android:excludeFromRecents="true"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden">
             <property

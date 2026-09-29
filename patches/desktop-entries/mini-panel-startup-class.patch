@@ -1,0 +1,8 @@
+--- a/usr/local/share/applications/mini-panel.desktop
++++ b/usr/local/share/applications/mini-panel.desktop
+@@ -1,4 +1,5 @@
+ [Desktop Entry]
++StartupWMClass=chrome-127.0.0.1__-Default
+ Type=Application
+ Name=Mini Panel
+ Name[zh_CN]=Mini Panel
