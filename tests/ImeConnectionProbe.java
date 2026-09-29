@@ -74,6 +74,14 @@ public final class ImeConnectionProbe {
         check("replaceText updates mirror and client atomically", text().equals("say help") && events.equals(List.of("5:5:0:help")));
         reset("prefix ",7,7); input.setComposingText("test",0);
         check("zero composing cursor means start", input.getExtractedText(null,0).selectionStart==7 && events.contains("2:0:0:test"));
+        reset("",0,0);
+        String symbols = "0123456789 !@#$%^&*()_+-=[]{};:'\"\\|,.<>/?`~ 中文，。！？ 😀é";
+        input.commitText(symbols,1);
+        check("Unicode and password punctuation commit unchanged", text().equals(symbols)
+                && events.equals(List.of("1:0:0:"+symbols)));
+        reset("😀",2,2); input.deleteSurroundingTextInCodePoints(1,0);
+        check("emoji backspace removes one whole code point", text().isEmpty()
+                && events.equals(List.of("3:4:0:")));
         if(failures!=0) throw new AssertionError(failures+" InputConnection regressions");
         System.out.println("All InputConnection contract regressions passed");
         System.exit(0);

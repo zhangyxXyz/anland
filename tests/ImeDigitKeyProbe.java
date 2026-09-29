@@ -66,6 +66,39 @@ public final class ImeDigitKeyProbe {
         }
         tap(activity, KeyEvent.KEYCODE_1, 0, KeyEvent.META_SHIFT_ON);
         check("shift modifier survives synthetic digit", events.equals(List.of("123:9:2:1:1", "123:9:2:0:1")));
+        int[][] symbols = {
+            {KeyEvent.KEYCODE_AT, 3}, {KeyEvent.KEYCODE_POUND, 4},
+            {KeyEvent.KEYCODE_STAR, 9}, {KeyEvent.KEYCODE_PLUS, 13},
+            {KeyEvent.KEYCODE_NUMPAD_LEFT_PAREN, 10}, {KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN, 11}
+        };
+        for (int[] symbol : symbols) {
+            tap(activity, symbol[0], 0, 0);
+            check(KeyEvent.keyCodeToString(symbol[0]) + " uses its shifted US position",
+                    events.equals(List.of("123:9:" + symbol[1] + ":1:1", "123:9:" + symbol[1] + ":0:1")));
+        }
+        int[][] shortcuts = {
+            {KeyEvent.KEYCODE_A, 30, KeyEvent.META_CTRL_ON},
+            {KeyEvent.KEYCODE_C, 46, KeyEvent.META_CTRL_ON},
+            {KeyEvent.KEYCODE_V, 47, KeyEvent.META_CTRL_ON},
+            {KeyEvent.KEYCODE_Z, 44, KeyEvent.META_CTRL_ON},
+            {KeyEvent.KEYCODE_TAB, 15, KeyEvent.META_SHIFT_ON},
+            {KeyEvent.KEYCODE_SLASH, 53, KeyEvent.META_SHIFT_ON},
+            {KeyEvent.KEYCODE_BACKSLASH, 43, 0},
+            {KeyEvent.KEYCODE_APOSTROPHE, 40, 0},
+            {KeyEvent.KEYCODE_DPAD_LEFT, 105, 0},
+            {KeyEvent.KEYCODE_FORWARD_DEL, 111, 0},
+            {KeyEvent.KEYCODE_ESCAPE, 1, 0}, {KeyEvent.KEYCODE_ENTER, 28, 0},
+            {KeyEvent.KEYCODE_F1, 59, 0}, {KeyEvent.KEYCODE_F11, 87, 0},
+            {KeyEvent.KEYCODE_NUMPAD_1, 79, KeyEvent.META_NUM_LOCK_ON}
+        };
+        for (int[] key : shortcuts) {
+            tap(activity, key[0], 0, key[2]);
+            check(KeyEvent.keyCodeToString(key[0]) + " preserves key identity and modifiers",
+                    events.equals(List.of("123:9:" + key[1] + ":1:" + key[2],
+                            "123:9:" + key[1] + ":0:" + key[2])));
+        }
+        tap(activity, KeyEvent.KEYCODE_AT, 3, 0);
+        check("physical symbol key keeps original modifiers", events.equals(List.of("123:9:3:1:0", "123:9:3:0:0")));
         tap(activity, KeyEvent.KEYCODE_1, 79, 0);
         check("physical scan code takes precedence", events.equals(List.of("123:9:79:1:0", "123:9:79:0:0")));
         events.clear();

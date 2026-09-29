@@ -1996,18 +1996,38 @@ public class AwlWindowActivity extends Activity {
         if (ev.getAction() == KeyEvent.ACTION_DOWN && ev.getRepeatCount() > 0)
             return true;   /* synthetic repeat — swallow (see above) */
         int sc = ev.getScanCode();
-        if (sc == 0) sc = fallbackSc(kc);
+        int meta = ev.getMetaState();
+        if (sc == 0) {
+            sc = fallbackSc(kc);
+            // These Android symbol keys occupy shifted positions in our US keymap.
+            if (kc == KeyEvent.KEYCODE_AT || kc == KeyEvent.KEYCODE_POUND
+                    || kc == KeyEvent.KEYCODE_STAR || kc == KeyEvent.KEYCODE_PLUS
+                    || kc == KeyEvent.KEYCODE_NUMPAD_LEFT_PAREN
+                    || kc == KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN)
+                meta |= KeyEvent.META_SHIFT_ON;
+        }
         if (sc > 0) {
             AwlClient.input(id, KEY, sc, 0, 0,
                            ev.getAction() == KeyEvent.ACTION_DOWN ? 1 : 0, 0,
-                           ev.getMetaState());
+                           meta);
             return true;
         }
         return super.dispatchKeyEvent(ev);
     }
 
-    /** IME-synthesized key (scanCode=0) → evdev code (matches the embedded keymap) */
+    // A..Z in the embedded evdev US/QWERTY keymap, not Android key-code order.
+    private static final int[] LETTER_SC = {
+        30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38, 50,
+        49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44
+    };
+
+    /** IME-synthesized key (scanCode=0) → evdev code (matches the embedded keymap).
+     * Unicode text from commitText stays on the text-input channel. */
     private static int fallbackSc(int keyCode) {
+        if (keyCode >= KeyEvent.KEYCODE_A && keyCode <= KeyEvent.KEYCODE_Z)
+            return LETTER_SC[keyCode - KeyEvent.KEYCODE_A];
+        if (keyCode >= KeyEvent.KEYCODE_F1 && keyCode <= KeyEvent.KEYCODE_F10)
+            return 59 + keyCode - KeyEvent.KEYCODE_F1;
         switch (keyCode) {
         /* Android IMEs can send digits as key events instead of commitText.
          * These synthetic events have no hardware scan code. */
@@ -2021,6 +2041,56 @@ public class AwlWindowActivity extends Activity {
         case KeyEvent.KEYCODE_7:            return 0x08;
         case KeyEvent.KEYCODE_8:            return 0x09;
         case KeyEvent.KEYCODE_9:            return 0x0a;
+        case KeyEvent.KEYCODE_GRAVE:        return 41;
+        case KeyEvent.KEYCODE_MINUS:        return 12;
+        case KeyEvent.KEYCODE_EQUALS:
+        case KeyEvent.KEYCODE_PLUS:         return 13;
+        case KeyEvent.KEYCODE_LEFT_BRACKET: return 26;
+        case KeyEvent.KEYCODE_RIGHT_BRACKET:return 27;
+        case KeyEvent.KEYCODE_BACKSLASH:    return 43;
+        case KeyEvent.KEYCODE_SEMICOLON:    return 39;
+        case KeyEvent.KEYCODE_APOSTROPHE:   return 40;
+        case KeyEvent.KEYCODE_COMMA:        return 51;
+        case KeyEvent.KEYCODE_PERIOD:       return 52;
+        case KeyEvent.KEYCODE_SLASH:        return 53;
+        case KeyEvent.KEYCODE_AT:           return 3;    /* Shift+2 */
+        case KeyEvent.KEYCODE_POUND:        return 4;    /* Shift+3 */
+        case KeyEvent.KEYCODE_STAR:         return 9;    /* Shift+8 */
+        case KeyEvent.KEYCODE_NUMPAD_LEFT_PAREN: return 10; /* Shift+9 */
+        case KeyEvent.KEYCODE_NUMPAD_RIGHT_PAREN:return 11; /* Shift+0 */
+        case KeyEvent.KEYCODE_SHIFT_LEFT:   return 42;
+        case KeyEvent.KEYCODE_SHIFT_RIGHT:  return 54;
+        case KeyEvent.KEYCODE_CTRL_LEFT:    return 29;
+        case KeyEvent.KEYCODE_CTRL_RIGHT:   return 97;
+        case KeyEvent.KEYCODE_ALT_LEFT:     return 56;
+        case KeyEvent.KEYCODE_ALT_RIGHT:    return 100;
+        case KeyEvent.KEYCODE_META_LEFT:    return 125;
+        case KeyEvent.KEYCODE_META_RIGHT:   return 126;
+        case KeyEvent.KEYCODE_CAPS_LOCK:    return 58;
+        case KeyEvent.KEYCODE_NUM_LOCK:     return 69;
+        case KeyEvent.KEYCODE_SCROLL_LOCK:  return 70;
+        case KeyEvent.KEYCODE_F11:          return 87;
+        case KeyEvent.KEYCODE_F12:          return 88;
+        case KeyEvent.KEYCODE_INSERT:       return 110;
+        case KeyEvent.KEYCODE_SYSRQ:        return 99;
+        case KeyEvent.KEYCODE_BREAK:        return 119;
+        case KeyEvent.KEYCODE_NUMPAD_0:     return 82;
+        case KeyEvent.KEYCODE_NUMPAD_1:     return 79;
+        case KeyEvent.KEYCODE_NUMPAD_2:     return 80;
+        case KeyEvent.KEYCODE_NUMPAD_3:     return 81;
+        case KeyEvent.KEYCODE_NUMPAD_4:     return 75;
+        case KeyEvent.KEYCODE_NUMPAD_5:     return 76;
+        case KeyEvent.KEYCODE_NUMPAD_6:     return 77;
+        case KeyEvent.KEYCODE_NUMPAD_7:     return 71;
+        case KeyEvent.KEYCODE_NUMPAD_8:     return 72;
+        case KeyEvent.KEYCODE_NUMPAD_9:     return 73;
+        case KeyEvent.KEYCODE_NUMPAD_DIVIDE:return 98;
+        case KeyEvent.KEYCODE_NUMPAD_MULTIPLY:return 55;
+        case KeyEvent.KEYCODE_NUMPAD_SUBTRACT:return 74;
+        case KeyEvent.KEYCODE_NUMPAD_ADD:   return 78;
+        case KeyEvent.KEYCODE_NUMPAD_DOT:   return 83;
+        case KeyEvent.KEYCODE_NUMPAD_COMMA: return 121;
+        case KeyEvent.KEYCODE_NUMPAD_EQUALS:return 117;
         case KeyEvent.KEYCODE_ENTER:
         case KeyEvent.KEYCODE_NUMPAD_ENTER: return 0x1c;
         case KeyEvent.KEYCODE_DEL:          return 0x0e;   /* Android DEL = backspace */
