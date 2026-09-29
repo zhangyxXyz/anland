@@ -1284,6 +1284,11 @@ public class AwlWindowActivity extends Activity {
             int cb = preeditCursorBytes(t, newCursorPosition);
             if (!marked || cb != utf8Len(t))
                 AwlClient.ime(id, AwlClient.IME_PREEDIT, cb, cb, t);
+            if (compText.isEmpty() && surCursor != surAnchor) {
+                int a = Math.min(surCursor, surAnchor), b = Math.max(surCursor, surAnchor);
+                surText = surText.substring(0, a) + surText.substring(b);
+                surCursor = surAnchor = a;
+            }
             compText = t;
             compCursor = composingCursorChars(t, newCursorPosition);
             notifyImeState();
@@ -1381,15 +1386,11 @@ public class AwlWindowActivity extends Activity {
                                    int newCursorPosition, TextAttribute textAttribute) {
             finishComposingText();
             String et = editorText();
-            int a = snap(et, Math.max(0, Math.min(start, end)));
-            int b = snap(et, Math.min(et.length(), Math.max(start, end)));
+            int a = snap(et, Math.max(0, Math.min(et.length(), Math.min(start, end))));
+            int b = snap(et, Math.max(0, Math.min(et.length(), Math.max(start, end))));
             int c = Math.min(surCursor, surText.length());
-            if (b > a) {
-                AwlClient.ime(id, AwlClient.IME_DELETE,
-                        utf8Len(et.substring(Math.min(a, c), Math.min(b, c))),
-                        utf8Len(et.substring(Math.max(a, c), Math.max(b, c))), "");
-                surCursor = surAnchor = toSurroundingIndex(a);
-            }
+            if (a > c || b < c) return false;
+            markedStart = a; markedEnd = b;
             return commitText(text, newCursorPosition);
         }
 
@@ -1398,7 +1399,7 @@ public class AwlWindowActivity extends Activity {
         @Override
         public CharSequence getTextBeforeCursor(int length, int flags) {
             String et = editorText();
-            int sel = editorSelStart();
+            int sel = Math.min(editorSelStart(), editorSelEnd());
             int start = snapBack(et, Math.max(0, sel - Math.max(0, length)));
             return et.subSequence(start, sel);
         }
@@ -1406,7 +1407,7 @@ public class AwlWindowActivity extends Activity {
         @Override
         public CharSequence getTextAfterCursor(int length, int flags) {
             String et = editorText();
-            int sel = editorSelStart();
+            int sel = Math.max(editorSelStart(), editorSelEnd());
             int end = snap(et, Math.min(et.length(), sel + Math.max(0, length)));
             return et.subSequence(sel, end);
         }
@@ -1422,11 +1423,11 @@ public class AwlWindowActivity extends Activity {
         @android.annotation.TargetApi(31)
         public SurroundingText getSurroundingText(int beforeLength, int afterLength, int flags) {
             String et = editorText();
-            int sel = editorSelStart();
-            int startPos = snapBack(et, Math.max(0, sel - Math.max(0, beforeLength)));
-            int endPos = snap(et, Math.min(et.length(), sel + Math.max(0, afterLength)));
+            int sel = editorSelStart(), anchor = editorSelEnd();
+            int startPos = snapBack(et, Math.max(0, Math.min(sel, anchor) - Math.max(0, beforeLength)));
+            int endPos = snap(et, Math.min(et.length(), Math.max(sel, anchor) + Math.max(0, afterLength)));
             return new SurroundingText(et.substring(startPos, endPos),
-                                       sel - startPos, sel - startPos, startPos);
+                                       sel - startPos, anchor - startPos, startPos);
         }
 
         @Override
@@ -1435,7 +1436,7 @@ public class AwlWindowActivity extends Activity {
             t.text = editorText();
             t.startOffset = 0;
             t.selectionStart = editorSelStart();
-            t.selectionEnd = editorSelStart();
+            t.selectionEnd = editorSelEnd();
             return t;
         }
 

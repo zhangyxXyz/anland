@@ -68,6 +68,10 @@ public final class ImeConnectionProbe {
         check("replacement uses UTF-8 byte lengths", text().equals("a中") && events.equals(List.of("5:5:0:中")));
         reset("one two",3,0); input.commitText("ONE",1);
         check("commit replaces selection", text().equals("ONE two"));
+        reset("one two",3,0); input.setComposingText("ONE",1); input.finishComposingText();
+        check("preedit replaces selection without duplicate original", text().equals("ONE two"));
+        reset("say hello",9,9); input.replaceText(4,9,"help",1,null);
+        check("replaceText updates mirror and client atomically", text().equals("say help") && events.equals(List.of("5:5:0:help")));
         reset("prefix ",7,7); input.setComposingText("test",0);
         check("zero composing cursor means start", input.getExtractedText(null,0).selectionStart==7 && events.contains("2:0:0:test"));
         if(failures!=0) throw new AssertionError(failures+" InputConnection regressions");
