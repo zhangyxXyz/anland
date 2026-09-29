@@ -157,7 +157,10 @@ the production mapping and mailbox with a gated acquire fence, including old
 and new heads and a retained reference after the queue advances. It passes
 under UBSan; link `awl_bufferqueue.c` when compiling this test.
 
-Candidate cd7db01 is building as run 36550740272. Real-device deployment and
+Candidate cd7db01 passed build 36550740272; both release and diagnostic binaries
+were downloaded from the draft Release and their SHA-256 checksums verified.
+The release candidate is staged on the tablet but has not replaced the running
+41fd555 daemon. Real-device deployment and
 visual verification remain pending confirmation about new unsaved content in
 the user's VS Code window; the earlier discard permission covered a separate
 disposable test file. Do not mark the delayed flicker resolved before that
