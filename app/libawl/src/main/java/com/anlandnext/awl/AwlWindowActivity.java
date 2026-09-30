@@ -874,6 +874,7 @@ public class AwlWindowActivity extends Activity {
 
     @Override
     protected void onStop() {
+        if (!isFinishing()) publishTaskBeforeBackground();
         detachVisibleSurface();
         if (windowSubscribed) {
             Awl.release();
@@ -882,6 +883,25 @@ public class AwlWindowActivity extends Activity {
         }
         fireHost((cbs, win, act) -> cbs.onHostStop(win, act));
         super.onStop();
+    }
+
+    private void publishTaskBeforeBackground() {
+        if (id < 0 || !isTaskRoot() || this instanceof AwlDialogActivity) return;
+        // A quick Back/Home can precede the asynchronous identity lookup.
+        // Retain a usable card now; the pending lookup can still refine it.
+        taskIdentityReady = true;
+        applyTaskDescription();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation") // Target SDK 29 routes button and gesture Back here.
+    public void onBackPressed() {
+        if (id >= 0 && isTaskRoot() && !(this instanceof AwlDialogActivity)) {
+            publishTaskBeforeBackground();
+            moveTaskToBack(true);
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override

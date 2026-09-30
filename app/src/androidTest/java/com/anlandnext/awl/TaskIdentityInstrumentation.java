@@ -20,6 +20,12 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             long id = Long.parseLong(args.getString("window_id", "-1"));
+            if ("back".equals(args.getString("mode"))) {
+                testBack(id);
+                result.putString("stream", "PASS: Back retains the live Linux window and its visible Recents task; the card resumes\n");
+                finish(Activity.RESULT_OK, result);
+                return;
+            }
             String expected = args.getString("label");
             if (id < 0 || expected == null) throw new AssertionError("window_id and label are required");
             // Exercise a foreground user launch. Some OEMs deny background
@@ -66,5 +72,48 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
             result.putString("stream", android.util.Log.getStackTraceString(error));
             finish(Activity.RESULT_CANCELED, result);
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void testBack(long id) throws Exception {
+        if (id < 0) throw new AssertionError("window_id is required");
+        try (android.os.ParcelFileDescriptor fd = getUiAutomation().executeShellCommand(
+                "am start -W -n com.anlandnext/.MainActivity");
+             java.io.InputStream input = new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)) {
+            while (input.read() != -1) { }
+        }
+        Awl.WlWindow window = null;
+        for (Awl.WlWindow item : Awl.getWindows()) if (item.id == id) window = item;
+        if (window == null) throw new AssertionError("Linux window missing");
+        final Awl.WlWindow target = window;
+        CountDownLatch resumed = new CountDownLatch(1);
+        AtomicReference<Activity> host = new AtomicReference<>();
+        runOnMainSync(() -> Awl.attachWindow(getTargetContext(), target, new Awl.HostCallbacks() {
+            @Override public void onHostResume(Awl.WlWindow win, Activity activity) {
+                host.set(activity);
+                resumed.countDown();
+            }
+        }));
+        if (!resumed.await(20, TimeUnit.SECONDS)) throw new AssertionError("Host did not resume");
+        Activity activity = host.get();
+        int taskId = activity.getTaskId();
+        // Exercise the callback immediately, including before asynchronous identity completion.
+        runOnMainSync(activity::onBackPressed);
+        waitForIdleSync();
+        if (activity.isFinishing() || activity.isDestroyed()) throw new AssertionError("Back finished the host");
+        ActivityManager.AppTask retained = null;
+        for (ActivityManager.AppTask item : getTargetContext().getSystemService(ActivityManager.class).getAppTasks()) {
+            if (item.getTaskInfo().taskId == taskId) retained = item;
+        }
+        if (retained == null) throw new AssertionError("Back removed the task");
+        if ((retained.getTaskInfo().baseIntent.getFlags() & android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0)
+            throw new AssertionError("Task is still excluded from Recents");
+        boolean alive = false;
+        for (Awl.WlWindow item : Awl.getWindows()) if (item.id == id) alive = true;
+        if (!alive) throw new AssertionError("Back closed the Linux window");
+        final ActivityManager.AppTask card = retained;
+        runOnMainSync(card::moveToFront);
+        waitForIdleSync();
+        if (activity.isFinishing()) throw new AssertionError("Cannot resume retained card");
     }
 }
