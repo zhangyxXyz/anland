@@ -27,7 +27,7 @@
     <string name="env_btn">環境</string>
     <string name="env_editor_title_fmt">啟動環境變數 — %1$s</string>
     <string name="env_defaults_fmt">內建：%1$s</string>
-    <string name="env_editor_hint">每行一個 KEY=VALUE，覆蓋內建值；值為空表示移除該內建變數；# 開頭為註釋</string>
+    <string name="env_editor_hint">每行填寫一個 KEY=VALUE，可覆蓋內建變數。值為空時移除該變數。以 # 開頭的行為註釋。</string>
     <string name="env_save">儲存</string>
     <string name="env_clear">清空</string>
     <string name="env_saved">已儲存</string>
@@ -81,7 +81,7 @@
     <string name="credential_import_key">匯入私密金鑰檔案</string>
     <string name="credential_passphrase">私密金鑰密碼（選填）</string>
     <string name="credential_storage_help">憑證透過 Android Keystore 加密儲存，不參與備份。解除安裝應用程式會刪除已儲存的連線。</string>
-    <string name="credential_local_help">選擇容器，填寫該容器的 Linux 帳號密碼。每次登入透過 PAM 驗證密碼和帳號狀態；驗證失敗即停止登入。</string>
+    <string name="credential_local_help">選擇容器，填寫該容器的 Linux 帳號密碼。每次登入透過 PAM 驗證密碼和帳號狀態。驗證失敗即停止登入。</string>
     <string name="credential_ssh_help">透過密碼或私密金鑰登入伺服器命令主控台。首次連線時需要核對主機指紋。</string>
     <string name="credential_default">已用於本機應用程式啟動</string>
     <string name="credential_launch_help">此容器已啟用儲存的憑證，新啟動應用程式和主控台時會驗證密碼。重新選擇下方一般使用者名稱會改回透過 root 授權切換使用者。</string>

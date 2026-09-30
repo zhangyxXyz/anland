@@ -807,12 +807,10 @@ static void xwm_activate_window(uint64_t id, bool focus) {
     xwm_send_cmd(id, cmd, (size_t)n);
 }
 
-/* config.json "auto_attach" (default false; see the daemon config section):
- * launch the host Activity on window creation. false = the window waits for a
- * binder SURFACE — the uid pass lets the wayland client app attach its own
- * windows. Defined here (used by cb_window_created), owned by the config
- * block below (g_cfg_lock guards it). */
-static bool g_cfg_auto_attach = false;
+/* New windows launch their host Activity automatically. The low-level toggle
+ * remains available for client/test integrations; the host app has no switch.
+ * Startup migrates saved disabled values to the standard enabled behavior. */
+static bool g_cfg_auto_attach = true;
 
 static void cb_window_created(void* user, uint64_t id, int32_t pref_w, int32_t pref_h,
                               const char* title, int is_popup) {
@@ -829,7 +827,7 @@ static void cb_window_created(void* user, uint64_t id, int32_t pref_w, int32_t p
      * scope for normal apps; the title rides along so a list UI can render
      * the row without a follow-up LIST) */
     evt_dispatch(awl_window_client_uid(id), id, AWL_E_CREATED, title ? title : "");
-    /* auto-attach (config.json "auto_attach", default false): off = the window
+    /* Internal auto-attach override: off = the window
      * waits for a binder SURFACE — the uid pass lets the wayland client app
      * itself attach its own windows */
     if (!g_cfg_auto_attach) {
@@ -1215,10 +1213,8 @@ static awl_window_callbacks_t k_cbs = {
  *                   socket; 0 = pure binder-fd mode (#36) — no socket file
  *                   at all, wayland clients connect only by sending their
  *                   own socketpair end over T_CONNECT
- * "auto_attach" (default false): launch the host Activity automatically when
- * a wayland window is created. false = the window waits for a binder SURFACE
- * from the wayland client app itself (SURFACE uid pass); toggled over
- * CFG_GET/SET as 0/1 or by hand in config.json (new windows only).
+ * "auto_attach": new windows open automatically. Startup normalizes this to
+ * 1; CFG_GET/SET remains compatible with clients and isolated test fixtures.
  * "xwayland_scale" (default true): apply the daemon zoom to XWayland resize
  * commands; toggled over CFG_GET/SET or by hand in config.json. */
 
@@ -1344,7 +1340,7 @@ static void cfg_load_sock_cfg(void) {
     if (sl == 0) {
         g_sock_listen = false;
         LOGI("config: socket_listen=0 — pure binder-fd mode (no wayland-0 socket)");
-    } else if (sl != -1) {
+    } else if (sl != -1 && sl != 1) {
         LOGE("config: socket_listen=%d invalid (0 or 1), ignored", sl);
     }
 }
@@ -1402,13 +1398,6 @@ static void cfg_load_and_apply(void) {
         LOGE("config: xwayland_scale=%d out of range (0..1), ignored", xws);
     }
     int aa = cfg_parse_int(buf, "auto_attach");
-    if (aa == 0 || aa == 1) {
-        std::lock_guard<std::mutex> lk(g_cfg_lock);
-        g_cfg_auto_attach = aa != 0;
-        LOGI("config: auto_attach=%s (applied at startup)", aa ? "true" : "false");
-    } else if (aa != -1) {
-        LOGE("config: auto_attach=%d out of range (0..1), ignored", aa);
-    }
     int sc = cfg_parse_int(buf, "sc_enabled");
     int decor = cfg_parse_int(buf, "hide_decorations");
     if (decor == 0 || decor == 1) {
@@ -1421,6 +1410,12 @@ static void cfg_load_and_apply(void) {
              sc ? "true (SC/HWC backend)" : "false (GL fallback)");
     } else if (sc != -1) {
         LOGE("config: sc_enabled=%d out of range (0..1), ignored", sc);
+    }
+    // Save only after loading every setting so migration preserves other values.
+    if (aa != 1) {
+        std::lock_guard<std::mutex> lk(g_cfg_lock);
+        cfg_save_locked();
+        LOGI("config: automatic window display enabled");
     }
 }
 

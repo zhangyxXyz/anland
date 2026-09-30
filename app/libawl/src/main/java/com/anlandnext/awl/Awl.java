@@ -109,6 +109,9 @@ public final class Awl {
     /** Host-only catalog, including configured containers with no windows. */
     public static List<String> containers() { return AwlClient.containers(); }
 
+    /** Host-only protocol check. Older daemons cannot safely scope a launch. */
+    public static boolean supportsContainerSelection() { return AwlClient.containerCatalog() != null; }
+
     /* ---- event subscription (process-wide; main thread bookkeeping) ---- */
 
     private static final EventBinder BINDER = new EventBinder();

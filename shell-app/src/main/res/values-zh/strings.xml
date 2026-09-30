@@ -27,7 +27,7 @@
     <string name="env_btn">环境</string>
     <string name="env_editor_title_fmt">启动环境变量 — %1$s</string>
     <string name="env_defaults_fmt">内置：%1$s</string>
-    <string name="env_editor_hint">每行一个 KEY=VALUE，覆盖内置值；值为空表示移除该内置变量；# 开头为注释</string>
+    <string name="env_editor_hint">每行填写一个 KEY=VALUE，可覆盖内置变量。值为空时移除该变量。以 # 开头的行为注释。</string>
     <string name="env_save">保存</string>
     <string name="env_clear">清空</string>
     <string name="env_saved">已保存</string>
@@ -81,7 +81,7 @@
     <string name="credential_import_key">导入私钥文件</string>
     <string name="credential_passphrase">私钥口令（可选）</string>
     <string name="credential_storage_help">凭据通过 Android Keystore 加密保存，不参与备份。卸载应用会删除已保存的连接。</string>
-    <string name="credential_local_help">选择容器，填写该容器的 Linux 账号密码。每次登录通过 PAM 验证密码和账号状态；验证失败即停止登录。</string>
+    <string name="credential_local_help">选择容器，填写该容器的 Linux 账号密码。每次登录通过 PAM 验证密码和账号状态。验证失败即停止登录。</string>
     <string name="credential_ssh_help">通过密码或私钥登录服务器命令控制台。首次连接时需要核对主机指纹。</string>
     <string name="credential_default">已用于本机应用启动</string>
     <string name="credential_launch_help">此容器已启用保存的凭据，新启动应用和控制台时会验证密码。重新选择下方普通用户名会改回通过 root 授权切换用户。</string>

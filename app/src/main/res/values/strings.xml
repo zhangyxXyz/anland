@@ -21,8 +21,6 @@
     <string name="ime_mode_overlay">Overlay (keyboard floats over the window, surface unchanged)</string>
     <string name="zoom_tip">Display zoom (whole wayland window, applies immediately):</string>
     <string name="scale_mode_tip">Window scaling (when a fixed-size window is resized, applies immediately):</string>
-    <string name="auto_attach_tip">When an app creates a window, bring it to the foreground automatically. Applies to newly created windows.</string>
-    <string name="auto_attach">Show new windows automatically</string>
     <string name="scale_mode_stretch">Stretch (fill the window, aspect may distort)</string>
     <string name="scale_mode_fit">Fit (uniform scale, centered, black bars)</string>
     <string name="scale_mode_center">Original size (1:1, centered, no scaling)</string>
@@ -32,10 +30,10 @@
     <string name="init_size_w">Width</string>
     <string name="init_size_h">Height</string>
     <string name="init_size_screen">Screen size · %1$d×%2$d</string>
-    <string name="sc_backend_tip">Compositor backend (on = SC/HWC: wayland layers are composed by SurfaceFlinger, zero-copy scanout when possible; off = per-window GL renderer fallback. Applies to windows attached from now on):</string>
+    <string name="sc_backend_tip">When enabled, Android composes the window layers. When disabled, Anland uses OpenGL to compose each window. Both can use the GPU. Takes effect when a window next attaches to its display, including after returning from the background.</string>
     <string name="sc_backend">SC compositor backend (HWC)</string>
     <string name="close_on_swipe">Close windows when swiping away</string>
     <string name="close_on_swipe_help">When a recent-task card is removed, request a normal window close, including the Linux desktop session. Unsaved-content prompts remain. Turning this off keeps apps running. A notification keeps task-removal handling active.</string>
     <string name="hide_titlebars">Hide independent-window titlebars</string>
-    <string name="hide_titlebars_help">Ask apps supporting Wayland decorations to hide the extra titlebar. Close windows from the window list or enable swipe-to-close. Apps drawing their own bars may keep them; menus, tabs and desktop panels are preserved.</string>
+    <string name="hide_titlebars_help">Ask apps supporting Wayland decorations to hide the extra titlebar. Close windows from the window list or enable swipe-to-close. Apps drawing their own bars may keep them. Menus, tabs and desktop panels are preserved.</string>
 </resources>

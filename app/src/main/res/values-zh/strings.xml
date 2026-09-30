@@ -28,12 +28,10 @@
     <string name="init_size_w">宽</string>
     <string name="init_size_h">高</string>
     <string name="init_size_screen">屏幕尺寸 · %1$d×%2$d</string>
-    <string name="auto_attach_tip">应用创建新窗口时直接拉起，无需再到窗口列表手动打开。仅对新建窗口生效。</string>
-    <string name="auto_attach">启动应用后自动显示窗口</string>
-    <string name="sc_backend_tip">开启时交给 Android 系统合成；关闭时使用逐窗口 OpenGL 渲染，两者都可使用 GPU。仅对之后打开的窗口生效。</string>
+    <string name="sc_backend_tip">开启时由 Android 系统合成画面，关闭时由 Anland 使用 OpenGL 合成窗口画面。两种方式都可以使用 GPU。窗口下次连接显示时生效，已有窗口退到后台再回来也会应用新设置。</string>
     <string name="sc_backend">SurfaceControl 合成</string>
     <string name="close_on_swipe">上划卡片时关闭窗口</string>
     <string name="close_on_swipe_help">移除最近任务卡片时，请求正常关闭窗口，也包括 Linux 桌面会话。保留未保存内容的确认，关闭此开关则保持应用运行。启用时会显示通知，以接收任务移除事件。</string>
     <string name="hide_titlebars">隐藏独立窗口标题栏</string>
-    <string name="hide_titlebars_help">通过 Wayland 装饰协议，让支持的应用隐藏额外标题栏。可从窗口列表关闭，或启用上划关闭。自行绘制标题栏的应用可能仍会保留；不会裁切菜单、标签页或桌面面板。</string>
+    <string name="hide_titlebars_help">通过 Wayland 装饰协议，让支持的应用隐藏额外标题栏。可从窗口列表关闭，或启用上划关闭。自行绘制标题栏的应用可能仍会保留。不会裁切菜单、标签页或桌面面板。</string>
 </resources>

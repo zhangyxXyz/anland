@@ -68,7 +68,6 @@ internal fun WindowSettings(state:WindowState) {
         Text(stringResource(R.string.config_shared_help),style=MaterialTheme.typography.bodyMedium)
         if(!state.connected) Text(stringResource(R.string.status_daemon_unreachable),color=MaterialTheme.colorScheme.error)
         SettingGroup(stringResource(R.string.config_tasks)) {
-            AutoLaunch(state)
             SettingItem(stringResource(R.string.close_on_swipe),description=stringResource(R.string.close_on_swipe_help),descriptionMaxLines=8,
                 trailingContent={Switch(closeOnSwipe,{closeOnSwipe=it;prefs.edit().putBoolean(WindowTaskService.PREF,it).apply();WindowTaskService.sync(context)})})
             SettingItem(stringResource(R.string.task_container_name),description=stringResource(R.string.task_container_name_help),descriptionMaxLines=8,

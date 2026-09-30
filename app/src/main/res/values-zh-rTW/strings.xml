@@ -30,12 +30,10 @@
     <string name="init_size_w">寬</string>
     <string name="init_size_h">高</string>
     <string name="init_size_screen">螢幕尺寸 · %1$d×%2$d</string>
-    <string name="auto_attach_tip">應用建立新視窗時直接拉起，無需再到視窗列表手動開啟。僅對新建視窗生效。</string>
-    <string name="auto_attach">啟動應用後自動顯示視窗</string>
-    <string name="sc_backend_tip">開啟時交給 Android 系統合成；關閉時使用逐視窗 OpenGL 渲染，兩者都可使用 GPU。僅對之後開啟的視窗生效。</string>
+    <string name="sc_backend_tip">開啟時由 Android 系統合成畫面，關閉時由 Anland 使用 OpenGL 合成視窗畫面。兩種方式都可以使用 GPU。視窗下次連接顯示時生效，既有視窗退到背景再回來也會套用新設定。</string>
     <string name="sc_backend">SurfaceControl 合成</string>
     <string name="close_on_swipe">上滑卡片時關閉視窗</string>
-    <string name="close_on_swipe_help">移除最近工作卡片時，要求正常關閉視窗，也包括 Linux 桌面工作階段。保留未儲存內容的確認；關閉此開關則保持應用程式執行。啟用時會顯示通知，以接收工作移除事件。</string>
+    <string name="close_on_swipe_help">移除最近工作卡片時，要求正常關閉視窗，也包括 Linux 桌面工作階段。保留未儲存內容的確認。關閉此開關則保持應用程式執行。啟用時會顯示通知，以接收工作移除事件。</string>
     <string name="hide_titlebars">隱藏獨立視窗標題列</string>
-    <string name="hide_titlebars_help">透過 Wayland 裝飾協定，讓支援的應用程式隱藏額外標題列。可從視窗清單關閉，或啟用上滑關閉。自行繪製標題列的應用程式可能仍會保留；不會裁切選單、分頁或桌面面板。</string>
+    <string name="hide_titlebars_help">透過 Wayland 裝飾協定，讓支援的應用程式隱藏額外標題列。可從視窗清單關閉，或啟用上滑關閉。自行繪製標題列的應用程式可能仍會保留。不會裁切選單、分頁或桌面面板。</string>
 </resources>

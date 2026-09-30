@@ -90,5 +90,14 @@ public final class WlBinder {
         }
     }
 
+    /** Migrate a running older daemon without restarting any existing windows. */
+    public static boolean ensureAutoAttach() {
+        int enabled = configGet("auto_attach");
+        if (enabled == 0 && configSet("auto_attach", 1) == 0) {
+            enabled = configGet("auto_attach");
+        }
+        return enabled == 1;
+    }
+
     private WlBinder() { }
 }

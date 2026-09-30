@@ -25,6 +25,7 @@ class OpenWindowActivity : AppCompatActivity() {
     private val changes = Channel<Unit>(Channel.CONFLATED)
     private var matches by mutableStateOf<List<Awl.WlWindow>>(emptyList())
     private var failed by mutableStateOf(false)
+    private var moduleUpdateNeeded by mutableStateOf(false)
     private var choosing by mutableStateOf(false)
     private var opening = false
     private val callback = object : Awl.Callback {
@@ -55,7 +56,7 @@ class OpenWindowActivity : AppCompatActivity() {
                 onDismissRequest = { finish() },
                 title = { Text(stringResource(R.string.window_open)) },
                 text = { Column {
-                    if (failed) Text(stringResource(R.string.window_open_timeout))
+                    if (failed) Text(stringResource(if(moduleUpdateNeeded)R.string.container_module_update_needed else R.string.window_open_timeout))
                     matches.forEach { w -> NavigationSettingItem(w.title.orEmpty(), onClick = { open(w) }) }
                 } },
                 confirmButton = { if (failed) TextButton(onClick = {
@@ -67,16 +68,21 @@ class OpenWindowActivity : AppCompatActivity() {
         } }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                if(exactId<0 && container!=null && !withContext(Dispatchers.IO){Awl.supportsContainerSelection()}) {
+                    moduleUpdateNeeded=true
+                    failed=true
+                    return@repeatOnLifecycle
+                }
                 changes.trySend(Unit)
                 while (isActive && !opening && !failed) {
                     val remaining = (deadline - SystemClock.uptimeMillis()).coerceAtLeast(1)
                     // Once windows are offered, waiting for the user's choice
                     // is not a launch timeout. Keep the list live until chosen
                     // or all its windows disappear.
-                    val changed = if (choosing && matches.isNotEmpty()) {
-                        changes.receive(); true
-                    } else withTimeoutOrNull(remaining) { changes.receive(); true } == true
-                    if (!changed) {
+                    // app_id/container metadata can become available after the
+                    // creation event without another lifecycle notification.
+                    withTimeoutOrNull(minOf(remaining,500L)) { changes.receive() }
+                    if (!(choosing && matches.isNotEmpty()) && SystemClock.uptimeMillis()>=deadline) {
                         failed = true
                         break
                     }

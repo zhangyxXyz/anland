@@ -23,7 +23,7 @@ class SessionPreflightActivity : AppCompatActivity() {
         if (callingPackage != "com.anland.shell") { finish(); return }
         lifecycleScope.launch {
             try {
-                val snapshot = withContext(Dispatchers.IO) { readSessionWindows(intent.getStringExtra("container")) }
+                val snapshot = withContext(Dispatchers.IO) { readSessionWindows(intent.getStringExtra("container"),this@SessionPreflightActivity) }
                 setResult(Activity.RESULT_OK, Intent().putExtras(snapshot))
             } catch (e: Exception) {
                 setResult(Activity.RESULT_CANCELED, Intent().putExtra("error", e.message))

@@ -40,23 +40,30 @@ final class AwlClient {
     static final int T_CONTAINERS = 21;
 
     static ArrayList<String> containers() {
+        ArrayList<String> names = containerCatalog();
+        return names == null ? new ArrayList<>() : names;
+    }
+
+    /** Null distinguishes an unsupported protocol from a valid empty catalog. */
+    static ArrayList<String> containerCatalog() {
         ArrayList<String> names = new ArrayList<>();
         IBinder b = get();
-        if (b == null) return names;
+        if (b == null) return null;
         Parcel d = Parcel.obtain(), r = Parcel.obtain();
         try {
             d.writeInterfaceToken(DESCRIPTOR);
             if (b.transact(T_CONTAINERS, d, r, 0) && r.dataSize() >= 4) {
                 int count = r.readInt();
-                if (count < 0 || count > 1024) return names;
+                if (count < 0 || count > 1024) return null;
                 for (int i=0; i<count; i++) {
                     String name = r.readString();
                     if (name != null && !name.isEmpty()) names.add(name);
                 }
+                return names;
             }
         } catch (Exception e) { Log.w(TAG, "container list unavailable", e); }
         finally { d.recycle(); r.recycle(); }
-        return names;
+        return null;
     }
 
     static final class Presentation {

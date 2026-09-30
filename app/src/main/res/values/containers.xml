@@ -1,6 +1,6 @@
 <resources>
-    <string name="containers_all">All containers</string>
-    <string name="containers_unknown">Other sources</string>
+    <string name="container_module_update_needed">The running Root module cannot identify window containers. Activate the updated module and reopen the desktop.</string>
+    <string name="containers_all">All</string>
     <string name="windows_close_all">Close all windows</string>
     <string name="containers_scope_help">The list follows the selected container. Configuration and appearance are shared across containers.</string>
     <string name="windows_close_all_confirm">Close all %2$d windows in %1$s? Applications may ask you to save changes. Windows opened after this confirmation are not included.</string>

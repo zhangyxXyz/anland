@@ -18,9 +18,9 @@
   <string name="maintenance_backup_destination_summary">Choose where this backup should be stored</string>
   <string name="maintenance_backup_encryption_disabled">Not encrypted</string>
   <string name="maintenance_backup_encryption_enabled">AES-256 encryption enabled</string>
-  <string name="maintenance_backup_encryption_help">## How encryption works\n\n- New ZIP backups use **AES-256** when a password is set.\n- The same password must be configured before restoring an encrypted backup.\n- Clearing the password disables encryption only for new backups; it does not decrypt existing files.\n\nKeep the password somewhere safe. A forgotten password cannot be recovered.</string>
+  <string name="maintenance_backup_encryption_help">## How encryption works\n\n- New ZIP backups use **AES-256** when a password is set.\n- The same password must be configured before restoring an encrypted backup.\n- Clearing the password disables encryption only for new backups. It does not decrypt existing files.\n\nKeep the password somewhere safe. A forgotten password cannot be recovered.</string>
   <string name="maintenance_backup_encryption_password">Encryption password</string>
-  <string name="maintenance_backup_encryption_password_summary">Used for new backups and restores; clear it to disable encryption</string>
+  <string name="maintenance_backup_encryption_password_summary">Used for new backups and restores. Clear it to disable encryption</string>
   <string name="maintenance_backup_folder">Backup folder</string>
   <string name="maintenance_backup_folder_help">## Folder selection\n\n- The recommended location is **Documents/Anland**.\n- Your selection is remembered, so later backups do not ask again.\n- Long press this row to copy the displayed relative path.\n\nAndroid grants access only to the folder you select.</string>
   <string name="maintenance_backup_folder_selected">Local backup folder selected</string>
@@ -28,10 +28,10 @@
   <string name="maintenance_backup_keep_unlimited">Keep all</string>
   <string name="maintenance_backup_local">Local backup</string>
   <string name="maintenance_backup_local_complete">Local backup complete</string>
-  <string name="maintenance_backup_local_complete_remote_failed">Local backup complete; cloud failed: %1$s</string>
+  <string name="maintenance_backup_local_complete_remote_failed">Local backup complete. Cloud failed: %1$s</string>
   <string name="maintenance_backup_local_retention">Local backups to keep</string>
   <string name="maintenance_backup_now">Back up now</string>
-  <string name="maintenance_backup_now_help">Back up this app’s settings. Shell includes container selection, launch preferences and saved connections; credentials require an encryption password. Wayland includes local app preferences. Container files, the Root module and daemon configuration are outside this backup.</string>
+  <string name="maintenance_backup_now_help">Back up this app’s settings. Shell includes container selection, launch preferences and saved connections. Credentials require an encryption password. Wayland includes local app preferences. Container files, the Root module and daemon configuration are outside this backup.</string>
   <string name="maintenance_backup_now_summary">Tap to back up locally and to cloud\nLong press to choose a target</string>
   <string name="maintenance_backup_path_copied">Backup path copied</string>
   <string name="maintenance_backup_remote_complete">Cloud backup complete</string>
@@ -66,7 +66,7 @@
   <string name="maintenance_expand">Expand</string>
   <string name="maintenance_feedback_issues">Feedback and issues</string>
   <string name="maintenance_license_content">Anland is GPL-3.0 licensed. The UI includes MIT-licensed MaterialDesignTmpl code. See the project repository for full licenses.</string>
-  <string name="maintenance_material_design_summary">Google’s open-source design system; tap to view documentation</string>
+  <string name="maintenance_material_design_summary">Google’s open-source design system. Tap to view documentation</string>
   <string name="maintenance_no_backups">No backups found</string>
   <string name="maintenance_not_set">Not set</string>
   <string name="maintenance_open_link_failed">Could not open the link</string>
@@ -80,7 +80,7 @@
   <string name="maintenance_privacy_policy">Privacy policy</string>
   <string name="maintenance_privacy_policy_content">Backup and updates
 
-WebDAV connects to your configured server and uploads backups you choose to create. Local passwords are encrypted with Android Keystore; exported connection credentials and WebDAV passwords require an archive password. Update checks access public GitHub Releases and download this app’s APK. Diagnostics are shared only on request.</string>
+WebDAV connects to your configured server and uploads backups you choose to create. Local passwords are encrypted with Android Keystore. Exported connection credentials and WebDAV passwords require an archive password. Update checks access public GitHub Releases and download this app’s APK. Diagnostics are shared only on request.</string>
   <string name="maintenance_privacy_policy_summary">How data and network access are used</string>
   <string name="maintenance_redownload_and_install">Download again and reinstall</string>
   <string name="maintenance_release_history">Release history</string>

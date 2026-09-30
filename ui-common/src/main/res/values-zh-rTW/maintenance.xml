@@ -31,7 +31,7 @@
   <string name="maintenance_backup_local_complete_remote_failed">本機備份完成，雲端失敗：%1$s</string>
   <string name="maintenance_backup_local_retention">本機保留份數</string>
   <string name="maintenance_backup_now">立即備份</string>
-  <string name="maintenance_backup_now_help">备份当前 App 的配置。Shell 包含容器选择、启动设置和登录凭据；凭据需要设置加密密码。Wayland 包含本机 App 设置。容器文件、Root 模块与守护进程配置不在备份中。</string>
+  <string name="maintenance_backup_now_help">备份当前 App 的配置。Shell 包含容器选择、启动设置和登录凭据。凭据需要设置加密密码。Wayland 包含本机 App 设置。容器文件、Root 模块与守护进程配置不在备份中。</string>
   <string name="maintenance_backup_now_summary">點擊備份到本機和雲端\n長按可選擇目標</string>
   <string name="maintenance_backup_path_copied">已複製備份路徑</string>
   <string name="maintenance_backup_remote_complete">雲端備份完成</string>
@@ -65,7 +65,7 @@
   <string name="maintenance_download_and_install">下載並安裝</string>
   <string name="maintenance_expand">展開</string>
   <string name="maintenance_feedback_issues">回饋與問題</string>
-  <string name="maintenance_license_content">Anland 使用 GPL-3.0；界面引用 MaterialDesignTmpl 的 MIT 许可代码。完整许可见项目仓库。</string>
+  <string name="maintenance_license_content">Anland 使用 GPL-3.0。界面引用 MaterialDesignTmpl 的 MIT 许可代码。完整许可见项目仓库。</string>
   <string name="maintenance_material_design_summary">Google 开源的 Material Design 3 設計體系，點擊檢視資料</string>
   <string name="maintenance_no_backups">暫無備份</string>
   <string name="maintenance_not_set">尚未設定</string>
@@ -80,7 +80,7 @@
   <string name="maintenance_privacy_policy">隱私權政策</string>
   <string name="maintenance_privacy_policy_content">备份与更新
 
-WebDAV 仅连接你设置的服务器，上传由你选择创建的备份。密码在本机使用 Android Keystore 加密；登录凭据及 WebDAV 密码导出需要备份加密密码。更新检查访问 GitHub 的公开 Release，并下载本 App 对应的 APK。应用不自动上传诊断信息。</string>
+WebDAV 仅连接你设置的服务器，上传由你选择创建的备份。密码在本机使用 Android Keystore 加密，登录凭据及 WebDAV 密码导出需要备份加密密码。更新检查访问 GitHub 的公开 Release，并下载本 App 对应的 APK。应用不自动上传诊断信息。</string>
   <string name="maintenance_privacy_policy_summary">瞭解資料與網路使用方式</string>
   <string name="maintenance_redownload_and_install">重新下載並覆蓋安裝</string>
   <string name="maintenance_release_history">更新歷程</string>
@@ -120,7 +120,7 @@ WebDAV 仅连接你设置的服务器，上传由你选择创建的备份。密�
   <string name="maintenance_webdav_device_name">裝置名稱</string>
   <string name="maintenance_webdav_device_name_summary">寫入備份檔名，用於區分不同裝置</string>
   <string name="maintenance_webdav_directory">子資料夾</string>
-  <string name="maintenance_webdav_directory_help">這裡填寫 WebDAV 伺服器位址下的**相對路徑**，例如 `backup/app`。\n\n不要填寫完整網址或開頭的斜線；條件允許時會自動建立目錄。</string>
+  <string name="maintenance_webdav_directory_help">這裡填寫 WebDAV 伺服器位址下的**相對路徑**，例如 `backup/app`。\n\n不要填寫完整網址或開頭的斜線。條件允許時會自動建立目錄。</string>
   <string name="maintenance_webdav_directory_summary">伺服器位址下的相對路徑，例如 backup/app</string>
   <string name="maintenance_webdav_endpoint">連線位置</string>
   <string name="maintenance_webdav_password">應用程式密碼</string>

@@ -20,15 +20,15 @@ This repository's `dev` branch contains the application and image build pipeline
 | Root module (`anland-awl`) | Native `waylandbridge`, SELinux setup, PulseAudio, boot service and appearance bridge | `anland-awl.zip`, standalone `waylandbridge` |
 | Linux RootFS | Selectable ARM64 distribution, Docker, Chinese locale, Anland session and optional full Xfce desktop | `anland-rootfs-<distribution>-arm64-<version>.tar.xz` |
 
-The two Apps share responsive Material UI, theme preferences and navigation. Linux windows have Android task identities resolved from desktop metadata and icons. Back sends an independent window to the background and retains its Recents card for resuming. Transient dialogs share their parent task; launch coordination activates existing windows and waits for new windows without restarting the Linux application.
+The two Apps share responsive Material UI, theme preferences and navigation. Independent Linux applications display their windows automatically, without a separate startup toggle. Reopening Linux Desktop activates the existing desktop session. Applications launched within the complete desktop stay inside that desktop. Linux windows have Android task identities resolved from desktop metadata and icons. Back sends an independent window to the background and retains its Recents card for resuming. Transient dialogs share their parent task; launch coordination activates existing windows and waits for new windows without restarting the Linux application.
 
 Wayland navigation has three tabs: **Windows**, **Configuration**, and **Settings**. Configuration groups window controls under **Tasks and startup**, **Display**, and **Input**. **Show container name on task cards** is off by default; enabling it appends the registered Droidspaces container name, for example `Google Chrome · HostDebian`, to Recents cards and window-list titles. Toggling refreshes existing live tasks and lists without relaunching Linux applications; tasks whose Android process was reclaimed update when restored. Unknown sources keep their original names. Container identification requires the matching Root module.
 
-The Windows page can show **All containers**, a specific registered Droidspaces container, or **Other sources**. Selecting a container only filters the list; display/input configuration and the Linux appearance policy are shared. **Close all windows** confirms the selected container scope and sends close requests to a snapshot of its windows, including entries hidden by text search. Newly opened windows and other containers are unaffected; applications can keep windows open for unsaved-document prompts. Shell launch coordination matches both container and application identity.
+The container selector beside Refresh in the top-right corner offers **All** and registered Droidspaces container names. Windows without an identified container appear only under **All**. Selecting a container only filters the window list; display/input configuration and the Linux appearance policy are shared. **Close all windows** confirms the selected container scope and sends close requests to a snapshot of its windows, including entries hidden by text search. Newly opened windows and other containers are unaffected; applications can keep windows open for unsaved-document prompts. Shell launch coordination matches both container and application identity.
 
-Independent X11 sessions use `sessions/p<PID-namespace>-u<UID>/wm.sock` under the shared runtime directory. The daemon routes each command to the window owner and verifies the socket peer; equal X11 serials in different containers do not identify the same window. Each container/user keeps its own D-Bus, Xwayland and desktop session state. Existing containers need the matching `anland-session/anland-session.sh` installed as their `anland-session` executable and a session restart to use the isolated path. Configuration and theme remain shared across containers.
+Independent X11 sessions use `sessions/p<PID-namespace>-u<UID>/wm.sock` under the shared runtime directory. The daemon routes each command to the window owner and verifies the socket peer; equal X11 serials in different containers do not identify the same window. Each container/user keeps its own D-Bus, Xwayland and desktop session state. Containers use the matching `anland-session/anland-session.sh` as their `anland-session` executable. The running Root module provides container identity and window activation. An incompatible module is reported before a container-scoped launch. Configuration and theme remain shared across containers.
 
-Android touch, keyboard and IME events are forwarded to Wayland. X11 applications use a patched Xwayland. The host supports SurfaceControl and EGL rendering, configurable window scaling, safe-area handling, and controls for automatic attachment and window lifecycle. GPU and touch behavior still require validation on the target device.
+Android touch, keyboard and IME events are forwarded to Wayland. X11 applications use a patched Xwayland. The host supports SurfaceControl and EGL rendering, window scaling, safe-area handling and window lifecycle settings. SurfaceControl submits compatible client GPU buffers directly for zero-copy presentation. Buffers requiring layout conversion use a GPU copy into platform-allocated buffers. Linux applications retain their native GPU rendering path. The Root module includes the SELinux permissions for SurfaceFlinger and the hardware composer to receive container buffers. GPU and touch compatibility depend on the device and driver.
 
 Shell provides a dedicated Credentials tab. A saved local or SSH login can be bound to a container user; application, desktop, shortcut and local-console launches validate that binding. SSH bindings require a trusted host key and a fresh proof that the session reaches the selected container and user. Container environment settings are available from the Containers page.
 
@@ -77,7 +77,11 @@ ls -l /dev/kgsl-3d0
 id
 ```
 
-`/run/anland` must be the shared host directory, not an ordinary empty directory. `wayland-0` and `pulse.sock` must be Unix sockets; The session-specific `wm.sock` appears when the independent-application session is running. Missing display sockets prevent the session from starting, missing audio sockets prevent Android audio output, and missing GPU access prevents the KGSL rendering path from working. Shell expects this mount to be configured; importing a RootFS or selecting a container in Shell does not create it.
+`/run/anland` must be the shared host directory, not an ordinary empty directory. `wayland-0` and `pulse.sock` must be Unix sockets. The session-specific `wm.sock` appears when the independent-application session is running. Missing display sockets prevent the session from starting, missing audio sockets prevent Android audio output, and missing GPU access prevents the KGSL rendering path from working. Shell expects this mount to be configured; importing a RootFS or selecting a container in Shell does not create it.
+
+## Browser networking
+
+Chrome's **Use secure DNS** setting can use Cloudflare/Google DNS-over-HTTPS independently of the container resolver and return different CDN addresses. When command-line HTTPS works but browser pages remain pending, compare the browser's DNS path. **Settings → Privacy and security → Security → Use secure DNS** can be switched off to follow the container resolver. This is a per-browser setting and does not change HTTPS certificate verification. RootFS images do not enforce a Chrome DNS policy.
 
 ## App backup and updates
 
@@ -85,7 +89,7 @@ Both Apps provide **Settings → Backup and restore** and **Settings → About �
 
 Shell backups contain its preferences and saved local/SSH connections. Exporting connection secrets or WebDAV credentials requires an archive encryption password; restored connections are encrypted again with the destination device's Android Keystore. Wayland backups contain local App preferences. Container files, the Root module, daemon configuration and command history are not included. WebDAV and encryption passwords are stored encrypted on the device; retain the archive password separately to restore on another device.
 
-The update source is the public `zhangyxXyz/anland` GitHub Releases API. Each App reads `build-manifest.json` from complete, published stable `v*` Releases and compares its own `SHELL_VERSION_CODE` or `WAYLAND_VERSION_CODE`, independently of `RELEASE_VERSION`. Shell selects only `anland-shell.apk`; Wayland selects only `anland-wayland.apk`. A Release containing only other components is skipped. Drafts, development Tags and prereleases are not offered as App updates.
+The update source is the public `zhangyxXyz/anland` GitHub Releases API. Each App reads `build-manifest.json`, or its component manifest when no unified manifest is present, from published stable `v*` Releases and compares its own `SHELL_VERSION_CODE` or `WAYLAND_VERSION_CODE`, independently of `RELEASE_VERSION`. Shell selects only `anland-shell.apk`; Wayland selects only `anland-wayland.apk`. A Release containing only other components is excluded from installable updates and remains visible in Release history. Public update checks require neither a GitHub App ID nor login. Drafts, development Tags and prereleases are not offered as App updates.
 
 Downloads are checked against the manifest's SHA256, package name, component version and installed signing certificate before opening Android's package installer. If install permission is needed, installation resumes after authorization. To distribute an update, increase the relevant App version name/code in `version.properties`, build the matching version Tag, verify the completed draft and publish it. Keep the manifests and original APK asset names. Creating a draft alone does not make an update available to users.
 
@@ -126,12 +130,12 @@ For manual runs, the dispatcher must also exist on GitHub's default branch; sele
 
 ```properties
 RELEASE_VERSION=0.5.3
-SHELL_VERSION_NAME=0.2.4
-SHELL_VERSION_CODE=6
-WAYLAND_VERSION_NAME=0.2.4
-WAYLAND_VERSION_CODE=6
-MODULE_VERSION_NAME=0.5.2
-MODULE_VERSION_CODE=7
+SHELL_VERSION_NAME=0.2.5
+SHELL_VERSION_CODE=7
+WAYLAND_VERSION_NAME=0.2.5
+WAYLAND_VERSION_CODE=7
+MODULE_VERSION_NAME=0.5.3
+MODULE_VERSION_CODE=8
 ROOTFS_VERSION=0.1.2
 ```
 
@@ -210,7 +214,7 @@ Native/module builds require a Linux host, JDK, Android SDK/NDK, CMake, Meson, N
 | `Fedora-44` | Fedora 44 | `fedora44` |
 | `Arch` | Arch Linux ARM (rolling) | `arch` |
 
-Each target includes Anland Next and the full Xfce desktop launcher. Ubuntu 24.04 and 25.10 are not selectable because the pinned upstream builder does not provide Anland Next for them. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.2.tar.xz`.
+Each listed target includes Anland Next and the full Xfce desktop launcher. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.2.tar.xz`.
 
 A separate Docker build stage derives from the selected runtime image and compiles Xfdesktop with the touch double-tap patch, Xwayland with GPU/input fixes and the current `anland-miniwm`. Xserver uses the repository's pinned submodule. The final stage installs the compiled Xfdesktop files, `/usr/lib/anland/Xwayland`, the session and miniwm, then verifies the distribution, session package version, AArch64 executables, shared-library dependencies and file hashes. Build dependencies remain in the disposable stage. The exported archive is checked against the recorded executable hashes before upload.
 
@@ -232,8 +236,6 @@ Opening or focusing a Linux window preserves the active theme controller. Unchan
 
 Linux sessions follow the effective theme of the most recently foregrounded Anland Shell or Wayland App. Selecting **System** keeps following Android, including automatic day/night changes while the Apps are in the background; selecting **Light** or **Dark** keeps that preference until it is changed. The full desktop and standalone applications share this session preference. Applications with their own explicit theme retain it; live switching depends on the application's support for GTK/XSettings or the Settings portal. Supported browser pages receive their browser's `prefers-color-scheme` changes.
 
-Shell provides a signature-protected appearance bridge for both Apps, so Wayland does not need an additional root grant. The runtime mount carries `appearance/app-theme` (active App and theme policy) and `appearance/night-mode` (Android system state). Containers need the updated Anland session/appearance scripts, `xfce4-settings`, `gsettings-desktop-schemas`, `xdg-desktop-portal` and `xdg-desktop-portal-gtk`; installing only the APKs does not add those Linux components. Packaged RootFS images include them.
-
-Both Apps check public Releases in `zhangyxXyz/anland` using their independent component versions and matching APKs. The updater validates the unified build manifest or a component manifest, APK size/hash, package, version and signing certificate. Releases without an installable component remain visible in update history. Public update checks do not require a GitHub App ID or login.
+Shell provides a signature-protected appearance bridge for both Apps, so Wayland does not need an additional root grant. The runtime mount carries `appearance/app-theme` (active App and theme policy) and `appearance/night-mode` (Android system state). Containers need the matching Anland session/appearance scripts, `xfce4-settings`, `gsettings-desktop-schemas`, `xdg-desktop-portal` and `xdg-desktop-portal-gtk`; installing only the APKs does not add those Linux components. Packaged RootFS images include them.
 
 **Project information** loads the repository README in the App's selected language, falling back to the available Chinese or default English document. **Open-source license** loads the repository's license directly. Both use the in-app document viewer; retry by tapping the entry again after a network error. Component and dependency licenses remain applicable.

@@ -1,5 +1,5 @@
 <resources>
-    <string name="ssh_launch_help">Verify SSH credentials before launching local apps. Enable to choose a container; the server must be that container.</string>
+    <string name="ssh_launch_help">Verify SSH credentials before launching local apps. Enable to choose a container. The server must be that container.</string>
     <string name="ssh_launch_bound_help">Launch verification for %1$s · %2$s. When enabled, every launch verifies the SSH host, container identity and saved credentials.</string>
     <string name="ssh_launch_bind_title">Use SSH for launch verification</string>
     <string name="ssh_launch_bind_help">Choose the container for this connection. Once verification succeeds, apps launch as %1$s. If the host, account or credentials cannot be verified, launch stops.</string>

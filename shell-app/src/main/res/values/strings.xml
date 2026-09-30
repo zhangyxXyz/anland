@@ -27,7 +27,7 @@
     <string name="env_btn">ENV</string>
     <string name="env_editor_title_fmt">Launch environment — %1$s</string>
     <string name="env_defaults_fmt">Built-in: %1$s</string>
-    <string name="env_editor_hint">One KEY=VALUE per line, overlaid on the built-ins; empty value removes the built-in; # comments</string>
+    <string name="env_editor_hint">One KEY=VALUE per line to override a built-in variable. Leave the value empty to remove it. Lines starting with # are comments.</string>
     <string name="env_save">Save</string>
     <string name="env_clear">Clear</string>
     <string name="env_saved">saved</string>
@@ -81,7 +81,7 @@
     <string name="credential_import_key">Import private key file</string>
     <string name="credential_passphrase">Key passphrase (optional)</string>
     <string name="credential_storage_help">Credentials are encrypted with Android Keystore and excluded from backup. Uninstalling the app removes saved connections.</string>
-    <string name="credential_local_help">Choose a container and enter its Linux account password. Each login checks the password and account status using PAM; failed authentication stops the login.</string>
+    <string name="credential_local_help">Choose a container and enter its Linux account password. Each login checks the password and account status using PAM. Failed authentication stops the login.</string>
     <string name="credential_ssh_help">Log in to the server command console with a password or private key. Verify its host fingerprint on the first connection.</string>
     <string name="credential_default">Used for local app launches</string>
     <string name="credential_launch_help">Saved credentials are enabled for this container. New app and console launches verify the password. Selecting a plain username below returns to root-authorized switching.</string>

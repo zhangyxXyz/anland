@@ -16,7 +16,7 @@ internal class SecretPreferences(context: Context, private val alias: String) {
     @Synchronized private fun key(create: Boolean): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias,null) as? SecretKey)?.let { return it }
-        check(create) { "Backup credential key is unavailable; reconfigure WebDAV" }
+        check(create) { "Backup credential key is unavailable. Reconfigure WebDAV" }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,"AndroidKeyStore").apply {
             init(KeyGenParameterSpec.Builder(alias,KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setKeySize(256).setBlockModes(KeyProperties.BLOCK_MODE_GCM)

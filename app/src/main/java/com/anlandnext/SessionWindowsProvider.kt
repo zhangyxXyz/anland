@@ -7,13 +7,13 @@ import android.net.Uri
 import android.os.Bundle
 import com.anlandnext.awl.Awl
 
-/** Read-only launch preflight. Observe the daemon, never infer mode from a preference. */
+/** Launch preflight. Observe the daemon and migrate automatic window display if needed. */
 class SessionWindowsProvider : ContentProvider() {
     override fun onCreate() = true
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
         check(callingPackage == "com.anland.shell" || callingPackage == "com.anlandnext")
         require(method == "windows")
-        return readSessionWindows(arg)
+        return readSessionWindows(arg,requireNotNull(context))
     }
     override fun query(u: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor? = null
     override fun getType(u: Uri): String? = null
@@ -23,12 +23,14 @@ class SessionWindowsProvider : ContentProvider() {
 }
 
 /** Shared by the warm provider path and the user-initiated cold-start handoff. */
-internal fun readSessionWindows(container:String?=null): Bundle {
+internal fun readSessionWindows(container:String?,context:android.content.Context): Bundle {
+    if(!container.isNullOrBlank() && !Awl.supportsContainerSelection())
+        error(context.getString(R.string.container_module_update_needed))
     val windows = (Awl.getWindows() ?: error("Anland daemon unavailable")).filter { container.isNullOrBlank() || Awl.containerName(it.id)==container }
     return Bundle().apply {
         putString("container",container)
         putInt("independent", windows.count { Awl.applicationId(it.id) != "org.freedesktop.Xwayland" })
         putLongArray("window_ids", windows.map { it.id }.toLongArray())
-        putBoolean("auto_attach", WlBinder.configGet("auto_attach") == 1)
+        putBoolean("auto_attach", WlBinder.ensureAutoAttach())
     }
 }

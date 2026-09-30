@@ -45,7 +45,7 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
         is ReleaseListResult.Success -> result.releases.filter { it.apk != null }
             .maxWithOrNull(compareBy<AppRelease> { it.versionCode }.thenBy { it.publishedAt })
             ?.let(ReleaseResult::Success) ?: if (result.releases.isEmpty()) ReleaseResult.NoRelease
-            else ReleaseResult.Failure("Published releases do not contain a verified ${config.component} APK and version manifest; open GitHub Releases")
+            else ReleaseResult.Failure("Published releases do not contain a verified ${config.component} APK and version manifest. Open GitHub Releases")
         ReleaseListResult.AuthorizationRequired -> ReleaseResult.AuthorizationRequired
         is ReleaseListResult.Failure -> ReleaseResult.Failure(result.message)
     }
@@ -75,7 +75,7 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
                 }
                 if (array.length() < 100) return@withContext ReleaseListResult.Success(releases.sortedWith(compareByDescending<AppRelease> { it.versionCode }.thenByDescending { it.publishedAt }))
             }
-            ReleaseListResult.Failure("Release history is too large; open GitHub Releases to inspect it")
+            ReleaseListResult.Failure("Release history is too large. Open GitHub Releases to inspect it")
         } catch (e: CancellationException) { throw e }
           catch (e: Exception) { ReleaseListResult.Failure(e.message ?: "Update check failed") }
     }
@@ -139,7 +139,7 @@ class UpdateClient(context: Context, private val http: OkHttpClient = OkHttpClie
 }
 
 private class GitHubHttpException(val code: Int) : java.io.IOException(
-    if (code == 403 || code == 429) "GitHub rate limit or access restriction; try later" else "GitHub HTTP $code")
+    if (code == 403 || code == 429) "GitHub rate limit or access restriction. Try later" else "GitHub HTTP $code")
 
 internal fun readmeCandidates(languageTag: String): List<String> {
     val normalized = java.util.Locale.forLanguageTag(languageTag.replace('_', '-')).toLanguageTag()

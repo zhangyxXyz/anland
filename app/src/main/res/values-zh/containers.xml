@@ -1,8 +1,8 @@
 <resources>
-    <string name="containers_all">全部容器</string>
-    <string name="containers_unknown">其他来源</string>
+    <string name="container_module_update_needed">当前运行的 Root 模块不支持窗口容器识别。请启用更新后的模块，再进入桌面。</string>
+    <string name="containers_all">全部</string>
     <string name="windows_close_all">关闭全部窗口</string>
-    <string name="containers_scope_help">仅显示所选容器的窗口；配置与主题由所有容器共用。</string>
+    <string name="containers_scope_help">仅显示所选容器的窗口。配置与主题由所有容器共用。</string>
     <string name="windows_close_all_confirm">关闭“%1$s”中的全部 %2$d 个窗口？应用可能需要确认保存内容，本次不会关闭随后新开的窗口。</string>
     <string name="config_shared_help">以下配置对所有容器生效。切换窗口列表的容器不会改变配置或主题。</string>
 </resources>

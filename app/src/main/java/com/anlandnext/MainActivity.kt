@@ -45,7 +45,12 @@ private data class WindowSnapshot(val windows:List<Awl.WlWindow>?,val config:Map
 
 class WindowState(app:Application) : AndroidViewModel(app) {
     private val prefs=app.getSharedPreferences("awl",Context.MODE_PRIVATE)
-    var scope by mutableStateOf(prefs.getString("window_scope",WindowScope.ALL)?:WindowScope.ALL); private set
+    var scope by mutableStateOf(prefs.getString("window_scope",WindowScope.ALL).let {
+        if(it==null || it==WindowScope.UNKNOWN) {
+            prefs.edit().putString("window_scope",WindowScope.ALL).apply()
+            WindowScope.ALL
+        } else it
+    }); private set
     var containers by mutableStateOf<List<String>>(emptyList()); private set
     var windows by mutableStateOf<List<Awl.WlWindow>>(emptyList()); private set
     var containerNames by mutableStateOf<Map<Long,String?>>(emptyMap()); private set
@@ -57,10 +62,11 @@ class WindowState(app:Application) : AndroidViewModel(app) {
     var closeWaiting by mutableStateOf(false)
     var closing by mutableStateOf<Set<Long>>(emptySet()); private set
     private val gate=Mutex()
-    private val keys=listOf("auto_attach","zoom","scale_mode","xwayland_scale","init_w","init_h","sc_enabled","hide_decorations")
+    private val keys=listOf("zoom","scale_mode","xwayland_scale","init_w","init_h","sc_enabled","hide_decorations")
     fun refresh() { viewModelScope.launch { gate.withLock {
             val snapshot=withContext(Dispatchers.IO) {
                 val windows=Awl.getWindows()
+                if(windows!=null) WlBinder.ensureAutoAttach()
                 WindowSnapshot(windows, keys.associateWith { WlBinder.configGet(it) },
                     windows.orEmpty().associate { it.id to Awl.containerName(it.id) },Awl.containers())
             }
@@ -159,7 +165,10 @@ open class MainActivity : AppCompatActivity() {
                 Destination(getString(R.string.windows_title),Icons.Outlined.Window),
                 Destination(getString(R.string.window_config),Icons.Outlined.Tune),
                 Destination(getString(R.string.app_settings),Icons.Outlined.Settings)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
-                actions={IconButton(onClick=state::refresh){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}}) { tab, _ ->
+                actions={
+                    ContainerSelector(state)
+                    IconButton(onClick=state::refresh){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}
+                }) { tab, _ ->
                 when {
                     tab==0 -> WindowsPage(state)
                     tab==1 -> WindowSettings(state)
@@ -180,9 +189,27 @@ open class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-internal fun AutoLaunch(state:WindowState) {
-    SettingItem(stringResource(R.string.auto_attach),description=stringResource(R.string.auto_attach_tip),icon=Icons.AutoMirrored.Outlined.OpenInNew,descriptionMaxLines=5,enabled=state.connected,
-        trailingContent={Switch(state.config["auto_attach"]==1,{state.set("auto_attach",if(it)1 else 0)},enabled=state.connected && !state.writing)})
+private fun scopeLabel(scope:String):String =
+    if(scope==WindowScope.ALL) stringResource(R.string.containers_all) else scope.removePrefix("container:")
+
+@Composable
+private fun ContainerSelector(state:WindowState) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick={expanded=true}) {
+            Text(scopeLabel(state.scope),maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=160.dp))
+            Icon(Icons.Outlined.ExpandMore,null)
+        }
+        DropdownMenu(expanded,{expanded=false}) {
+            val choices=listOf(WindowScope.ALL to stringResource(R.string.containers_all))+
+                state.containers.map{WindowScope.container(it) to it}
+            choices.forEach { (scope,name) ->
+                DropdownMenuItem(text={Text(name)},
+                    trailingIcon={if(scope==state.scope)Icon(Icons.Outlined.Check,null)},
+                    onClick={state.select(scope);expanded=false})
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class,ExperimentalLayoutApi::class)
@@ -198,47 +225,25 @@ private fun WindowsPage(state:WindowState) {
     var search by rememberSaveable { mutableStateOf("") }
     var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
     var info by remember { mutableStateOf<Awl.WlWindow?>(null) }
-    var containerMenu by remember { mutableStateOf(false) }
     var closeBatch by remember { mutableStateOf<Triple<String,String,Set<Long>>?>(null) }
-    val scopeLabel=when(state.scope) {
-        WindowScope.ALL -> stringResource(R.string.containers_all)
-        WindowScope.UNKNOWN -> stringResource(R.string.containers_unknown)
-        else -> state.scope.removePrefix("container:")
-    }
+    val scopeLabel=scopeLabel(state.scope)
     val scoped=state.windows.filter{WindowScope.matches(state.scope,state.containerNames[it.id])}
     val filtered=scoped.filter{search.isBlank() || label(it).contains(search,true)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)) {
             Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Box {
-                        FilledTonalButton(onClick={containerMenu=true}) {
-                            Icon(Icons.Outlined.Storage,null);Spacer(Modifier.width(8.dp))
-                            Text(scopeLabel,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=240.dp))
-                            Icon(Icons.Outlined.ExpandMore,null)
-                        }
-                        DropdownMenu(containerMenu,{containerMenu=false}) {
-                            val choices=listOf(WindowScope.ALL to stringResource(R.string.containers_all))+
-                                state.containers.map{WindowScope.container(it) to it}+
-                                listOf(WindowScope.UNKNOWN to stringResource(R.string.containers_unknown))
-                            choices.forEach { (scope,name) ->
-                                DropdownMenuItem(text={Text(name)},
-                                    trailingIcon={if(scope==state.scope)Icon(Icons.Outlined.Check,null)},
-                                    onClick={state.select(scope);containerMenu=false})
-                            }
-                        }
-                    }
+                FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Text(if(state.connected)stringResource(R.string.status_window_count,scoped.size)else stringResource(R.string.status_daemon_unreachable),
+                        modifier=Modifier.align(Alignment.CenterVertically).padding(end=16.dp),style=MaterialTheme.typography.titleLarge)
                     OutlinedButton(onClick={closeBatch=Triple(state.scope,scopeLabel,scoped.map{it.id}.toSet())},
                         enabled=state.connected && scoped.isNotEmpty() && state.closing.isEmpty(),
                         colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
                         Icon(Icons.Outlined.Close,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.windows_close_all))
                     }
                 }
-                Text(if(state.connected)stringResource(R.string.status_window_count,scoped.size)else stringResource(R.string.status_daemon_unreachable),style=MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.containers_scope_help),style=MaterialTheme.typography.bodySmall)
             }
         }
-        SettingGroup("") { AutoLaunch(state) }
         WorkspaceSearch(search,{search=it},stringResource(R.string.design_search_windows),Modifier.fillMaxWidth())
         if(state.connected && filtered.isEmpty())EmptyWorkspace(stringResource(if(search.isEmpty())R.string.status_empty else R.string.design_no_results),Icons.Outlined.Window)
         LazyVerticalGrid(GridCells.Adaptive(340.dp),Modifier.weight(1f),contentPadding=PaddingValues(bottom=20.dp),verticalArrangement=Arrangement.spacedBy(14.dp),horizontalArrangement=Arrangement.spacedBy(14.dp)) {
