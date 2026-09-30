@@ -1,0 +1,8 @@
+<resources>
+    <string name="containers_all">全部容器</string>
+    <string name="containers_unknown">其他來源</string>
+    <string name="windows_close_all">關閉全部視窗</string>
+    <string name="containers_scope_help">僅顯示所選容器的視窗；配置與主題由所有容器共用。</string>
+    <string name="windows_close_all_confirm">關閉「%1$s」中的全部 %2$d 個視窗？應用程式可能需要確認儲存內容，本次不會關閉隨後新開啟的視窗。</string>
+    <string name="config_shared_help">以下配置對所有容器生效。切換視窗清單的容器不會改變配置或主題。</string>
+</resources>

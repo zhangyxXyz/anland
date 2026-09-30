@@ -18,6 +18,10 @@ RT=$(sed -n 's/.*"runtime_dir": *"\([^"]*\)".*/\1/p' "$MODDIR/config.json" 2>/de
 case "$RT" in /*) ;; *) RT=/data/local/tmp/awl ;; esac
 
 start_daemon() {
+  # Sessions share display/audio but have separate X11 control sockets.
+  mkdir -p "$RT/sessions"
+  chown 0:0 "$RT/sessions"
+  chmod 1777 "$RT/sessions"
   chmod 755 "$MODDIR/waylandbridge" 2>/dev/null
   # custom SELinux domain: relabel → exec transitions into awl_daemon
   # (module sepolicy.rule is applied by ksud before service stage)

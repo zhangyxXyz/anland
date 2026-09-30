@@ -43,6 +43,7 @@ class OpenWindowActivity : AppCompatActivity() {
             .filter { it.isNotBlank() }.map { it.removeSuffix(".desktop") }
         // The privileged daemon supplies an exact ID, before any document task
         // exists. Both automatic and explicit launches now preload identity.
+        val container = intent.getStringExtra("container")?.takeIf { it.isNotBlank() }
         val exactId = intent.getLongExtra("id", -1)
         if (targets.isEmpty() && exactId < 0) { finish(); return }
         // An absent snapshot means a legacy caller: it still uses explicit activation.
@@ -82,6 +83,7 @@ class OpenWindowActivity : AppCompatActivity() {
                     matches = withContext(Dispatchers.IO) {
                         Awl.getWindows().orEmpty().filter { w ->
                             if (exactId >= 0) return@filter w.id == exactId
+                            if (container != null && Awl.containerName(w.id) != container) return@filter false
                             val id = Awl.applicationId(w.id)?.removeSuffix(".desktop")
                             id != null && targets.any { it.equals(id, ignoreCase = true) }
                         }

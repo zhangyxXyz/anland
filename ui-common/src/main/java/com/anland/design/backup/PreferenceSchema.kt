@@ -15,6 +15,7 @@ internal object PreferenceSchema {
                 else -> false
             }
             "awl" -> when(key) {
+                "window_scope" -> value is String && (value in setOf("all","unknown") || value.startsWith("container:"))
                 "ime_mode" -> value is Int && value in 0..1
                 "close_on_task_removed", "show_container_name" -> value is Boolean
                 else -> false

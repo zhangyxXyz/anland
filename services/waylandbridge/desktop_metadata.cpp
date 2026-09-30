@@ -231,6 +231,50 @@ std::string window_container_name(pid_t pid, const std::string& proc_dir, const 
     return ambiguous ? std::string{} : match;
 }
 
+std::vector<std::string> registered_containers(const std::string& containers_dir, const std::string& pids_dir) {
+    std::vector<std::string> names;
+    for (const auto& path : {containers_dir, pids_dir}) {
+        DIR* dir = opendir(path.c_str());
+        if (!dir) continue;
+        size_t count = 0;
+        while (auto entry = readdir(dir)) {
+            if (++count > 512) break;
+            std::string name = entry->d_name;
+            if (name == "." || name == "..") continue;
+            if (path == pids_dir) {
+                if (name.size() <= 4 || name.substr(name.size()-4) != ".pid") continue;
+                name.resize(name.size()-4);
+            } else {
+                struct stat info{};
+                if (stat((path + "/" + name + "/container.config").c_str(), &info) || !S_ISREG(info.st_mode)) continue;
+            }
+            if (name.size() > 128 || std::any_of(name.begin(), name.end(), [](unsigned char c) { return c < 32 || c == 127; })) continue;
+            names.push_back(name);
+        }
+        closedir(dir);
+    }
+    std::sort(names.begin(), names.end());
+    names.erase(std::unique(names.begin(), names.end()), names.end());
+    return names;
+}
+
+std::string window_session_key(pid_t pid, const std::string& proc_dir) {
+    if (pid <= 0) return {};
+    const auto path = proc_dir + "/" + std::to_string(pid);
+    struct stat ns{}, process{};
+    if (stat((path + "/ns/pid").c_str(), &ns) || stat(path.c_str(), &process)) return {};
+    return "p" + std::to_string(ns.st_ino) + "-u" + std::to_string(process.st_uid);
+}
+
+bool same_window_session(pid_t client, pid_t peer, const std::string& proc_dir) {
+    auto key = window_session_key(client, proc_dir);
+    if (key.empty() || key != window_session_key(peer, proc_dir)) return false;
+    struct stat a{}, b{};
+    return !stat((proc_dir + "/" + std::to_string(client) + "/root").c_str(), &a) &&
+           !stat((proc_dir + "/" + std::to_string(peer) + "/root").c_str(), &b) &&
+           a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
 DesktopMetadata desktop_metadata(pid_t pid, const std::string& app_id, const std::string& locale) {
     if (pid <= 0) return {};
     std::string proc = "/proc/" + std::to_string(pid);

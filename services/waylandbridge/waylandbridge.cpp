@@ -174,6 +174,7 @@ enum {
     AWL_T_ICON    = 15,  /* (id:i64) → w:i32 h:i32 bytes[RGBA] — current toplevel icon
                             (xdg-toplevel-icon-v1, best buffer, w=0 = none) */
     AWL_T_APP_ID = 19,   /* (id:i64 locale:string16) → app_id,name,encoded icon; window-scoped */
+    AWL_T_CONTAINERS = 21, /* host-only registered container names */
     AWL_T_PRESENTATION = 20, /* (id:i64) -> parent:i64 width,height,dialog:i32 */
     AWL_T_SUBSCRIBE = 16, /* (listener binder) → ok:i32; window lifecycle events
                             * (create/destroy/attach/detach) pushed to the listener
@@ -717,40 +718,36 @@ static void attach_activity(uint64_t id, const char* title) {
 
 /* ---------------- wayland logic-layer callbacks (wayland event thread) ---------------- */
 
-/* ---- mini-wm control channel (X-side operations on Xwayland windows, #32) ----
- * The in-container mini-wm listens on <runtime_dir>/anland-wm.sock — the
- * dir that also holds wayland-0 (config "runtime_dir", default
- * /data/local/tmp/awl; droidspaces bind-mounts it at /run/anland inside the
- * container, which is the ANLAND_RUNTIME_DIR convention there). It
- * used to sit one level up in /data/local/tmp, which is 0771 shell: a
- * NON-root user service in the container (anland-session/setupanlandx.sh) cannot bind
- * there, while the awl dir is 0777 by design. One connection per command,
- * line-text protocol:
- *   S <serial> <w> <h>   resize the X window (serial = WL_SURFACE_SERIAL pairing value)
- *   C <serial>           request close (WM_DELETE_WINDOW, or XKillClient if unsupported)
- * With no mini-wm (pure wayland client scenario) the connect fails —
- * skip silently, warn only once. */
-static const char* cfg_runtime_dir(void);   /* defined with the config block (g_sock_dir) */
-static void xwm_send_cmd(const char* cmd, size_t len) {
-    static std::atomic<time_t> warned{0};   /* reachable from multiple binder threads */
-    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) return;
-    struct sockaddr_un sa = {};
-    sa.sun_family = AF_UNIX;
-    snprintf(sa.sun_path, sizeof(sa.sun_path), "%s/anland-wm.sock", cfg_runtime_dir());
-    if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
-        time_t now = time(NULL);
-        time_t last = warned.load(std::memory_order_relaxed);
-        if (now - last > 60) {   /* no Xwayland session is the norm; don't spam */
-            warned.store(now, std::memory_order_relaxed);
-            LOGI("mini-wm channel %s unreachable (%s) — Xwayland window resize/close skipped",
-                 sa.sun_path, strerror(errno));
+/* Each container/user session owns its control socket. Verify peer identity
+ * even on the legacy path: a stale shared socket must never control another
+ * container's X server, where surface serials may have the same values. */
+static const char* cfg_runtime_dir(void);
+static void xwm_send_cmd(uint64_t id, const char* cmd, size_t len) {
+    pid_t client = awl_window_client_pid(id);
+    auto key = window_session_key(client);
+    if (key.empty()) return;
+    const std::string runtime = cfg_runtime_dir();
+    for (const auto& path : {runtime + "/sessions/" + key + "/wm.sock", runtime + "/anland-wm.sock"}) {
+        struct sockaddr_un sa = {};
+        if (path.size() >= sizeof(sa.sun_path)) continue;
+        int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+        if (fd < 0) return;
+        sa.sun_family = AF_UNIX;
+        memcpy(sa.sun_path, path.c_str(), path.size()+1);
+        if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) == 0) {
+            struct ucred peer{};
+            socklen_t size = sizeof(peer);
+            if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &size) == 0 &&
+                    same_window_session(client, peer.pid)) {
+                if (send(fd, cmd, len, MSG_NOSIGNAL) != (ssize_t)len)
+                    LOGE("mini-wm command failed for window %llu", (unsigned long long)id);
+                close(fd);
+                return;
+            }
+            LOGE("mini-wm peer does not own window %llu; command rejected", (unsigned long long)id);
         }
         close(fd);
-        return;
     }
-    if (write(fd, cmd, len) < 0) LOGE("xwm cmd write: %s", strerror(errno));
-    close(fd);
 }
 /* Xwayland window: Android window size change → resize its X window. X11
  * clients do not consume fractional-scale-v1, so when enabled they receive
@@ -778,14 +775,14 @@ static void xwm_resize_window(uint64_t id, int32_t w, int32_t h) {
     char cmd[96];
     int n = snprintf(cmd, sizeof(cmd), "S %llu %d %d\n",
                      (unsigned long long)serial, xw, xh);
-    xwm_send_cmd(cmd, (size_t)n);
+    xwm_send_cmd(id, cmd, (size_t)n);
 }
 static void xwm_close_window(uint64_t id) {
     uint64_t serial = 0;
     if (!awl_xwayland_window_serial(id, &serial)) return;
     char cmd[48];
     int n = snprintf(cmd, sizeof(cmd), "C %llu\n", (unsigned long long)serial);
-    xwm_send_cmd(cmd, (size_t)n);
+    xwm_send_cmd(id, cmd, (size_t)n);
 }
 /* Xwayland window about to receive input: mirror the Android side onto the X
  * stacking order. All X toplevels sit at (0,0) in one X screen (mini-wm pins
@@ -797,17 +794,17 @@ static void xwm_close_window(uint64_t id) {
  * propagateWindows). 'R' = raise only (pointer enter / touch down — hover
  * must not move X keyboard focus, keys still come from the focused
  * Activity), 'F' = raise + XSetInputFocus (Android window focus). Deduped
- * on the last raised serial so a touch storm costs one connect. */
+ * on the last raised window ID (serials can repeat across X servers). */
 static std::atomic<uint64_t> g_xwm_top{0};
 static void xwm_activate_window(uint64_t id, bool focus) {
     uint64_t serial = 0;
     if (!awl_xwayland_window_serial(id, &serial)) return;
-    if (!focus && g_xwm_top.load(std::memory_order_relaxed) == serial) return;
-    g_xwm_top.store(serial, std::memory_order_relaxed);
+    if (!focus && g_xwm_top.load(std::memory_order_relaxed) == id) return;
+    g_xwm_top.store(id, std::memory_order_relaxed);
     char cmd[48];
     int n = snprintf(cmd, sizeof(cmd), "%c %llu\n", focus ? 'F' : 'R',
                      (unsigned long long)serial);
-    xwm_send_cmd(cmd, (size_t)n);
+    xwm_send_cmd(id, cmd, (size_t)n);
 }
 
 /* config.json "auto_attach" (default false; see the daemon config section):
@@ -1809,6 +1806,12 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         AParcel_writeInt32(out, p.width);
         AParcel_writeInt32(out, p.height);
         AParcel_writeInt32(out, p.dialog);
+        return STATUS_OK;
+    }
+    case AWL_T_CONTAINERS: {
+        const auto names = registered_containers();
+        AParcel_writeInt32(out, (int32_t)names.size());
+        for (const auto& name : names) AParcel_writeString(out, name.c_str(), (int32_t)name.size());
         return STATUS_OK;
     }
     case AWL_T_APP_ID: {

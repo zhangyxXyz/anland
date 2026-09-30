@@ -65,6 +65,7 @@ internal fun WindowSettings(state:WindowState) {
     var closeOnSwipe by remember { mutableStateOf(prefs.getBoolean(WindowTaskService.PREF,false)) }
     val showContainer=rememberShowContainerName()
     Page {
+        Text(stringResource(R.string.config_shared_help),style=MaterialTheme.typography.bodyMedium)
         if(!state.connected) Text(stringResource(R.string.status_daemon_unreachable),color=MaterialTheme.colorScheme.error)
         SettingGroup(stringResource(R.string.config_tasks)) {
             AutoLaunch(state)

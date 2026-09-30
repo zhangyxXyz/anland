@@ -84,7 +84,8 @@ jobs:
             app/libawl/src/main/java/com/anlandnext/awl/WindowSafeArea.java tests/WindowSafeAreaTest.java
           java -cp /tmp/anland-java-tests com.anlandnext.awl.WindowSafeAreaTest
           javac -d /tmp/anland-java-tests \
-            app/libawl/src/main/java/com/anlandnext/awl/TaskIdentity.java tests/TaskIdentityTest.java
+            app/libawl/src/main/java/com/anlandnext/awl/TaskIdentity.java \
+            app/libawl/src/main/java/com/anlandnext/awl/WindowScope.java tests/TaskIdentityTest.java
           java -cp /tmp/anland-java-tests com.anlandnext.awl.TaskIdentityTest
           g++ -std=c++17 -Wall -Wextra -Werror -I services/waylandbridge \
             services/waylandbridge/desktop_metadata.cpp tests/desktop_metadata_test.cpp \

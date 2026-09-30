@@ -15,7 +15,7 @@
 #      clients do `export DISPLAY=$(cat ~/.anlandx)`
 #   5. mini-wm runs on it (rootless Xwayland surfaces windows only with a
 #      WM that redirects them; it also serves the daemon's resize/close
-#      channel on $ANLAND_RUNTIME_DIR/anland-wm.sock)
+#      channel on $ANLAND_RUNTIME_DIR/sessions/<namespace-user>/wm.sock)
 #   6. the app-facing environment is published TWICE: as KEY=VALUE lines in
 #      ~/.anlandx-env, and as the systemd user session environment
 #      (systemctl --user set-environment) so that apps launched via
@@ -32,7 +32,7 @@
 #                        finds the socket under its own runtime_dir
 #   WAYLAND_DISPLAY      socket name in it (default wayland-0; the app-facing
 #                        name via the link is always wayland-anland)
-#   ANLAND_WM_SOCK       mini-wm control socket (default <runtime dir>/anland-wm.sock)
+# The mini-wm control path is derived from namespace/user identity, not overridden.
 #   ANLAND_XWAYLAND_ARGS extra Xwayland arguments
 #   ANLAND_MINIWM        mini-wm binary (default: anland-miniwm next to this script)
 set -u
@@ -47,6 +47,11 @@ if [ ! -d "$RT" ]; then
     echo "anland-session: no user runtime dir $RT — log in once, or: sudo loginctl enable-linger $USER" >&2
     exit 1
 fi
+
+# One independent session per user inside each container. A duplicate start
+# must not replace the running session's socket, environment or cleanup files.
+exec 7>"$RT/anland-session.lock"
+flock -n 7 || { echo 'anland-session: already running' >&2; exit 0; }
 
 # ---- session D-Bus: system user bus when present, else dbus-launch one at
 # the same path (fixed address, so apps find it via $XDG_RUNTIME_DIR/bus)
@@ -117,7 +122,13 @@ export FD_FORCE_KGSL="${FD_FORCE_KGSL:-1}"
 # session (Xwayland included) and the apps share one environment
 ln -sfn "$ANLAND_RUNTIME_DIR/$WAYLAND_DISPLAY" "$WL_LINK"
 export WAYLAND_DISPLAY=wayland-anland
-export ANLAND_WM_SOCK="${ANLAND_WM_SOCK:-$ANLAND_RUNTIME_DIR/anland-wm.sock}"
+# PID namespace + desktop uid distinguishes equal user IDs in different containers.
+# The host resolves the same key from Xwayland's authenticated socket credentials.
+SESSION_KEY="p$(stat -Lc %i /proc/self/ns/pid)-u$(id -u)"
+SESSION_DIR="$ANLAND_RUNTIME_DIR/sessions/$SESSION_KEY"
+mkdir -p "$SESSION_DIR" || exit 1
+chmod 700 "$SESSION_DIR" || exit 1
+export ANLAND_WM_SOCK="$SESSION_DIR/wm.sock"
 printf 'XDG_RUNTIME_DIR=%s\nWAYLAND_DISPLAY=%s\nDBUS_SESSION_BUS_ADDRESS=%s\n' \
        "$RT" "$WAYLAND_DISPLAY" "${DBUS_SESSION_BUS_ADDRESS:-unix:path=$RT/bus}" > "$ENVF"
 # app PATH: ~/.local/bin first. Login shells have it (~/.profile); the systemd

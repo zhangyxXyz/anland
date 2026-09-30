@@ -13,7 +13,7 @@ class SessionWindowsProvider : ContentProvider() {
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
         check(callingPackage == "com.anland.shell" || callingPackage == "com.anlandnext")
         require(method == "windows")
-        return readSessionWindows()
+        return readSessionWindows(arg)
     }
     override fun query(u: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor? = null
     override fun getType(u: Uri): String? = null
@@ -23,9 +23,10 @@ class SessionWindowsProvider : ContentProvider() {
 }
 
 /** Shared by the warm provider path and the user-initiated cold-start handoff. */
-internal fun readSessionWindows(): Bundle {
-    val windows = Awl.getWindows() ?: error("Anland daemon unavailable")
+internal fun readSessionWindows(container:String?=null): Bundle {
+    val windows = (Awl.getWindows() ?: error("Anland daemon unavailable")).filter { container.isNullOrBlank() || Awl.containerName(it.id)==container }
     return Bundle().apply {
+        putString("container",container)
         putInt("independent", windows.count { Awl.applicationId(it.id) != "org.freedesktop.Xwayland" })
         putLongArray("window_ids", windows.map { it.id }.toLongArray())
         putBoolean("auto_attach", WlBinder.configGet("auto_attach") == 1)

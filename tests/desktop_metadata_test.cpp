@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "desktop_metadata.hpp"
 #include <cassert>
 #include <cstdlib>
@@ -94,10 +95,23 @@ int main(int argc, char** argv) {
     put(pids / "Duplicate.pid", "100");
     assert(window_container_name(101, proc, pids).empty());
     fs::remove(pids / "Duplicate.pid");
+    assert(window_session_key(100, proc) == window_session_key(101, proc));
+    assert(window_session_key(100, proc) != window_session_key(200, proc));
+    assert(window_session_key(999, proc).empty());
+    assert(same_window_session(100, 101, proc));
+    assert(!same_window_session(100, 200, proc));
+    assert(!same_window_session(100, 999, proc));
+    auto containers = root / "containers";
+    put(containers / "StoppedUbuntu/container.config", "name=StoppedUbuntu");
+    put(containers / "HostDebian/container.config", "name=HostDebian");
+    auto catalog = registered_containers(containers, pids);
+    assert(std::count(catalog.begin(), catalog.end(), "HostDebian") == 1);
+    assert(std::count(catalog.begin(), catalog.end(), "StoppedUbuntu") == 1);
     // A stale/reused init PID or a different process root is not a match.
     fs::remove(proc / "100/root");
     put(proc / "100/root", "changed-root");
     assert(window_container_name(101, proc, pids).empty());
+    assert(!same_window_session(100, 101, proc));
     close(fd);
     fs::remove_all(root); // only the directory returned by mkdtemp above
     std::cout << "desktop metadata tests passed\n";

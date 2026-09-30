@@ -37,6 +37,27 @@ final class AwlClient {
     static final int T_ICON = 15;     /* (id) → w,h,bytes[RGBA] toplevel icon */
     static final int T_APP_ID = 19;
     static final int T_PRESENTATION = 20;
+    static final int T_CONTAINERS = 21;
+
+    static ArrayList<String> containers() {
+        ArrayList<String> names = new ArrayList<>();
+        IBinder b = get();
+        if (b == null) return names;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(DESCRIPTOR);
+            if (b.transact(T_CONTAINERS, d, r, 0) && r.dataSize() >= 4) {
+                int count = r.readInt();
+                if (count < 0 || count > 1024) return names;
+                for (int i=0; i<count; i++) {
+                    String name = r.readString();
+                    if (name != null && !name.isEmpty()) names.add(name);
+                }
+            }
+        } catch (Exception e) { Log.w(TAG, "container list unavailable", e); }
+        finally { d.recycle(); r.recycle(); }
+        return names;
+    }
 
     static final class Presentation {
         long parent;

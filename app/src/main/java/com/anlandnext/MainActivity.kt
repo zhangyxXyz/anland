@@ -1,6 +1,7 @@
 package com.anlandnext
 
 import android.content.Context
+import android.app.Application
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -27,10 +28,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.anland.design.*
 import com.anlandnext.awl.Awl
 import com.anlandnext.awl.AwlWindowActivity
+import com.anlandnext.awl.WindowScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -38,7 +41,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class WindowState : ViewModel() {
+private data class WindowSnapshot(val windows:List<Awl.WlWindow>?,val config:Map<String,Int>,val sources:Map<Long,String?>,val containers:List<String>)
+
+class WindowState(app:Application) : AndroidViewModel(app) {
+    private val prefs=app.getSharedPreferences("awl",Context.MODE_PRIVATE)
+    var scope by mutableStateOf(prefs.getString("window_scope",WindowScope.ALL)?:WindowScope.ALL); private set
+    var containers by mutableStateOf<List<String>>(emptyList()); private set
     var windows by mutableStateOf<List<Awl.WlWindow>>(emptyList()); private set
     var containerNames by mutableStateOf<Map<Long,String?>>(emptyMap()); private set
     var config by mutableStateOf<Map<String,Int>>(emptyMap()); private set
@@ -53,14 +61,15 @@ class WindowState : ViewModel() {
     fun refresh() { viewModelScope.launch { gate.withLock {
             val snapshot=withContext(Dispatchers.IO) {
                 val windows=Awl.getWindows()
-                Triple(windows, keys.associateWith { WlBinder.configGet(it) },
-                    windows.orEmpty().associate { it.id to Awl.containerName(it.id) })
+                WindowSnapshot(windows, keys.associateWith { WlBinder.configGet(it) },
+                    windows.orEmpty().associate { it.id to Awl.containerName(it.id) },Awl.containers())
             }
             // libawl subscription/ref-count operations belong to the main thread.
             // A daemon restart invalidates the previous event subscription.
-            if(snapshot.first!=null) Awl.ensureSubscribed()
-        connected=snapshot.first!=null; windows=snapshot.first.orEmpty(); config=snapshot.second
-        containerNames=snapshot.third
+            if(snapshot.windows!=null) Awl.ensureSubscribed()
+        connected=snapshot.windows!=null; windows=snapshot.windows.orEmpty(); config=snapshot.config
+        containerNames=snapshot.sources
+        containers=(snapshot.containers+snapshot.sources.values.filterNotNull().filter{it.isNotBlank()}).distinct().sorted()
     } } }
     fun set(values: Map<String,Int>) { viewModelScope.launch { gate.withLock {
         writing=true
@@ -73,6 +82,28 @@ class WindowState : ViewModel() {
         } finally { writing=false }
     } } }
     fun set(key:String,value:Int)=set(mapOf(key to value))
+    fun select(value:String) { scope=value; prefs.edit().putString("window_scope",value).apply() }
+    fun closeMany(ids:Set<Long>,selectedScope:String) {
+        val targets=ids-closing
+        if(targets.isEmpty())return
+        closing=closing+targets
+        viewModelScope.launch {
+            try {
+                val failed=withContext(Dispatchers.IO) {
+                    val live=Awl.getWindows()?.map{it.id}?.toSet()?:return@withContext true
+                    var failed=false
+                    for(id in targets.intersect(live)) {
+                        if(WindowScope.matches(selectedScope,Awl.containerName(id)) && Awl.closeWindow(id)!=0)failed=true
+                    }
+                    failed
+                }
+                closeFailed=failed
+                delay(1500)
+                closeWaiting=withContext(Dispatchers.IO){Awl.getWindows()?.any{it.id in targets}==true}
+                refresh()
+            } finally { closing=closing-targets }
+        }
+    }
     fun close(id:Long) {
         if(id in closing)return
         closing=closing+id
@@ -119,6 +150,7 @@ open class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
         applySavedAppearance(this)
         super.onCreate(savedInstanceState)
+        intent.getStringExtra("container")?.takeIf{it.isNotBlank()}?.let { state.select(WindowScope.container(it)) }
         setContent { WithAnlandTheme { appearance ->
             LaunchedEffect(state.connected,state.windows) {
                 if(state.connected)AwlWindowActivity.reconcileTasks(this@MainActivity,state.windows)
@@ -153,7 +185,7 @@ internal fun AutoLaunch(state:WindowState) {
         trailingContent={Switch(state.config["auto_attach"]==1,{state.set("auto_attach",if(it)1 else 0)},enabled=state.connected && !state.writing)})
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class,ExperimentalLayoutApi::class)
 @Composable
 private fun WindowsPage(state:WindowState) {
     val context=LocalContext.current
@@ -166,12 +198,44 @@ private fun WindowsPage(state:WindowState) {
     var search by rememberSaveable { mutableStateOf("") }
     var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
     var info by remember { mutableStateOf<Awl.WlWindow?>(null) }
-    val filtered=state.windows.filter{search.isBlank() || label(it).contains(search,true)}
+    var containerMenu by remember { mutableStateOf(false) }
+    var closeBatch by remember { mutableStateOf<Triple<String,String,Set<Long>>?>(null) }
+    val scopeLabel=when(state.scope) {
+        WindowScope.ALL -> stringResource(R.string.containers_all)
+        WindowScope.UNKNOWN -> stringResource(R.string.containers_unknown)
+        else -> state.scope.removePrefix("container:")
+    }
+    val scoped=state.windows.filter{WindowScope.matches(state.scope,state.containerNames[it.id])}
+    val filtered=scoped.filter{search.isBlank() || label(it).contains(search,true)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)) {
-            Row(Modifier.fillMaxWidth().padding(24.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                SettingLeadingIcon(Icons.Outlined.Window)
-                Text(if(state.connected)stringResource(R.string.status_window_count,state.windows.size)else stringResource(R.string.status_daemon_unreachable),style=MaterialTheme.typography.titleLarge)
+            Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Box {
+                        FilledTonalButton(onClick={containerMenu=true}) {
+                            Icon(Icons.Outlined.Storage,null);Spacer(Modifier.width(8.dp))
+                            Text(scopeLabel,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.widthIn(max=240.dp))
+                            Icon(Icons.Outlined.ExpandMore,null)
+                        }
+                        DropdownMenu(containerMenu,{containerMenu=false}) {
+                            val choices=listOf(WindowScope.ALL to stringResource(R.string.containers_all))+
+                                state.containers.map{WindowScope.container(it) to it}+
+                                listOf(WindowScope.UNKNOWN to stringResource(R.string.containers_unknown))
+                            choices.forEach { (scope,name) ->
+                                DropdownMenuItem(text={Text(name)},
+                                    trailingIcon={if(scope==state.scope)Icon(Icons.Outlined.Check,null)},
+                                    onClick={state.select(scope);containerMenu=false})
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick={closeBatch=Triple(state.scope,scopeLabel,scoped.map{it.id}.toSet())},
+                        enabled=state.connected && scoped.isNotEmpty() && state.closing.isEmpty(),
+                        colors=ButtonDefaults.outlinedButtonColors(contentColor=MaterialTheme.colorScheme.error)) {
+                        Icon(Icons.Outlined.Close,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.windows_close_all))
+                    }
+                }
+                Text(if(state.connected)stringResource(R.string.status_window_count,scoped.size)else stringResource(R.string.status_daemon_unreachable),style=MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.containers_scope_help),style=MaterialTheme.typography.bodySmall)
             }
         }
         SettingGroup("") { AutoLaunch(state) }
@@ -205,6 +269,11 @@ private fun WindowsPage(state:WindowState) {
         }
     }
     info?.let{w->AlertDialog(onDismissRequest={info=null},title={Text(stringResource(R.string.menu_window_info))},text={Text(stringResource(R.string.window_info_format,w.id,w.title.orEmpty(),stringResource(if(w.attached)R.string.state_visible else R.string.state_background)))},confirmButton={TextButton(onClick={info=null}){Text(stringResource(R.string.dialog_ok))}})}
+    closeBatch?.let { batch -> AlertDialog(onDismissRequest={closeBatch=null},
+        title={Text(stringResource(R.string.windows_close_all))},
+        text={Text(stringResource(R.string.windows_close_all_confirm,batch.second,batch.third.size))},
+        confirmButton={TextButton(onClick={state.closeMany(batch.third,batch.first);closeBatch=null}){Text(stringResource(R.string.windows_close_all))}},
+        dismissButton={TextButton(onClick={closeBatch=null}){Text(stringResource(android.R.string.cancel))}}) }
     confirmClose?.let { w -> AlertDialog(onDismissRequest={confirmClose=null},title={Text(stringResource(R.string.window_close))},
         text={Text(stringResource(R.string.window_close_confirm,w.title.orEmpty()))},
         confirmButton={TextButton(onClick={state.close(w.id);confirmClose=null}){Text(stringResource(R.string.window_close))}},

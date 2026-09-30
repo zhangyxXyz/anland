@@ -13,6 +13,13 @@ struct DesktopMetadata {
 std::string window_container_name(pid_t pid, const std::string& proc_dir = "/proc",
         const std::string& pids_dir = "/data/local/Droidspaces/Pids");
 
+std::vector<std::string> registered_containers(
+        const std::string& containers_dir = "/data/local/Droidspaces/Containers",
+        const std::string& pids_dir = "/data/local/Droidspaces/Pids");
+// Socket routing is independent of the human-readable container label.
+std::string window_session_key(pid_t pid, const std::string& proc_dir = "/proc");
+bool same_window_session(pid_t client, pid_t peer, const std::string& proc_dir = "/proc");
+
 // Resolve a client's desktop ID inside its own filesystem namespace.
 DesktopMetadata desktop_metadata(pid_t pid, const std::string& app_id,
                                  const std::string& locale);

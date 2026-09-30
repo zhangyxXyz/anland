@@ -16,6 +16,15 @@ public class TaskIdentityTest {
             equal("Chrome · HostDebian", TaskIdentity.label("Chrome", "Page title", "HostDebian", true));
             equal("Chrome", TaskIdentity.label("Chrome", "Page title", "HostDebian", false));
         }
+        if (!WindowScope.matches(WindowScope.container("HostDebian"), "HostDebian")) throw new AssertionError();
+        if (WindowScope.matches(WindowScope.container("HostDebian"), "HostUbuntu")) throw new AssertionError();
+        if (WindowScope.matches(WindowScope.container("HostDebian"), null)) throw new AssertionError();
+        if (!WindowScope.matches(WindowScope.UNKNOWN, null)) throw new AssertionError();
+        if (WindowScope.matches(WindowScope.UNKNOWN, "HostDebian")) throw new AssertionError();
+        if (!WindowScope.matches(WindowScope.ALL, "HostUbuntu")) throw new AssertionError();
+        if (!WindowScope.matches(WindowScope.ALL, null)) throw new AssertionError();
+        // Container names cannot collide with the All/Other selector tokens.
+        if (WindowScope.matches(WindowScope.container("all"), "unknown")) throw new AssertionError();
         System.out.println("Task identity container label tests passed");
     }
 }

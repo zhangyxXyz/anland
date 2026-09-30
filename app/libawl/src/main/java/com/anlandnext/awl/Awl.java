@@ -106,6 +106,9 @@ public final class Awl {
         return info == null ? null : info.containerName;
     }
 
+    /** Host-only catalog, including configured containers with no windows. */
+    public static List<String> containers() { return AwlClient.containers(); }
+
     /* ---- event subscription (process-wide; main thread bookkeeping) ---- */
 
     private static final EventBinder BINDER = new EventBinder();

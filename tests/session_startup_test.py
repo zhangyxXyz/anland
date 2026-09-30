@@ -42,14 +42,14 @@ esac
         executable(binaries/'Xwayland', 'echo distro >> "$TEST_BINARY_LOG"\nprintf "99\\n" >&3\nsleep 2\n')
         if compat:
             executable(packaged/'Xwayland', 'echo compat >> "$TEST_BINARY_LOG"\nprintf "99\\n" >&3\nsleep 2\n')
-        executable(binaries/'miniwm', 'sleep 0.1\n')
+        executable(binaries/'miniwm', 'printf \"%s\\n\" \"$ANLAND_WM_SOCK\" > \"$TEST_WM_SOCKET\"\nsleep 0.1\n')
         executable(binaries/'xfsettingsd', 'printf "%s\\n" "${GDK_BACKEND:-unset}" > "$TEST_SETTINGS_BACKEND"\n')
         env = dict(os.environ, HOME=str(home), XDG_RUNTIME_DIR=str(runtime),
                    ANLAND_RUNTIME_DIR=str(host), WAYLAND_DISPLAY='wayland-0',
                    ANLAND_COMPAT_BIN_DIR=str(packaged), ANLAND_MINIWM=str(binaries/'miniwm'),
                    PATH=str(binaries)+':/usr/bin:/bin', TEST_BASE_PATH=str(binaries)+':/usr/bin:/bin',
                    TEST_LOG=str(base/'manager-env'), TEST_ENV_COPY=str(base/'file-env'),
-                   TEST_BINARY_LOG=str(base/'binary'), TEST_SETTINGS_BACKEND=str(base/'settings-backend'))
+                   TEST_WM_SOCKET=str(base/'wm-socket'), TEST_BINARY_LOG=str(base/'binary'), TEST_SETTINGS_BACKEND=str(base/'settings-backend'))
         result = subprocess.run(['bash', str(script)], env=env, capture_output=True, text=True, timeout=10)
         assert result.returncode == 1, result.stderr  # miniwm exit deliberately ends the session
         expected = 'PULSE_SERVER=unix:' + str(host/'pulse.sock')
@@ -57,7 +57,18 @@ esac
         assert expected in (base/'file-env').read_text().splitlines(), result.stdout+result.stderr
         assert (base/'binary').read_text().strip() == ('compat' if compat else 'distro')
         assert (base/'settings-backend').read_text().strip() == 'x11', 'Xwayland clients need an X11 XSettings manager'
+        expected_socket = host/'sessions'/f'p{os.stat("/proc/self/ns/pid").st_ino}-u{os.getuid()}'/'wm.sock'
+        assert (base/'wm-socket').read_text().strip() == str(expected_socket)
+        assert not (host/'anland-wm.sock').exists(), 'shared control path must not be reused'
         assert not (host/'pulse.sock').exists(), 'test must cover audio not ready yet'
+        # A second start must not touch session state owned by the first process.
+        import fcntl
+        with (runtime/'anland-session.lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            saved = (base/'manager-env').read_bytes()
+            duplicate = subprocess.run(['bash',str(script)],env=env,capture_output=True,text=True,timeout=3)
+            assert duplicate.returncode == 0 and 'already running' in duplicate.stderr
+            assert (base/'manager-env').read_bytes() == saved
         for sock in sockets:
             sock.close()
         print('PASS: late audio in both environments; compatibility directory', 'present' if compat else 'absent')

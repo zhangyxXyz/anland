@@ -55,11 +55,15 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
         super.onDestroy();
     }
 
-    private Bundle sessionWindows() throws Exception {
+    private Bundle sessionWindows(String container) throws Exception {
         try {
             Bundle snapshot = getContentResolver().call(
-                    android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
-            if (snapshot != null) return snapshot;
+                    android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", container, null);
+            if (snapshot != null) {
+                if (!container.equals(snapshot.getString("container")))
+                    throw new IllegalStateException(getString(R.string.host_update_needed));
+                return snapshot;
+            }
         } catch (IllegalArgumentException unavailable) {
             // HyperOS can report "Unknown authority" for an installed provider
             // when its owner is not running. Never infer an empty desktop here.
@@ -72,13 +76,17 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
             try {
                 preflightLauncher.launch(new android.content.Intent()
                         .setClassName("com.anlandnext", "com.anlandnext.SessionPreflightActivity")
+                        .putExtra("container", container)
                         .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION));
             } catch (android.content.ActivityNotFoundException e) {
                 pending.completeExceptionally(new IllegalStateException(getString(R.string.host_update_needed), e));
             }
         });
         try {
-            return pending.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            Bundle snapshot = pending.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            if (!container.equals(snapshot.getString("container")))
+                throw new IllegalStateException(getString(R.string.host_update_needed));
+            return snapshot;
         } finally {
             sessionPreflight = null;
         }
@@ -147,12 +155,12 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
             // Snapshot before launching. Newly mapped windows with auto_attach
             // enabled belong to the daemon's launch path; do not race it with
             // another startActivity from the explicit activation path.
-            android.os.Bundle windows = sessionWindows();
+            android.os.Bundle windows = sessionWindows(container);
             if (desktopEntry && !inDesktop) {
                 if (windows == null) throw new IllegalStateException(getString(R.string.host_update_needed));
                 if (windows.getInt("independent") > 0) {
                     runOnUiThread(() -> LaunchUi.blocked(this, () -> {
-                        startActivity(new android.content.Intent().setClassName("com.anlandnext", "com.anlandnext.MainActivity"));
+                        startActivity(new android.content.Intent().setClassName("com.anlandnext", "com.anlandnext.MainActivity").putExtra("container",container));
                         finish();
                     }));
                     return;
@@ -184,6 +192,7 @@ public final class AppLaunchActivity extends androidx.appcompat.app.AppCompatAct
                             startActivity(new android.content.Intent().setClassName("com.anlandnext", "com.anlandnext.OpenWindowActivity")
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION)
                                     .putExtra("window_app_id",windowAppId)
+                                    .putExtra("container",container)
                                     .putExtra("app_name",appName)
                                     .putExtra("launch_message",getString(R.string.launching_fmt, appName))
                                     .putExtra(com.anland.design.LaunchTheme.EXTRA, com.anland.design.LaunchTheme.capture(this))
