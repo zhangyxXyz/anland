@@ -16,7 +16,7 @@ internal object PreferenceSchema {
             }
             "awl" -> when(key) {
                 "ime_mode" -> value is Int && value in 0..1
-                "close_on_task_removed" -> value is Boolean
+                "close_on_task_removed", "show_container_name" -> value is Boolean
                 else -> false
             }
             else -> false

@@ -22,6 +22,8 @@ This repository's `dev` branch contains the application and image build pipeline
 
 The two Apps share responsive Material UI, theme preferences and navigation. Linux windows have Android task identities resolved from desktop metadata and icons. Back sends an independent window to the background and retains its Recents card for resuming. Transient dialogs share their parent task; launch coordination activates existing windows and waits for new windows without restarting the Linux application.
 
+Wayland navigation has three tabs: **Windows**, **Configuration**, and **Settings**. Configuration groups window controls under **Tasks and startup**, **Display**, and **Input**. **Show container name on task cards** is off by default; enabling it appends the registered Droidspaces container name, for example `Google Chrome · HostDebian`, to Recents cards and window-list titles. Toggling refreshes existing live tasks and lists without relaunching Linux applications; tasks whose Android process was reclaimed update when restored. Unknown sources keep their original names. Container identification requires the matching Root module.
+
 Android touch, keyboard and IME events are forwarded to Wayland. X11 applications use a patched Xwayland. The host supports SurfaceControl and EGL rendering, configurable window scaling, safe-area handling, and controls for automatic attachment and window lifecycle. GPU and touch behavior still require validation on the target device.
 
 Shell provides a dedicated Credentials tab. A saved local or SSH login can be bound to a container user; application, desktop, shortcut and local-console launches validate that binding. SSH bindings require a trusted host key and a fresh proof that the session reaches the selected container and user. Container environment settings are available from the Containers page.
@@ -119,13 +121,13 @@ For manual runs, the dispatcher must also exist on GitHub's default branch; sele
 
 ```properties
 RELEASE_VERSION=0.5.3
-SHELL_VERSION_NAME=0.2.2
-SHELL_VERSION_CODE=4
-WAYLAND_VERSION_NAME=0.2.2
-WAYLAND_VERSION_CODE=4
+SHELL_VERSION_NAME=0.2.3
+SHELL_VERSION_CODE=5
+WAYLAND_VERSION_NAME=0.2.3
+WAYLAND_VERSION_CODE=5
 MODULE_VERSION_NAME=0.5.1
 MODULE_VERSION_CODE=6
-ROOTFS_VERSION=0.1.0
+ROOTFS_VERSION=0.1.1
 ```
 
 The Git tag must be `v` plus `RELEASE_VERSION`. Component versions do not need to match the tag. Increase an App/module's integer code when issuing a newer version of that component. Unselected components are not rebuilt or relabeled.
@@ -203,7 +205,7 @@ Native/module builds require a Linux host, JDK, Android SDK/NDK, CMake, Meson, N
 | `Fedora-44` | Fedora 44 | `fedora44` |
 | `Arch` | Arch Linux ARM (rolling) | `arch` |
 
-Each target includes Anland Next and the full Xfce desktop launcher. Ubuntu 24.04 and 25.10 are not selectable because the pinned upstream builder does not provide Anland Next for them. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.0.tar.xz`.
+Each target includes Anland Next and the full Xfce desktop launcher. Ubuntu 24.04 and 25.10 are not selectable because the pinned upstream builder does not provide Anland Next for them. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.1.tar.xz`.
 
 A separate Docker build stage derives from the selected runtime image and compiles Xfdesktop with the touch double-tap patch, Xwayland with GPU/input fixes and the current `anland-miniwm`. Xserver uses the repository's pinned submodule. The final stage installs the compiled Xfdesktop files, `/usr/lib/anland/Xwayland`, the session and miniwm, then verifies the distribution, session package version, AArch64 executables, shared-library dependencies and file hashes. Build dependencies remain in the disposable stage. The exported archive is checked against the recorded executable hashes before upload.
 

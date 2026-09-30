@@ -40,6 +40,7 @@ import kotlinx.coroutines.sync.withLock
 
 class WindowState : ViewModel() {
     var windows by mutableStateOf<List<Awl.WlWindow>>(emptyList()); private set
+    var containerNames by mutableStateOf<Map<Long,String?>>(emptyMap()); private set
     var config by mutableStateOf<Map<String,Int>>(emptyMap()); private set
     var connected by mutableStateOf(false); private set
     var writing by mutableStateOf(false); private set
@@ -52,12 +53,14 @@ class WindowState : ViewModel() {
     fun refresh() { viewModelScope.launch { gate.withLock {
             val snapshot=withContext(Dispatchers.IO) {
                 val windows=Awl.getWindows()
-                windows to keys.associateWith { WlBinder.configGet(it) }
+                Triple(windows, keys.associateWith { WlBinder.configGet(it) },
+                    windows.orEmpty().associate { it.id to Awl.containerName(it.id) })
             }
             // libawl subscription/ref-count operations belong to the main thread.
             // A daemon restart invalidates the previous event subscription.
             if(snapshot.first!=null) Awl.ensureSubscribed()
         connected=snapshot.first!=null; windows=snapshot.first.orEmpty(); config=snapshot.second
+        containerNames=snapshot.third
     } } }
     fun set(values: Map<String,Int>) { viewModelScope.launch { gate.withLock {
         writing=true
@@ -98,7 +101,6 @@ class WindowState : ViewModel() {
 open class MainActivity : AppCompatActivity() {
     private val state:WindowState by viewModels()
     protected open val initialTab=0
-    protected open val openWindowSettings=false
     private val handler=Handler(Looper.getMainLooper())
     private var visible=false
     private val refresher=Runnable { if(visible) state.refresh() }
@@ -121,19 +123,17 @@ open class MainActivity : AppCompatActivity() {
             LaunchedEffect(state.connected,state.windows) {
                 if(state.connected)AwlWindowActivity.reconcileTasks(this@MainActivity,state.windows)
             }
-            var windowSettings by rememberSaveable { mutableStateOf(openWindowSettings) }
-            AnlandShell(listOf(Destination(getString(R.string.windows_title),Icons.Outlined.Window),Destination(getString(R.string.app_settings),Icons.Outlined.Settings)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
-                secondaryTitle=if(windowSettings)getString(R.string.settings_title)else null,onSecondaryBack={windowSettings=false},
+            AnlandShell(listOf(
+                Destination(getString(R.string.windows_title),Icons.Outlined.Window),
+                Destination(getString(R.string.window_config),Icons.Outlined.Tune),
+                Destination(getString(R.string.app_settings),Icons.Outlined.Settings)),appearance,initialTab,brand=getString(R.string.app_name),contextLabel=if(state.connected)getString(R.string.design_connected)else getString(R.string.status_daemon_unreachable),
                 actions={IconButton(onClick=state::refresh){Icon(Icons.Outlined.Refresh,getString(R.string.refresh))}}) { tab, _ ->
                 when {
-                    windowSettings -> WindowSettings(state)
                     tab==0 -> WindowsPage(state)
+                    tab==1 -> WindowSettings(state)
                     else -> Page {
                         AppearanceSettings(appearance)
                         com.anland.design.maintenance.MaintenanceEntries(WaylandMaintenanceActivity::class.java)
-                        SettingGroup(stringResource(R.string.windows_title)) {
-                            NavigationSettingItem(stringResource(R.string.settings_title),description=stringResource(R.string.window_settings_summary),icon=Icons.Outlined.Tune,onClick={windowSettings=true})
-                        }
                     }
                 }
             }
@@ -157,10 +157,16 @@ internal fun AutoLaunch(state:WindowState) {
 @Composable
 private fun WindowsPage(state:WindowState) {
     val context=LocalContext.current
+    val showContainer=rememberShowContainerName()
+    fun label(window:Awl.WlWindow):String {
+        val title=window.title?.takeIf{it.isNotBlank()}?:context.getString(R.string.window_fallback_title,window.id)
+        val container=state.containerNames[window.id]?.takeIf{it.isNotBlank()}
+        return if(showContainer && container!=null) "$title · $container" else title
+    }
     var search by rememberSaveable { mutableStateOf("") }
     var confirmClose by remember { mutableStateOf<Awl.WlWindow?>(null) }
     var info by remember { mutableStateOf<Awl.WlWindow?>(null) }
-    val filtered=state.windows.filter{search.isBlank() || it.title.orEmpty().contains(search,true)}
+    val filtered=state.windows.filter{search.isBlank() || label(it).contains(search,true)}
     Column(Modifier.fillMaxSize().padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=if(state.connected)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer)) {
             Row(Modifier.fillMaxWidth().padding(24.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -188,7 +194,7 @@ private fun WindowsPage(state:WindowState) {
                                 }
                             }
                         }
-                        Text(window.title?.takeIf{it.isNotBlank()}?:stringResource(R.string.window_fallback_title,window.id),style=MaterialTheme.typography.titleMedium,maxLines=2,minLines=2,overflow=TextOverflow.Ellipsis)
+                        Text(label(window),style=MaterialTheme.typography.titleMedium,maxLines=2,minLines=2,overflow=TextOverflow.Ellipsis)
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                             StatusPill(stringResource(if(window.attached)R.string.state_visible else R.string.state_background),Modifier.weight(1f,false),window.attached)
                             FilledTonalIconButton(onClick={Awl.attachWindow(context,window.id,window.title)}){Icon(Icons.AutoMirrored.Outlined.OpenInNew,stringResource(R.string.window_open))}

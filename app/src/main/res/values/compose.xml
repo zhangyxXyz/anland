@@ -2,7 +2,6 @@
     <string name="windows_title">Windows</string>
     <string name="appearance_title">Appearance</string>
     <string name="refresh">Refresh</string>
-    <string name="launch_behavior">Launch behavior</string>
     <string name="setting_write_failed">Unable to save. Check the Anland service and try again.</string>
     <string name="state_visible">Window connected</string>
     <string name="state_background">In background · tap to show</string>

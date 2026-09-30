@@ -197,6 +197,40 @@ DesktopMetadata desktop_metadata_at(int root, const std::string& app_id,
     return result;
 }
 
+std::string window_container_name(pid_t pid, const std::string& proc_dir, const std::string& pids_dir) {
+    if (pid <= 0) return {};
+    struct stat client_ns{}, client_root{};
+    const auto client = proc_dir + "/" + std::to_string(pid);
+    if (stat((client + "/ns/pid").c_str(), &client_ns) ||
+        stat((client + "/root").c_str(), &client_root)) return {};
+    DIR* directory = opendir(pids_dir.c_str());
+    if (!directory) return {};
+    std::string match;
+    bool ambiguous = false;
+    size_t count = 0;
+    while (auto entry = readdir(directory)) {
+        if (++count > 256) { ambiguous = true; break; }
+        std::string file = entry->d_name;
+        if (file.size() <= 4 || file.size() > 132 || file.substr(file.size() - 4) != ".pid") continue;
+        auto name = file.substr(0, file.size() - 4);
+        if (std::any_of(name.begin(), name.end(), [](unsigned char c) { return c < 32 || c == 127; })) continue;
+        std::ifstream registration(pids_dir + "/" + file);
+        int init = 0;
+        std::string extra;
+        if (!(registration >> init) || init <= 0 || (registration >> extra)) continue;
+        struct stat init_ns{}, init_root{};
+        const auto process = proc_dir + "/" + std::to_string(init);
+        if (stat((process + "/ns/pid").c_str(), &init_ns) ||
+            stat((process + "/root").c_str(), &init_root)) continue;
+        if (client_ns.st_dev != init_ns.st_dev || client_ns.st_ino != init_ns.st_ino ||
+            client_root.st_dev != init_root.st_dev || client_root.st_ino != init_root.st_ino) continue;
+        if (!match.empty()) { ambiguous = true; break; }
+        match = name;
+    }
+    closedir(directory);
+    return ambiguous ? std::string{} : match;
+}
+
 DesktopMetadata desktop_metadata(pid_t pid, const std::string& app_id, const std::string& locale) {
     if (pid <= 0) return {};
     std::string proc = "/proc/" + std::to_string(pid);

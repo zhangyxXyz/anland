@@ -121,6 +121,12 @@ public class AwlWindowActivity extends Activity {
     private boolean deathLinked;       /* daemon death monitoring attached */
     private String taskTitle;          /* last known client title (Recents label) */
     private String taskDesktopName;
+    public static final String SHOW_CONTAINER_NAME = "show_container_name";
+    private String taskContainerName;
+    private android.content.SharedPreferences taskPreferences;
+    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener taskPreferenceListener = (prefs, key) -> {
+        if (key == null || SHOW_CONTAINER_NAME.equals(key)) runOnUiThread(this::applyTaskDescription);
+    };
     private String taskAppId;
     private boolean taskIdentityReady, taskPublished;
     private boolean iconFetchRunning, iconFetchPending;
@@ -429,6 +435,7 @@ public class AwlWindowActivity extends Activity {
         iconRequest.incrementAndGet();
         taskTitle = null;
         taskDesktopName = null;
+        taskContainerName = null;
         taskAppId = null;
         taskIcon = null;
         taskIdentityReady = false;
@@ -461,6 +468,7 @@ public class AwlWindowActivity extends Activity {
                 if (he.identity.desktop != null) {
                     taskAppId = he.identity.desktop.appId;
                     taskDesktopName = he.identity.desktop.name;
+                    taskContainerName = he.identity.desktop.containerName;
                 }
             }
         } else {
@@ -516,6 +524,8 @@ public class AwlWindowActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        taskPreferences = getSharedPreferences("awl", MODE_PRIVATE);
+        taskPreferences.registerOnSharedPreferenceChangeListener(taskPreferenceListener);
         /* the manifest theme belongs to THIS class's declaration — a SUBCLASS
          * declared without a theme falls back to the app default (title bar
          * and all). Kill the title programmatically so subclasses inherit
@@ -721,7 +731,8 @@ public class AwlWindowActivity extends Activity {
     private void applyTaskDescription() {
         if (this instanceof AwlDialogActivity) return; // retain the parent's task identity
         if (!taskIdentityReady) return;
-        String label = TaskIdentity.label(taskDesktopName, taskTitle);
+        String label = TaskIdentity.label(taskDesktopName, taskTitle, taskContainerName,
+                taskPreferences != null && taskPreferences.getBoolean(SHOW_CONTAINER_NAME, false));
         android.app.ActivityManager.TaskDescription td = taskIcon != null
                 ? new android.app.ActivityManager.TaskDescription(label, taskIcon)
                 : new android.app.ActivityManager.TaskDescription(label);
@@ -773,6 +784,7 @@ public class AwlWindowActivity extends Activity {
                         if (taskAppId != null && !taskAppId.equals(desktop.appId)) taskIcon = null;
                         taskAppId = desktop.appId;
                         taskDesktopName = desktop.name;
+                        taskContainerName = desktop.containerName;
                     }
                     // A failed fetch must not erase a valid icon; C_ICON reset
                     // explicitly clears it. Coalesce rapid title/icon events.
@@ -2168,6 +2180,7 @@ public class AwlWindowActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (taskPreferences != null) taskPreferences.unregisterOnSharedPreferenceChangeListener(taskPreferenceListener);
         fireHost((cbs, win, act) -> cbs.onHostDestroy(win, act));
         boolean owned = LIVE.remove(id, this);
         if (owned && isFinishing() && id >= 0 && !redirectingDialog)

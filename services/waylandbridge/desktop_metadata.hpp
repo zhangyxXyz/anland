@@ -8,6 +8,11 @@ struct DesktopMetadata {
     std::vector<unsigned char> icon;
 };
 
+// Match the client's PID namespace and root to a registered Droidspaces init.
+// Unknown or ambiguous registrations deliberately return no label.
+std::string window_container_name(pid_t pid, const std::string& proc_dir = "/proc",
+        const std::string& pids_dir = "/data/local/Droidspaces/Pids");
+
 // Resolve a client's desktop ID inside its own filesystem namespace.
 DesktopMetadata desktop_metadata(pid_t pid, const std::string& app_id,
                                  const std::string& locale);

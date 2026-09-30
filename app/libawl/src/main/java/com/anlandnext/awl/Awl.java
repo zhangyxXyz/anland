@@ -100,6 +100,12 @@ public final class Awl {
         return info == null ? null : info.appId;
     }
 
+    /** Registered source container; null for unknown clients or older daemons. */
+    public static String containerName(long id) {
+        AwlClient.DesktopInfo info = AwlClient.desktopInfo(id);
+        return info == null ? null : info.containerName;
+    }
+
     /* ---- event subscription (process-wide; main thread bookkeeping) ---- */
 
     private static final EventBinder BINDER = new EventBinder();

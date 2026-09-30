@@ -6,6 +6,8 @@ class PreferenceSchemaTest {
         PreferenceSchema.validate("shell","launch_user.Debian","seiun")
         PreferenceSchema.validate("shell","console_font_sp",14)
         PreferenceSchema.validate("awl","close_on_task_removed",true)
+        PreferenceSchema.validate("awl","show_container_name",true)
+        assertThrows(IllegalArgumentException::class.java) { PreferenceSchema.validate("awl","show_container_name","true") }
         assertThrows(IllegalArgumentException::class.java) { PreferenceSchema.validate("awl","ime_mode","1") }
         assertThrows(IllegalArgumentException::class.java) { PreferenceSchema.validate("shell","console_font_sp",999) }
         assertThrows(IllegalArgumentException::class.java) { PreferenceSchema.validate("shell","history","secret") }

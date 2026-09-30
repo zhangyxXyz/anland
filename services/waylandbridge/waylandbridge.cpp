@@ -1824,6 +1824,9 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
         AParcel_writeString(out, app_id, (int32_t)strlen(app_id));
         AParcel_writeString(out, metadata.name.c_str(), (int32_t)metadata.name.size());
         AParcel_writeByteArray(out, (const int8_t*)metadata.icon.data(), (int32_t)metadata.icon.size());
+        // Optional trailing field: old clients ignore it and new clients tolerate old daemons.
+        auto container = window_container_name(awl_window_client_pid((uint64_t)id64));
+        AParcel_writeString(out, container.c_str(), (int32_t)container.size());
         return STATUS_OK;
     }
     case AWL_T_ICON: {   /* current toplevel icon → RGBA bytes (Recents icon, xdg-toplevel-icon-v1) */

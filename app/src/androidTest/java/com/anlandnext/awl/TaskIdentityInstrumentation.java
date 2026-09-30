@@ -20,9 +20,11 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
         Bundle result = new Bundle();
         try {
             long id = Long.parseLong(args.getString("window_id", "-1"));
-            if ("back".equals(args.getString("mode"))) {
+            if ("back".equals(args.getString("mode")) || "container-label".equals(args.getString("mode"))) {
                 testBack(id);
-                result.putString("stream", "PASS: Back retains the live Linux window and its visible Recents task; the card resumes\n");
+                result.putString("stream", "container-label".equals(args.getString("mode"))
+                        ? "PASS: existing task follows container-label preference without changing task or icon\n"
+                        : "PASS: Back retains the live Linux window and its visible Recents task; the card resumes\n");
                 finish(Activity.RESULT_OK, result);
                 return;
             }
@@ -97,6 +99,37 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
         if (!resumed.await(20, TimeUnit.SECONDS)) throw new AssertionError("Host did not resume");
         Activity activity = host.get();
         int taskId = activity.getTaskId();
+        if ("container-label".equals(args.getString("mode"))) {
+            android.content.SharedPreferences preferences = getTargetContext().getSharedPreferences("awl", 0);
+            boolean original = preferences.getBoolean(AwlWindowActivity.SHOW_CONTAINER_NAME, false);
+            WindowTaskIdentity identity = WindowTaskIdentity.load(id);
+            if (identity == null) throw new AssertionError("Missing identity");
+            String name = identity.desktop == null ? null : identity.desktop.name;
+            String container = identity.desktop == null ? null : identity.desktop.containerName;
+            String expectedContainer = args.getString("container");
+            if (expectedContainer != null && !expectedContainer.equals(container))
+                throw new AssertionError("Unexpected source container: " + container);
+            android.graphics.Bitmap icon = null;
+            try {
+                for (boolean enabled : new boolean[]{false, true, false}) {
+                    runOnMainSync(() -> preferences.edit().putBoolean(AwlWindowActivity.SHOW_CONTAINER_NAME, enabled).apply());
+                    waitForIdleSync();
+                    ActivityManager.RecentTaskInfo found = null;
+                    for (ActivityManager.AppTask task : getTargetContext().getSystemService(ActivityManager.class).getAppTasks())
+                        if (task.getTaskInfo().taskId == taskId) found = task.getTaskInfo();
+                    if (found == null) throw new AssertionError("Toggling replaced the task");
+                    String expected = TaskIdentity.label(name, identity.title, container, enabled);
+                    if (!java.util.Objects.equals(expected, found.taskDescription.getLabel()))
+                        throw new AssertionError("Existing task did not refresh: " + found.taskDescription.getLabel());
+                    android.graphics.Bitmap next = found.taskDescription.getIcon();
+                    if (icon != null && (next == null || !icon.sameAs(next))) throw new AssertionError("Task icon changed");
+                    icon = next;
+                }
+            } finally {
+                runOnMainSync(() -> preferences.edit().putBoolean(AwlWindowActivity.SHOW_CONTAINER_NAME, original).apply());
+            }
+            return;
+        }
         // Exercise the callback immediately, including before asynchronous identity completion.
         runOnMainSync(activity::onBackPressed);
         waitForIdleSync();

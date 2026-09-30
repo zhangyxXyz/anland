@@ -1,0 +1,8 @@
+<resources>
+    <string name="task_container_name">Show container name on task cards</string>
+    <string name="task_container_name_help">Append the source container to names in Recents and the window list, for example Google Chrome · HostDebian. Changes apply immediately to existing cards. Keep the original name when the source is unavailable.</string>
+    <string name="window_config">Configuration</string>
+    <string name="config_tasks">Tasks and startup</string>
+    <string name="config_display">Display</string>
+    <string name="config_input">Input</string>
+</resources>

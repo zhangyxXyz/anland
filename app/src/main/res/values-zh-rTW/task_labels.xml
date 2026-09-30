@@ -1,0 +1,8 @@
+<resources>
+    <string name="task_container_name">工作卡片顯示容器名稱</string>
+    <string name="task_container_name_help">在最近工作卡片和視窗清單的名稱後附加來源容器，例如 Google Chrome · HostDebian。調整後立即更新既有卡片；無法辨識來源時保留原名稱。</string>
+    <string name="window_config">配置</string>
+    <string name="config_tasks">工作與啟動</string>
+    <string name="config_display">顯示</string>
+    <string name="config_input">輸入</string>
+</resources>

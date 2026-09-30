@@ -275,7 +275,7 @@ final class AwlClient {
     }
 
     static final class DesktopInfo {
-        String appId, name;
+        String appId, name, containerName;
         byte[] icon;
     }
 
@@ -293,6 +293,7 @@ final class AwlClient {
             info.appId = r.readString();
             info.name = r.readString();
             info.icon = r.createByteArray();
+            info.containerName = r.dataAvail() > 0 ? r.readString() : null;
             return info;
         } catch (Exception e) {
             Log.w(TAG, "APP_ID unavailable", e);

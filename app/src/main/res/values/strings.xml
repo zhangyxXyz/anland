@@ -3,7 +3,6 @@
     <string name="app_name">Anland Wayland</string>
 
     <!-- MainActivity -->
-    <string name="settings_title">Window Settings</string>
     <string name="status_daemon_unreachable">Window service unavailable</string>
     <string name="status_window_count">%1$d windows · service connected</string>
     <string name="status_empty">No windows yet. Start an application from Anland Shell.</string>

@@ -2,7 +2,6 @@
     <string name="windows_title">窗口</string>
     <string name="appearance_title">外观</string>
     <string name="refresh">刷新</string>
-    <string name="launch_behavior">启动行为</string>
     <string name="setting_write_failed">保存失败，请检查 Anland 服务后重试。</string>
     <string name="state_visible">窗口已连接</string>
     <string name="state_background">后台运行 · 点击显示</string>

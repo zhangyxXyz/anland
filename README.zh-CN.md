@@ -22,6 +22,8 @@
 
 两款 App 共用响应式 Material 界面、主题偏好和导航。Linux 窗口根据桌面元数据与图标确定 Android 任务身份；返回会将独立窗口置于后台，保留最近任务卡片以便恢复；临时对话框共享父任务。启动协调负责激活已有窗口或等待新窗口，不需要重启 Linux 应用。
 
+Wayland 导航包含**窗口、配置、设置**三个平级页面。配置按**任务与启动、显示、输入**分组；“任务卡片显示容器名称”默认关闭。开启后，最近任务卡片和窗口列表的名称追加 Droidspaces 登记的实际容器名称，例如 `Google Chrome · HostDebian`。调整开关会即时刷新已有的存活任务和列表，不重启 Linux 应用；Android 进程已被回收的卡片在恢复时更新。无法识别来源时保留原名称。容器识别需要配套版本的 Root 模块。
+
 Android 的触摸、键盘和 IME 事件被转发到 Wayland；X11 应用通过修复版 Xwayland 运行。宿主支持 SurfaceControl 与 EGL 渲染、窗口缩放、安全区域适配，以及自动挂载和窗口生命周期设置。GPU 与触控表现仍需在目标设备上验证。
 
 Shell 提供独立的「凭据」页面，可将本地或 SSH 登录凭据绑定到容器用户。启动应用、桌面、快捷方式和本地控制台时会校验绑定；SSH 绑定要求已信任的主机密钥，并通过临时证明确认连接到选定容器及用户。容器环境变量在「容器」页面配置。
@@ -119,13 +121,13 @@ flowchart LR
 
 ```properties
 RELEASE_VERSION=0.5.3
-SHELL_VERSION_NAME=0.2.2
-SHELL_VERSION_CODE=4
-WAYLAND_VERSION_NAME=0.2.2
-WAYLAND_VERSION_CODE=4
+SHELL_VERSION_NAME=0.2.3
+SHELL_VERSION_CODE=5
+WAYLAND_VERSION_NAME=0.2.3
+WAYLAND_VERSION_CODE=5
 MODULE_VERSION_NAME=0.5.1
 MODULE_VERSION_CODE=6
-ROOTFS_VERSION=0.1.0
+ROOTFS_VERSION=0.1.1
 ```
 
 Git tag 必须等于 `v` 加 `RELEASE_VERSION`，不要求各组件版本与 tag 相同。发布某个 App/模块的新版本时，递增该组件的整数版本号。未选择的组件不会重建，也不会重新标注版本。
@@ -203,7 +205,7 @@ python scripts/ci/signing.py sync --repo zhangyxXyz/anland
 | `Fedora-44` | Fedora 44 | `fedora44` |
 | `Arch` | Arch Linux ARM（滚动更新） | `arch` |
 
-各目标均包含 Anland Next 和完整 Xfce 桌面入口。固定版本的上游 builder 没有为 Ubuntu 24.04、25.10 提供 Anland Next，因此这两个版本不在可选范围。目标定义、默认发行版、builder commit、Xfdesktop 源码及各发行版会话包的校验值统一存放在 [`rootfs/sources.json`](rootfs/sources.json)，workflow 下拉列表与其保持一致。所有发行版共用 [`version.properties`](version.properties) 中的 `ROOTFS_VERSION`，通过文件名中的发行版标识区分，例如 `anland-rootfs-fedora44-arm64-0.1.0.tar.xz`。
+各目标均包含 Anland Next 和完整 Xfce 桌面入口。固定版本的上游 builder 没有为 Ubuntu 24.04、25.10 提供 Anland Next，因此这两个版本不在可选范围。目标定义、默认发行版、builder commit、Xfdesktop 源码及各发行版会话包的校验值统一存放在 [`rootfs/sources.json`](rootfs/sources.json)，workflow 下拉列表与其保持一致。所有发行版共用 [`version.properties`](version.properties) 中的 `ROOTFS_VERSION`，通过文件名中的发行版标识区分，例如 `anland-rootfs-fedora44-arm64-0.1.1.tar.xz`。
 
 独立的 Docker 编译阶段以所选运行镜像为基础，编译包含触控双击补丁的 Xfdesktop、包含 GPU/输入修复的 Xwayland，以及当前源码的 `anland-miniwm`。Xserver 使用仓库固定的 submodule。最终阶段安装编译后的 Xfdesktop 文件、`/usr/lib/anland/Xwayland`、会话脚本和 miniwm，校验发行版、会话包版本、AArch64 可执行文件、动态库依赖和文件哈希。编译依赖保留在临时阶段，导出镜像上传前再次检查可执行文件哈希。
 

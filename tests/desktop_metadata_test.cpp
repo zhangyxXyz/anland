@@ -13,6 +13,10 @@ static void put(const fs::path& path, const std::string& value) {
     std::ofstream(path, std::ios::binary) << value;
 }
 int main(int argc, char** argv) {
+    if (argc == 2) {
+        std::cout << window_container_name((pid_t)std::stoi(argv[1])) << '\n';
+        return 0;
+    }
     if (argc == 4) {
         auto m = desktop_metadata((pid_t)std::stoi(argv[1]), argv[2], argv[3]);
         std::cout << m.name << "\nicon bytes=" << m.icon.size() << "\n";
@@ -70,6 +74,30 @@ int main(int argc, char** argv) {
     large_png.push_back('\0');
     put(root / "usr/share/pixmaps/large-icon.png", large_png);
     assert(desktop_metadata_at(fd, "large", "en", dirs).icon.empty());
+    // Container labels use registered init identity, never hostname or app ID.
+    auto proc = root / "proc";
+    auto pids = root / "pids";
+    put(proc / "100/ns/pid", "namespace-a");
+    put(proc / "100/root", "root-a");
+    fs::create_directories(proc / "101/ns");
+    fs::create_hard_link(proc / "100/ns/pid", proc / "101/ns/pid");
+    fs::create_hard_link(proc / "100/root", proc / "101/root");
+    put(proc / "200/ns/pid", "namespace-b");
+    put(proc / "200/root", "root-b");
+    put(pids / "HostDebian.pid", "100\n");
+    put(pids / "OtherContainer.pid", "200\n");
+    assert(window_container_name(101, proc, pids) == "HostDebian");
+    assert(window_container_name(200, proc, pids) == "OtherContainer");
+    assert(window_container_name(999, proc, pids).empty());
+    put(pids / "Invalid.pid", "101 trailing junk");
+    assert(window_container_name(101, proc, pids) == "HostDebian");
+    put(pids / "Duplicate.pid", "100");
+    assert(window_container_name(101, proc, pids).empty());
+    fs::remove(pids / "Duplicate.pid");
+    // A stale/reused init PID or a different process root is not a match.
+    fs::remove(proc / "100/root");
+    put(proc / "100/root", "changed-root");
+    assert(window_container_name(101, proc, pids).empty());
     close(fd);
     fs::remove_all(root); // only the directory returned by mkdtemp above
     std::cout << "desktop metadata tests passed\n";

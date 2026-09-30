@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_settings">设置</string>
-    <string name="window_settings_summary">启动行为、显示缩放、键盘与渲染</string>
     <string name="design_connected">窗口服务已连接</string>
     <string name="design_search_windows">搜索窗口</string>
     <string name="design_no_results">没有匹配的窗口</string>

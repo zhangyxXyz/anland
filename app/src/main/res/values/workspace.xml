@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_settings">Settings</string>
-    <string name="window_settings_summary">Launch behavior, display scale, keyboard and rendering</string>
     <string name="design_connected">Window service connected</string>
     <string name="design_search_windows">Search windows</string>
     <string name="design_no_results">No matching windows</string>

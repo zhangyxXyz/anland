@@ -3,7 +3,6 @@
     <string name="app_name">Anland Wayland</string>
 
     <!-- MainActivity -->
-    <string name="settings_title">視窗設定</string>
     <string name="status_daemon_unreachable">視窗服務尚未連線</string>
     <string name="status_window_count">%1$d 個視窗 · 服務已連線</string>
     <string name="status_empty">還沒有視窗，先到 Anland Shell 啟動一個應用。</string>
