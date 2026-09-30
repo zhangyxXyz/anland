@@ -172,7 +172,7 @@ pulse-deps: check-tools
 	  if [ ! -f "$$DL/$$1" ]; then curl -fsSL --retry 3 -o "$$DL/$$1" "$$2"; fi
 	  echo "$$3  $$DL/$$1" | sha256sum -c --quiet || { echo "ERROR: checksum $$1"; rm -f "$$DL/$$1"; exit 1; }
 	}
-	fetch libtool-2.4.7.tar.xz https://ftpmirror.gnu.org/libtool/libtool-2.4.7.tar.xz \
+	fetch libtool-2.4.7.tar.xz https://ftp.gnu.org/gnu/libtool/libtool-2.4.7.tar.xz \
 	  4f7f217f057ce655ff22559ad221a0fd8ef84ad1fc5fcb6990cecc333aa1635d
 	fetch libsndfile-1.2.2.tar.xz https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz \
 	  3799ca9924d3125038880367bf1468e53a1b7e3686a934f098b7e1d286cdb80e
