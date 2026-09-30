@@ -221,6 +221,8 @@ GPL-3.0. Bundled components retain their licenses. The shared UI's MIT license i
 
 ## Appearance and in-app project information
 
+Opening or focusing a Linux window preserves the active theme controller. Unchanged effective themes are not reapplied. The Apps refresh Android's theme state and recover a stopped monitor when returning to the foreground; the Shell APK includes the monitor, so recovery does not require reflashing the root module.
+
 Linux sessions follow the effective theme of the most recently foregrounded Anland Shell or Wayland App. Selecting **System** keeps following Android, including automatic day/night changes while the Apps are in the background; selecting **Light** or **Dark** keeps that preference until it is changed. The full desktop and standalone applications share this session preference. Applications with their own explicit theme retain it; live switching depends on the application's support for GTK/XSettings or the Settings portal. Supported browser pages receive their browser's `prefers-color-scheme` changes.
 
 Shell provides a signature-protected appearance bridge for both Apps, so Wayland does not need an additional root grant. The runtime mount carries `appearance/app-theme` (active App and theme policy) and `appearance/night-mode` (Android system state). Containers need the updated Anland session/appearance scripts, `xfce4-settings`, `gsettings-desktop-schemas`, `xdg-desktop-portal` and `xdg-desktop-portal-gtk`; installing only the APKs does not add those Linux components. Packaged RootFS images include them.

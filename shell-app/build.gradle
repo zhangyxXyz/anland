@@ -53,6 +53,13 @@ android {
 }
 
 ext.anlandComponent = 'SHELL'
+def appearanceAssets = tasks.register('prepareAppearanceAssets', Sync) {
+    from('../module') { include 'appearance.sh' }
+    into(layout.buildDirectory.dir('generated/appearance-assets'))
+}
+android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/appearance-assets'))
+tasks.named('preBuild').configure { dependsOn(appearanceAssets) }
+
 apply from: '../gradle/component-version.gradle'
 apply from: '../gradle/component-signing.gradle'
 

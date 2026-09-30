@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import com.anland.shell.ds.RootExec
 import com.anland.design.LinuxThemePolicy
+import java.io.File
 
 /** One signed, serialized writer for the shared Linux session. Only Shell needs root access. */
 class AppearanceProvider : ContentProvider() {
@@ -16,7 +17,13 @@ class AppearanceProvider : ContentProvider() {
         require(method == "publish")
         val caller = callingPackage ?: context!!.packageName
         require(caller in setOf("com.anland.shell", "com.anlandnext"))
-        val command = LinuxThemePolicy.command(caller, arg ?: "System", extras?.getBoolean("claim") == true)
+        // Bundle the same monitor as the module so existing installations can recover
+        // through an APK update alone, without flashing a module or rebooting.
+        val monitor = File(context!!.filesDir, "android-appearance.sh")
+        val source = context!!.assets.open("appearance.sh").bufferedReader().use { it.readText() }
+        if (!monitor.exists() || monitor.readText() != source) monitor.writeText(source)
+        val command = LinuxThemePolicy.command(caller, arg ?: "System", extras?.getBoolean("claim") == true,
+            monitor.absolutePath)
         val result = RootExec.exec(command, 5000)
         if (!result.ok) android.util.Log.w("AnlandAppearance",
             "Root bridge exit=${result.exit}: ${result.error ?: result.stderr.take(500)}")

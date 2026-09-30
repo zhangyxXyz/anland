@@ -8,8 +8,13 @@ exec 8>"$lock"
 flock -n 8 || exit 0
 last=
 set_property() {
+    [[ "$(xfconf-query -c "$1" -p "$2" 2>/dev/null)" == "$4" ]] && return 0
     xfconf-query -c "$1" -p "$2" -s "$4" 2>/dev/null ||
         xfconf-query -c "$1" -p "$2" -n -t "$3" -s "$4"
+}
+set_setting() {
+    [[ "$(gsettings get "$1" "$2" 2>/dev/null)" == "'$3'" ]] && return 0
+    gsettings set "$1" "$2" "$3"
 }
 while :; do
     policy=$(sed -n '2p' "${state%/*}/app-theme" 2>/dev/null || true)
@@ -49,16 +54,16 @@ while :; do
                         set_property xfwm4 /general/theme string "$wm_theme" || applied=false
                         set_property xsettings /Net/IconThemeName string "WhiteSur-$mode" || applied=false
                     fi
-                    gsettings set org.gnome.desktop.interface gtk-theme "$theme" || applied=false
+                    set_setting org.gnome.desktop.interface gtk-theme "$theme" || applied=false
                     if [[ "$theme" == WhiteSur-* ]]; then
-                        gsettings set org.gnome.desktop.interface icon-theme "WhiteSur-$mode" || applied=false
+                        set_setting org.gnome.desktop.interface icon-theme "WhiteSur-$mode" || applied=false
                     fi
                 fi
                 ;;
         esac
         # xdg-desktop-portal-gtk exports this as org.freedesktop.appearance/color-scheme
         # and emits SettingChanged for browsers and libadwaita clients.
-        gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode" || applied=false
+        set_setting org.gnome.desktop.interface color-scheme "prefer-$mode" || applied=false
         if $applied; then last=$appearance; fi
     fi
     sleep 2

@@ -221,6 +221,8 @@ GPL-3.0，随附组件保留各自许可证。共享 UI 的 MIT 许可证位于 
 
 ## 外观同步与应用内项目信息
 
+打开或聚焦 Linux 窗口保持当前主题控制来源，实际深浅色未变时不重复设置外观。App 回到前台时会刷新 Android 主题状态，并恢复已停止的同步进程；Shell APK 内置同步脚本，恢复无需重新刷入 Root 模块。
+
 Linux 会话跟随最近切到前台的 Anland Shell 或 Wayland App 的实际主题。选择**跟随系统**时，App 退到后台后仍持续跟随 Android 的自动深浅色变化；选择**浅色**或**深色**时，保持该选择。完整桌面与独立 Linux 应用共用这一会话偏好。Linux 应用自身明确指定的主题保持不变；动态切换取决于应用对 GTK/XSettings 或 Settings portal 的支持。支持此功能的网页通过浏览器接收 `prefers-color-scheme` 变化。
 
 Shell 为两款 App 提供签名权限保护的外观同步入口，Wayland 无需额外申请 Root 权限。运行目录挂载中的 `appearance/app-theme` 保存当前控制 App 与主题策略，`appearance/night-mode` 保存 Android 系统状态。容器需要更新后的 Anland 会话／外观脚本，以及 `xfce4-settings`、`gsettings-desktop-schemas`、`xdg-desktop-portal`、`xdg-desktop-portal-gtk`；仅安装 APK 不会自动补齐这些 Linux 组件。发布的 RootFS 镜像已包含它们。

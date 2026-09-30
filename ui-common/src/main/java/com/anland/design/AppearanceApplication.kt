@@ -3,6 +3,7 @@ package com.anland.design
 import android.app.Activity
 import android.app.Application
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -35,8 +36,13 @@ class AppearanceApplication : Application(), Application.ActivityLifecycleCallba
     }
 
     override fun onActivityResumed(activity: Activity) {
-        // Transparent cross-app coordinators must not steal ownership from the launching app.
-        if (activity.javaClass.simpleName !in setOf("SessionPreflightActivity", "OpenWindowActivity")) publish(true)
+        // Opening/focusing Linux windows is not a change of the controlling Android UI.
+        // Otherwise mapping a window can replace Shell's policy with Wayland's policy.
+        publish(LinuxThemePolicy.claimsOnResume(activity.javaClass.simpleName))
+    }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (preferences.getString("mode", "System") == "System") publish(false)
     }
     override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
     override fun onActivityStarted(activity: Activity) = Unit
