@@ -416,6 +416,18 @@ public final class DsCli {
             if (s == null)
                 return new RootExec.Result("", "", -1,
                         "user " + user + " not found in container");
+            // A short su login starts the user manager, but logind stops it
+            // after logout unless lingering is enabled. Detached app units
+            // and Xwayland must outlive that launch login.
+            RootExec.Result persistence = runSh(name,
+                    SessionPersistence.prepare(s.user, s.uid), 20_000);
+            if (!persistence.ok)
+                return persistence;
+            // The manager may have just started and published its bus/env.
+            s = probeSession(name, user);
+            if (s == null)
+                return new RootExec.Result("", "", -1,
+                        "user " + user + " not found in container");
         }
 
         /* env: built-ins < anland-session env (~/.anlandx-env) < user custom;

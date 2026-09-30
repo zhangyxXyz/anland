@@ -34,6 +34,8 @@ Android 的触摸、键盘和 IME 事件被转发到 Wayland。X11 应用通过�
 
 Shell 提供独立的「凭据」页面，可将本地或 SSH 登录凭据绑定到容器用户。启动应用、桌面、快捷方式和本地控制台时会校验绑定。SSH 绑定要求已信任的主机密钥，并通过临时证明确认连接到选定容器及用户。容器环境变量在「容器」页面配置。
 
+Shell 在以普通用户启动应用前，会在所选容器内启用并验证 systemd 用户会话持久运行（`linger`），然后启动该用户的服务管理器。启动登录退出后，Linux 应用及其会话仍保持运行。此设置保存在容器内，不需要额外的 Droidspaces 启动参数。
+
 ## 环境与安装
 
 - 已 root、具备 SukiSU/KernelSU 和 Droidspaces 的 ARM64 Android 设备。Wayland App 最低要求 Android 10。原生服务按 Android API 35 构建，因此整套产物面向 Android 15 及以上。
