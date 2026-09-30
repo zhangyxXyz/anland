@@ -4,7 +4,7 @@
 
 # Anland
 
-Upstream project: [SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland). [zhangyxXyz](https://github.com/zhangyxXyz) maintains this fork; its source, issue tracker and App updates are provided by [zhangyxXyz/anland](https://github.com/zhangyxXyz/anland).
+Upstream project: [SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland).
 
 Run Linux container applications as Android windows on a rooted ARM64 device. Anland provides a Wayland host, an application launcher, a Root module with audio support, and ARM64 Linux images with integrated desktop fixes. RootFS builds support Debian 13 (default), Ubuntu 26.04, Fedora 43/44 and Arch Linux ARM.
 

@@ -4,7 +4,7 @@
 
 # Anland
 
-上游项目：[SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland)。[zhangyxXyz](https://github.com/zhangyxXyz) 是本分支维护者。本分支的源码、问题反馈和 App 更新由 [zhangyxXyz/anland](https://github.com/zhangyxXyz/anland) 提供。
+上游项目：[SuperTurtleDev/anland](https://github.com/SuperTurtleDev/anland)。
 
 在已 root 的 ARM64 Android 设备上，以 Android 窗口运行 Linux 容器应用。Anland 包含 Wayland 宿主、应用启动器、带音频支持的 Root 模块，以及集成桌面修复的 ARM64 Linux 镜像。RootFS 构建支持 Debian 13（默认）、Ubuntu 26.04、Fedora 43/44 和 Arch Linux ARM。
 
