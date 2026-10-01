@@ -224,8 +224,41 @@ start_pulse() {
   return 1
 }
 
+recover_boot_pulse() {
+  LOG=/data/local/tmp/awl_pulse.log
+  PAR="$RT/pulse"
+  PH="$RT/pulse-home"
+  # Android can expose AudioFlinger before package/audio policy startup is
+  # complete. An early OpenSL player failure must not leave audio off for
+  # the rest of this boot. Keep this wait separate from graphics startup.
+  waited=0
+  while [ "$(getprop sys.boot_completed)" != 1 ] ||
+        ! service check media.audio_flinger 2>/dev/null | grep -q ': found' ||
+        ! service check media.audio_policy 2>/dev/null | grep -q ': found'; do
+    if [ "$waited" -ge 180 ]; then
+      echo "anland: audio recovery timed out waiting for Android boot/audio services"
+      return 1
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+
+  recovery=1
+  while [ "$recovery" -le 3 ]; do
+    # A manual repair may already have restored sound while we waited.
+    if pulse_is_ready; then return 0; fi
+    echo "anland: post-boot audio recovery $recovery/3"
+    if start_pulse; then return 0; fi
+    if [ "$recovery" -lt 3 ]; then sleep 5; fi
+    recovery=$((recovery + 1))
+  done
+  echo "anland: post-boot audio recovery exhausted"
+  return 1
+}
+
 case "${1:-}" in
   pulse) start_pulse ;;
+  pulse-boot) recover_boot_pulse ;;
   *)
     # Complete audio staging and the real-sink readiness probe before the
     # Wayland socket becomes available to auto-starting container sessions.
@@ -234,6 +267,11 @@ case "${1:-}" in
     pulse_status=$?
     start_daemon
     nohup /system/bin/sh "$MODDIR/appearance.sh" "$RT" > /data/local/tmp/awl_appearance.log 2>&1 &
+    if [ "$pulse_status" -ne 0 ]; then
+      cp "$LOG" /data/local/tmp/awl_pulse.boot-failure.log 2>/dev/null
+      nohup /system/bin/sh "$MODDIR/service.sh" pulse-boot \
+        > /data/local/tmp/awl_pulse_recovery.log 2>&1 &
+    fi
     exit "$pulse_status"
     ;;
 esac
