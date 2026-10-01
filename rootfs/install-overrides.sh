@@ -6,6 +6,11 @@ cp -a xfdesktop-root/. /
 install -m755 Xwayland /usr/lib/anland/Xwayland
 install -m755 anland-miniwm /usr/bin/anland-miniwm
 install -m755 anland-session /usr/bin/anland-session
+fcitx_libdir=$(find /usr/lib /usr/lib64 -type d -name fcitx5 -print -quit 2>/dev/null || true)
+[[ -n "$fcitx_libdir" ]] || { echo 'Fcitx 5 library directory missing' >&2; exit 1; }
+install -m755 libanland-desktop-ime.so /usr/lib/anland/libanland-desktop-ime.so
+ln -sfn /usr/lib/anland/libanland-desktop-ime.so "$fcitx_libdir/libanland-desktop-ime.so"
+install -m644 anland-desktop-ime.conf /usr/share/fcitx5/addon/anland-desktop-ime.conf
 install -d /usr/share/anland /var/lib/droidspaces-tui/components
 install -m644 rootfs-components.json /usr/share/anland/rootfs-components.json
 source /etc/os-release

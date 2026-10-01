@@ -53,6 +53,7 @@
 #include "awl_renderer.hpp"
 #include "awl_sc.hpp"
 #include "desktop_metadata.hpp"
+#include "desktop_ime_wire.h"
 
 #include <android/binder_ibinder.h>
 #include <android/binder_parcel.h>
@@ -122,6 +123,7 @@ static bool binder_plat_init(void) {
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,6 +177,7 @@ enum {
                             (xdg-toplevel-icon-v1, best buffer, w=0 = none) */
     AWL_T_APP_ID = 19,   /* (id:i64 locale:string16) → app_id,name,encoded icon; window-scoped */
     AWL_T_CONTAINERS = 21, /* host-only registered container names */
+    AWL_T_DESKTOP_IME = 22, /* window-scoped Fcitx editor state/text channel */
     AWL_T_PRESENTATION = 20, /* (id:i64) -> parent:i64 width,height,dialog:i32 */
     AWL_T_SUBSCRIBE = 16, /* (listener binder) → ok:i32; window lifecycle events
                             * (create/destroy/attach/detach) pushed to the listener
@@ -722,6 +725,57 @@ static void attach_activity(uint64_t id, const char* title) {
  * even on the legacy path: a stale shared socket must never control another
  * container's X server, where surface serials may have the same values. */
 static const char* cfg_runtime_dir(void);
+static int desktop_ime_request(uint64_t id, const anland_ime_request& request,
+                               const std::string& text, anland_ime_reply* reply,
+                               std::string* surrounding) {
+    char app_id[256] = {};
+    awl_window_get_app_id(id, app_id, sizeof(app_id));
+    if (strcmp(app_id, "org.freedesktop.Xwayland")) return 0;
+    // Only a currently focused attachment may read or modify the editor.
+    {
+        std::lock_guard<std::mutex> lock(g_state_lock);
+        auto it = g_wins.find(id);
+        if (it == g_wins.end() || !it->second.attached || !it->second.kbd_focus) return -1;
+    }
+    pid_t client = awl_window_client_pid(id);
+    auto key = window_session_key(client);
+    if (key.empty() || text.size() > ANLAND_IME_TEXT_MAX) return -1;
+    const std::string path = std::string(cfg_runtime_dir()) + "/sessions/" + key + "/desktop-ime.sock";
+    sockaddr_un address{};
+    if (path.size() >= sizeof(address.sun_path)) return -1;
+    address.sun_family = AF_UNIX;
+    memcpy(address.sun_path, path.c_str(), path.size() + 1);
+    int fd = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    if (fd < 0) return -1;
+    int result = -1;
+    if (!connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address))) {
+        ucred peer{};
+        socklen_t length = sizeof(peer);
+        if (!getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &length) && same_window_session(client, peer.pid)) {
+            char packet[sizeof(request) + ANLAND_IME_TEXT_MAX];
+            memcpy(packet, &request, sizeof(request));
+            memcpy(packet + sizeof(request), text.data(), text.size());
+            if (send(fd, packet, sizeof(request) + text.size(), MSG_NOSIGNAL) == static_cast<ssize_t>(sizeof(request) + text.size())) {
+                pollfd ready{fd, POLLIN, 0};
+                // Bounded even if Fcitx is stopped or the peer never replies.
+                if (poll(&ready, 1, 100) > 0 && (ready.revents & POLLIN)) {
+                    char response[sizeof(*reply) + ANLAND_IME_TEXT_MAX];
+                    ssize_t size = recv(fd, response, sizeof(response), MSG_TRUNC);
+                    if (size >= static_cast<ssize_t>(sizeof(*reply)) && size <= static_cast<ssize_t>(sizeof(response))) {
+                        memcpy(reply, response, sizeof(*reply));
+                        if (reply->magic == ANLAND_IME_MAGIC && reply->length == size - sizeof(*reply)) {
+                            surrounding->assign(response + sizeof(*reply), reply->length);
+                            awl_window_map_buffer_rect(id, &reply->x, &reply->y, &reply->width, &reply->height);
+                            result = reply->status;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    close(fd);
+    return result;
+}
 static void xwm_send_cmd(uint64_t id, const char* cmd, size_t len) {
     pid_t client = awl_window_client_pid(id);
     auto key = window_session_key(client);
@@ -1607,7 +1661,8 @@ static bool caller_ok(transaction_code_t code) {
         code == AWL_T_CONNECT ||
         code == AWL_T_PAUSE || code == AWL_T_RESIZE || code == AWL_T_FOCUS ||
         code == AWL_T_INPUT || code == AWL_T_IME || code == AWL_T_CLIPBOARD ||
-        code == AWL_T_ICON || code == AWL_T_APP_ID || code == AWL_T_PRESENTATION || code == AWL_T_CLOSE)
+        code == AWL_T_ICON || code == AWL_T_APP_ID || code == AWL_T_PRESENTATION || code == AWL_T_CLOSE ||
+        code == AWL_T_DESKTOP_IME)
         return true;
 
     uid_t u = AIBinder_getCallingUid();
@@ -2097,6 +2152,28 @@ static binder_status_t host_on_transact(AIBinder* binder, transaction_code_t cod
             xwm_activate_window(ev.id, false);
         awl_input_dispatch(&ev);
         return STATUS_OK;   /* oneway, no reply */
+    }
+    case AWL_T_DESKTOP_IME: {
+        int64_t id, context;
+        int32_t op, a, b;
+        std::string text;
+        if (AParcel_readInt64(in, &id) != STATUS_OK || AParcel_readInt32(in, &op) != STATUS_OK ||
+            AParcel_readInt64(in, &context) != STATUS_OK || AParcel_readInt32(in, &a) != STATUS_OK ||
+            AParcel_readInt32(in, &b) != STATUS_OK || AParcel_readString(in, &text, wl_str_alloc) != STATUS_OK ||
+            op < 0 || op > 6 || a < 0 || b < 0 || text.size() > ANLAND_IME_TEXT_MAX) return STATUS_BAD_VALUE;
+        if (!window_ok(static_cast<uint64_t>(id))) return STATUS_PERMISSION_DENIED;
+        anland_ime_request request{ANLAND_IME_MAGIC, static_cast<uint32_t>(op),
+            static_cast<uint64_t>(context), a, b, static_cast<uint32_t>(text.size()), 0};
+        anland_ime_reply reply{};
+        std::string surrounding;
+        int status = desktop_ime_request(id, request, text, &reply, &surrounding);
+        AParcel_writeInt32(out, status);
+        AParcel_writeInt64(out, reply.context);
+        int32_t fields[] = {static_cast<int32_t>(reply.flags), reply.cursor, reply.anchor,
+            reply.x, reply.y, reply.width, reply.height};
+        for (auto field : fields) AParcel_writeInt32(out, field);
+        AParcel_writeString(out, surrounding.c_str(), static_cast<int32_t>(surrounding.size()));
+        return STATUS_OK;
     }
     case AWL_T_IME: {   /* IME text sent straight through (InputConnection → text-input protocol, ONEWAY) */
         int64_t id64; int32_t op, a, b;

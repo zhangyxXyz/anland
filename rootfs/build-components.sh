@@ -15,7 +15,8 @@ case "$ID" in
             libthunarx-3-dev libnotify-dev libyaml-dev libx11-dev libxcomposite-dev \
             xutils-dev x11proto-dev libpixman-1-dev libxkbfile-dev libxfont-dev \
             libxcvt-dev libwayland-dev wayland-protocols libxshmfence-dev libdrm-dev \
-            libepoxy-dev libgbm-dev libssl-dev libtirpc-dev libxdmcp-dev libxau-dev libdecor-0-dev
+            libepoxy-dev libgbm-dev libssl-dev libtirpc-dev libxdmcp-dev libxau-dev libdecor-0-dev \
+            libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev
         ;;
     fedora)
         dnf install -y --setopt=install_weak_deps=False gcc gcc-c++ make patch meson ninja-build \
@@ -26,14 +27,14 @@ case "$ID" in
             xorg-x11-xtrans-devel pixman-devel libxkbfile-devel libXfont2-devel \
             libxcvt-devel wayland-devel wayland-protocols-devel libxshmfence-devel \
             libdrm-devel libepoxy-devel mesa-libgbm-devel openssl-devel libtirpc-devel libXdmcp-devel \
-            libXau-devel libdecor-devel
+            libXau-devel libdecor-devel fcitx5-devel
         ;;
     arch|archarm|archlinux)
         pacman -S --noconfirm --needed base-devel patch meson ninja python bzip2 xz \
             gettext intltool gtk3 libxfce4ui libxfce4util libxfce4windowing xfconf exo \
             garcon thunar libnotify libyaml libx11 libxcomposite xorg-util-macros \
             xorgproto xtrans pixman libxkbfile libxfont2 libxcvt wayland wayland-protocols \
-            libxshmfence libdrm libepoxy mesa openssl libtirpc libxdmcp libxau libdecor
+            libxshmfence libdrm libepoxy mesa openssl libtirpc libxdmcp libxau libdecor fcitx5
         ;;
     *) echo "Unsupported build system: $ID" >&2; exit 1 ;;
 esac
@@ -54,4 +55,7 @@ meson compile -C build -j4
 install -m755 build/hw/xwayland/Xwayland /out/Xwayland
 gcc -O2 -Wall /src/miniwm.c -o /out/anland-miniwm -lX11 -lXcomposite
 install -m755 /src/anland-session /out/anland-session
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -fPIC -shared -I/src \
+    /src/fcitx5-anland.cpp $(pkg-config --cflags --libs Fcitx5Core) -o /out/libanland-desktop-ime.so
+install -m644 /src/fcitx5-anland.conf /out/anland-desktop-ime.conf
 python3 /src/record-components.py

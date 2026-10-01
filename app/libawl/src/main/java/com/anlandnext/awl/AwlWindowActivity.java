@@ -152,6 +152,73 @@ public class AwlWindowActivity extends Activity {
     private int imeHint, imePurpose;    /* zwp_text_input content type */
     private final int[] imeRect = new int[4];   /* cursor rect (surface coords) */
     private boolean imeWanted;          /* input wanted (kept across detach, basis for reopening) */
+    private boolean desktopIme, desktopProbeDone, desktopPollBusy;
+    private long desktopContext, desktopEditSequence;
+    private int cursorUpdateMode;
+    private final ProjectionImeCompat projectionIme = new ProjectionImeCompat();
+    private final java.util.concurrent.ExecutorService desktopImeWorker =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final android.os.Handler desktopImeHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable desktopImePoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed() || !hasWindowFocus() || !attached || id < 0) return;
+            if (desktopProbeDone && !desktopIme) return;
+            if (!desktopPollBusy) {
+                desktopPollBusy = true;
+                final long window = id, sequence = desktopEditSequence;
+                desktopImeWorker.execute(() -> {
+                    AwlClient.DesktopEditor editor = AwlClient.desktopIme(window, 0, 0, 0, 0, "");
+                    runOnUiThread(() -> {
+                        desktopPollBusy = false;
+                        if (id == window && hasWindowFocus() && attached && sequence == desktopEditSequence)
+                            applyDesktopEditor(editor);
+                    });
+                });
+            }
+            desktopImeHandler.postDelayed(this, 200);
+        }
+    };
+
+    private void applyDesktopEditor(AwlClient.DesktopEditor editor) {
+        if (editor == null || editor.status < 0) return; // old daemon / optional bridge absent
+        desktopProbeDone = true;
+        desktopIme = editor.status > 0;
+        if (!desktopIme) return;
+        if (editor.status == 2) {
+            desktopContext = 0;
+            if (imeWanted) onImeHide();
+            return;
+        }
+        boolean changed = desktopContext != editor.context;
+        desktopContext = editor.context;
+        if (changed) {
+            compText = ""; compCursor = 0; markedStart = markedEnd = -1;
+            surText = ""; surCursor = surAnchor = 0;
+        }
+        if ((editor.flags & 1) != 0) {
+            surText = editor.text;
+            surCursor = byteToChar(surText, editor.cursor);
+            surAnchor = byteToChar(surText, editor.anchor);
+        } else {
+            surText = ""; surCursor = surAnchor = 0;
+        }
+        imeRect[0] = editor.x; imeRect[1] = editor.y;
+        imeRect[2] = Math.max(1, editor.width); imeRect[3] = Math.max(1, editor.height);
+        int purpose = (editor.flags & 2) != 0 ? 8 : 0; // password / normal
+        if (!imeWanted || purpose != imePurpose) onImeShow(0, purpose);
+        if (changed && imm != null) imm.restartInput(hiddenInput);
+        notifyImeState();
+    }
+
+    private boolean sendIme(int op, int a, int b, String text) {
+        if (!desktopIme) { AwlClient.ime(id, op, a, b, text); return true; }
+        ++desktopEditSequence; // discard a poll captured before this edit
+        AwlClient.DesktopEditor editor = AwlClient.desktopIme(id, op, desktopContext, a, b, text);
+        if (editor == null || editor.status != 1 || editor.context != desktopContext) return false;
+        imeRect[0] = editor.x; imeRect[1] = editor.y;
+        imeRect[2] = Math.max(1, editor.width); imeRect[3] = Math.max(1, editor.height);
+        return true;
+    }
     private String compText = "";       /* mirror of the preedit we sent (inserted at surCursor) */
     private int compCursor;             /* char cursor inside the preedit */
 
@@ -454,6 +521,9 @@ public class AwlWindowActivity extends Activity {
         markedStart = markedEnd = -1;
         imeBatchDepth = 0;
         imeWanted = false;
+        desktopIme = desktopProbeDone = false;
+        desktopContext = 0;
+        ++desktopEditSequence;
         LIVE.put(id, this);
 
         if (fromRegistry) {
@@ -612,6 +682,7 @@ public class AwlWindowActivity extends Activity {
         root.addView(sv, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(hiddenInput, new FrameLayout.LayoutParams(1, 1));
+        sv.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> notifyImeState());
         /* IME inset: in inset mode the surface yields (client reflows); in overlay mode the keyboard floats above */
         if (android.os.Build.VERSION.SDK_INT >= 30)
             SurfaceInsetsController.install(root, this::applyContentInsets);
@@ -810,6 +881,10 @@ public class AwlWindowActivity extends Activity {
         // the previous attachment harmless even when this Activity is reused.
         int rc = AwlClient.surface(id, w, h, holder.getSurface(), ctrl, host, ++surfaceGeneration);
         attached = rc == 0;
+        if (attached) {
+            desktopImeHandler.removeCallbacks(desktopImePoll);
+            desktopImeHandler.post(desktopImePoll);
+        }
         lastW = w;
         lastH = h;
         if (!attached) {
@@ -937,6 +1012,8 @@ public class AwlWindowActivity extends Activity {
         else if (attached)
             AwlClient.focus(id, hasWindowFocus(), host, surfaceGeneration);
         fireHost((cbs, win, act) -> cbs.onHostResume(win, act));
+        desktopImeHandler.removeCallbacks(desktopImePoll);
+        desktopImeHandler.post(desktopImePoll);
         Log.i(TAG, "win " + id + " RESUME");
         /* capture state is daemon-owned: the SURFACE re-attach re-pushes
          * C_CAPTURE (a persistent constraint survives the pause) */
@@ -944,6 +1021,7 @@ public class AwlWindowActivity extends Activity {
 
     @Override
     protected void onPause() {
+        desktopImeHandler.removeCallbacks(desktopImePoll);
         fireHost((cbs, win, act) -> cbs.onHostPause(win, act));
         if (clipMgr != null)
             clipMgr.removePrimaryClipChangedListener(clipListener);
@@ -969,6 +1047,9 @@ public class AwlWindowActivity extends Activity {
         if (id < 0) return;   /* awaiting: nothing to report focus for */
         AwlClient.focus(id, hasFocus, host, surfaceGeneration);   /* focus notifies the wayland client (configure ACTIVATED) */
         if (hasFocus) {
+            projectionIme.reset();
+            desktopImeHandler.removeCallbacks(desktopImePoll);
+            desktopImeHandler.post(desktopImePoll);
             tryShowIme();        /* C_IME_SHOW may arrive before focus does (input state kept across re-attach) */
             pushClipboard();     /* daemon restart / listener missed the change → re-push while focused */
             applyPointerCapture();   /* the system broke the capture silently on focus loss — re-request (mode unchanged) */
@@ -998,6 +1079,9 @@ public class AwlWindowActivity extends Activity {
         hiddenInput.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         hiddenInput.setCursorVisible(false);
         hiddenInput.setAlpha(0f);
+        hiddenInput.setPadding(0, 0, 0, 0);
+        hiddenInput.setMinWidth(0);
+        hiddenInput.setMinHeight(0);
         hiddenInput.setEnabled(false);
         hiddenInput.setFocusable(false);
         hiddenInput.setFocusableInTouchMode(false);
@@ -1101,6 +1185,7 @@ public class AwlWindowActivity extends Activity {
         hiddenInput.setFocusable(true);
         hiddenInput.setFocusableInTouchMode(true);
         boolean focused = hiddenInput.requestFocus();
+        notifyImeState();
         /* explicit (flags=0), not SHOW_IMPLICIT: the wl client asked for the
          * panel; InputMethodService.onShowInputRequested refuses implicit
          * requests while a hard keyboard is attached. */
@@ -1139,7 +1224,6 @@ public class AwlWindowActivity extends Activity {
             compCursor = 0;
             markedStart = markedEnd = -1;
             if (imm != null) imm.restartInput(hiddenInput);
-            return;
         }
         if (typeChanged) hiddenInput.setInputType(imeInputType());
         notifyImeState();
@@ -1147,7 +1231,7 @@ public class AwlWindowActivity extends Activity {
 
     /** Push selection/composing region/cursor anchor (IME candidate window follows the cursor, context stays in sync) */
     private void notifyImeState() {
-        if (imm == null || imeBatchDepth > 0) return;
+        if (imm == null || hiddenInput == null || imeBatchDepth > 0) return;
         int sel = editorSelStart();
         int candStart = -1, candEnd = -1;
         int compAt = Math.min(surCursor, surText.length());
@@ -1160,13 +1244,35 @@ public class AwlWindowActivity extends Activity {
             candEnd = markedEnd;
         }
         imm.updateSelection(hiddenInput, sel, editorSelEnd(), candStart, candEnd);
-        if (imeRect[2] > 0 && imeRect[3] > 0 && sv != null) {
+        // Wayland permits a zero-width caret rectangle (GTK uses it).
+        if (imeRect[2] >= 0 && imeRect[3] > 0 && sv != null) {
             /* Positional parameters require a local→screen matrix
              * (CursorAnchorInfo.Builder.build throws IllegalArgumentException
              * otherwise). The daemon's rect is in surface-view pixels; the
              * IME wants screen coordinates. */
             int[] loc = new int[2];
             sv.getLocationOnScreen(loc);
+            int[] inWindow = new int[2];
+            sv.getLocationInWindow(inWindow);
+            // Screen-sharing implementations may locate the editor via its
+            // View bounds or the legacy window-local cursor rect. Keep all
+            // three representations aligned with the actual Linux caret.
+            int[] inRoot = new int[2];
+            root.getLocationOnScreen(inRoot);
+            FrameLayout.LayoutParams editorLayout = (FrameLayout.LayoutParams)hiddenInput.getLayoutParams();
+            int width = Math.max(1, imeRect[2]), height = Math.max(1, imeRect[3]);
+            int left = loc[0] - inRoot[0] + imeRect[0];
+            int top = loc[1] - inRoot[1] + imeRect[1];
+            if (editorLayout.width != width || editorLayout.height != height
+                    || editorLayout.leftMargin != left || editorLayout.topMargin != top) {
+                editorLayout.width = width; editorLayout.height = height;
+                editorLayout.leftMargin = left; editorLayout.topMargin = top;
+                hiddenInput.setLayoutParams(editorLayout);
+            }
+            updateLegacyCursor(inWindow[0] + imeRect[0], inWindow[1] + imeRect[1], width, height);
+            if (hasWindowFocus() && imeWanted)
+                projectionIme.update(hiddenInput.getInputType(), loc[0] + imeRect[0],
+                        loc[1] + imeRect[1]); // OEM TextView reports the caret's top
             android.graphics.Matrix m = new android.graphics.Matrix();
             m.setTranslate(loc[0], loc[1]);
             CursorAnchorInfo.Builder b = new CursorAnchorInfo.Builder()
@@ -1185,6 +1291,11 @@ public class AwlWindowActivity extends Activity {
                 Log.w(TAG, "win " + id + ": cursor anchor info rejected: " + e.getMessage());
             }
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void updateLegacyCursor(int x, int y, int width, int height) {
+        imm.updateCursor(hiddenInput, x, y, x + width, y + height);
     }
 
     private void clearComposing() {
@@ -1351,8 +1462,8 @@ public class AwlWindowActivity extends Activity {
             // Text-input-v3 can replace around its cursor, not a disjoint
             // remote selection. Never claim an unrelated deletion succeeded.
             if (a > c || b < c) return false;
-            AwlClient.ime(id, preedit ? AwlClient.IME_REPLACE_PREEDIT : AwlClient.IME_REPLACE,
-                    utf8Len(surText.substring(a, c)), utf8Len(surText.substring(c, b)), text);
+            if (!sendIme(preedit ? AwlClient.IME_REPLACE_PREEDIT : AwlClient.IME_REPLACE,
+                    utf8Len(surText.substring(a, c)), utf8Len(surText.substring(c, b)), text)) return false;
             surText = surText.substring(0, a) + surText.substring(b);
             surCursor = surAnchor = a;
             markedStart = markedEnd = -1;
@@ -1366,7 +1477,7 @@ public class AwlWindowActivity extends Activity {
             String t = text == null ? "" : text.toString();
             boolean marked = markedStart >= 0;
             if (marked && !replaceMarked(t, false)) return false;
-            if (!marked) AwlClient.ime(id, AwlClient.IME_COMMIT, 0, 0, t);
+            if (!marked && !sendIme(AwlClient.IME_COMMIT, 0, 0, t)) return false;
             /* keep the virtual editor in step: without this a commit-only
              * session (English typing) leaves surText stale and the next
              * backspace converts to a zero-byte delete (client-side no-op) */
@@ -1385,7 +1496,7 @@ public class AwlWindowActivity extends Activity {
             if (marked && !replaceMarked(t, true)) return false;
             int cb = preeditCursorBytes(t, newCursorPosition);
             if (!marked || cb != utf8Len(t))
-                AwlClient.ime(id, AwlClient.IME_PREEDIT, cb, cb, t);
+                if (!sendIme(AwlClient.IME_PREEDIT, cb, cb, t)) return false;
             if (compText.isEmpty() && surCursor != surAnchor) {
                 int a = Math.min(surCursor, surAnchor), b = Math.max(surCursor, surAnchor);
                 surText = surText.substring(0, a) + surText.substring(b);
@@ -1425,9 +1536,9 @@ public class AwlWindowActivity extends Activity {
          * state cache still shows the pre-delete editor makes it delete again,
          * each retry eating another char until the field is empty. */
         private void deleteAround(int beforeChars, int afterChars, boolean codePoints) {
-            AwlClient.ime(id, AwlClient.IME_DELETE,
+            if (!sendIme(AwlClient.IME_DELETE,
                     codePoints ? bytesBeforeCp(beforeChars) : bytesBefore(beforeChars),
-                    codePoints ? bytesAfterCp(afterChars) : bytesAfter(afterChars), "");
+                    codePoints ? bytesAfterCp(afterChars) : bytesAfter(afterChars), "")) return;
             int c = Math.min(surCursor, surText.length());
             int a = codePoints ? cpBack(surText, c, beforeChars)
                                : snapBack(surText, Math.max(0, c - beforeChars));
@@ -1476,7 +1587,7 @@ public class AwlWindowActivity extends Activity {
             String et = editorText();
             int a = toSurroundingIndex(snap(et, Math.max(0, Math.min(start, end))));
             int b = toSurroundingIndex(snap(et, Math.min(et.length(), Math.max(start, end))));
-            AwlClient.ime(id, AwlClient.IME_CURSOR, a, b, "");
+            if (!sendIme(AwlClient.IME_CURSOR, a, b, "")) return false;
             surCursor = a;
             surAnchor = b;
             notifyImeState();
@@ -1551,7 +1662,13 @@ public class AwlWindowActivity extends Activity {
 
         @Override
         public boolean requestCursorUpdates(int cursorUpdateMode) {
-            return true;   /* every state push already does updateCursorAnchorInfo */
+            AwlWindowActivity.this.cursorUpdateMode = cursorUpdateMode;
+            if ((cursorUpdateMode & InputConnection.CURSOR_UPDATE_IMMEDIATE) != 0) notifyImeState();
+            return true;
+        }
+
+        @Override public boolean requestCursorUpdates(int cursorUpdateMode, int cursorUpdateFilter) {
+            return requestCursorUpdates(cursorUpdateMode);
         }
 
         @Override
@@ -2180,6 +2297,8 @@ public class AwlWindowActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        desktopImeHandler.removeCallbacks(desktopImePoll);
+        desktopImeWorker.shutdown();
         if (taskPreferences != null) taskPreferences.unregisterOnSharedPreferenceChangeListener(taskPreferenceListener);
         fireHost((cbs, win, act) -> cbs.onHostDestroy(win, act));
         boolean owned = LIVE.remove(id, this);

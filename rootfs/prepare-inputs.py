@@ -31,6 +31,9 @@ for folder in ('xfdesktop', 'xwayland'):
     shutil.copytree(SOURCE / 'patches' / folder, out / 'patches' / folder)
 for name, source in {'anland-session': 'anland-session/anland-session.sh',
                      'miniwm.c': 'anland-session/miniwm.c',
+                     'fcitx5-anland.cpp': 'anland-session/fcitx5-anland.cpp',
+                     'fcitx5-anland.conf': 'anland-session/fcitx5-anland.conf',
+                     'desktop_ime_wire.h': 'include/desktop_ime_wire.h',
                      'build-components.sh': 'rootfs/build-components.sh',
                      'record-components.py': 'rootfs/record-components.py'}.items():
     shutil.copyfile(SOURCE / source, out / name)

@@ -38,6 +38,34 @@ final class AwlClient {
     static final int T_APP_ID = 19;
     static final int T_PRESENTATION = 20;
     static final int T_CONTAINERS = 21;
+    static final int T_DESKTOP_IME = 22;
+
+    static final class DesktopEditor {
+        int status, flags, cursor, anchor, x, y, width, height;
+        long context;
+        String text = "";
+    }
+
+    static DesktopEditor desktopIme(long id, int op, long context, int a, int c, String text) {
+        IBinder binder = get();
+        if (binder == null) return null;
+        Parcel d = Parcel.obtain(), r = Parcel.obtain();
+        try {
+            d.writeInterfaceToken(DESCRIPTOR); d.writeLong(id); d.writeInt(op);
+            d.writeLong(context); d.writeInt(a); d.writeInt(c); d.writeString(text);
+            if (!binder.transact(T_DESKTOP_IME, d, r, 0) || r.dataSize() < 40) return null;
+            DesktopEditor editor = new DesktopEditor();
+            editor.status = r.readInt(); editor.context = r.readLong(); editor.flags = r.readInt();
+            editor.cursor = r.readInt(); editor.anchor = r.readInt();
+            editor.x = r.readInt(); editor.y = r.readInt();
+            editor.width = r.readInt(); editor.height = r.readInt();
+            String surrounding = r.readString();
+            editor.text = surrounding == null ? "" : surrounding;
+            return editor;
+        } catch (Exception e) { Log.w(TAG, "desktop editor channel unavailable", e); }
+        finally { d.recycle(); r.recycle(); }
+        return null;
+    }
 
     static ArrayList<String> containers() {
         ArrayList<String> names = containerCatalog();

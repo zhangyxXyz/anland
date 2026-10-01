@@ -18,6 +18,7 @@ RUNTIME = {
     'usr/bin/anland-miniwm': 'anland-miniwm',
     'usr/bin/anland-session': 'anland-session',
     'usr/bin/xfdesktop': 'xfdesktop',
+    'usr/lib/anland/libanland-desktop-ime.so': 'desktop-ime',
 }
 METADATA = 'usr/share/anland/rootfs-components.json'
 

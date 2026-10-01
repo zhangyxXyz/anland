@@ -18,6 +18,7 @@ for path, expected in manifest['xfdesktop_files'].items():
         raise SystemExit(f'Wrong installed Xfdesktop file: {path}')
 for name, path in {'Xwayland': '/usr/lib/anland/Xwayland',
                    'anland-miniwm': '/usr/bin/anland-miniwm',
+                   'desktop-ime': '/usr/lib/anland/libanland-desktop-ime.so',
                    'anland-session': '/usr/bin/anland-session', 'xfdesktop': '/usr/bin/xfdesktop'}.items():
     data = Path(path).read_bytes()
     if hashlib.sha256(data).hexdigest() != manifest['patched_files'][name]:
@@ -45,6 +46,7 @@ session = Path('/usr/bin/anland-session').read_text()
 if 'ANLAND_COMPAT_BIN_DIR:=/usr/lib/anland' not in session:
     raise SystemExit('Session does not prefer packaged Xwayland')
 for path in ('/usr/local/bin/anland-desktop', '/usr/local/bin/anland-desktop-session',
+             '/usr/share/fcitx5/addon/anland-desktop-ime.conf',
              '/usr/local/bin/anland-desktop-inner', '/usr/local/bin/anland-desktop-appearance',
              '/usr/share/xdg-desktop-portal/anland-portals.conf',
              '/usr/share/xdg-desktop-portal/xfce-portals.conf',

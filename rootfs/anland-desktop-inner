@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+# The full desktop's Fcitx context is also the Android/PC IME text endpoint.
+# It owns this desktop's private D-Bus, independently of standalone apps.
+export GTK_IM_MODULE=fcitx QT_IM_MODULE=fcitx XMODIFIERS=@im=fcitx
+export SDL_IM_MODULE=fcitx GLFW_IM_MODULE=fcitx
+fcitx5 -d
 # Match the previous apparent size on the 200% host window while rendering
 # at native resolution. Keep subsequent user scaling choices intact.
 config="${XDG_CONFIG_HOME:-$HOME/.config}/anland"

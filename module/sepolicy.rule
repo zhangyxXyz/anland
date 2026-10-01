@@ -158,6 +158,10 @@ allow awl_daemon awl_daemon dir search
 allow awl_daemon awl_daemon file { getattr read open }
 allow awl_daemon droidspacesd dir search
 allow awl_daemon droidspacesd file { getattr read open }
+# Fcitx desktop IME endpoint: the host daemon verifies container/user peer
+# identity and the current focused attachment before each text operation.
+allow awl_daemon droidspacesd unix_stream_socket { connectto read write getopt }
+allow droidspacesd self unix_stream_socket { create bind listen accept read write getattr setattr getopt setopt shutdown }
 allow awl_daemon untrusted_app_29 dir search
 allow awl_daemon untrusted_app dir search
 allow awl_daemon untrusted_app_29 file { getattr read open }

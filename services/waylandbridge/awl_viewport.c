@@ -223,6 +223,27 @@ void awl_surface_view_map(struct awl_surface* root,
                  (double)cw, (double)ch, rx, ry, sx, sy, ox, oy);
 }
 
+int awl_window_map_buffer_rect(uint64_t id, int32_t* x, int32_t* y, int32_t* w, int32_t* h) {
+    int found = 0;
+    pthread_rwlock_rdlock(&g_srv.rwl);
+    struct awl_surface* s = awl_surface_by_id(id);
+    if (s) {
+        pthread_mutex_lock(&s->ev_lock);
+        double sx, sy, ox, oy;
+        awl_surface_view_map(s, &sx, &sy, &ox, &oy);
+        double rx, ry;
+        vp_buffer_ratio(s, &rx, &ry);
+        *x = (int32_t)((double)*x / rx * sx + ox);
+        *y = (int32_t)((double)*y / ry * sy + oy);
+        *w = (int32_t)((double)*w / rx * sx);
+        *h = (int32_t)((double)*h / ry * sy);
+        pthread_mutex_unlock(&s->ev_lock);
+        found = 1;
+    }
+    pthread_rwlock_unlock(&g_srv.rwl);
+    return found;
+}
+
 /* Sample region (viewport source; absent = whole buffer) → normalized uv
  * transform for the layer snapshot / cursor layer. The shader uv is already
  * Y-flipped (top-down) and the source rectangle is top-down too, so a plain

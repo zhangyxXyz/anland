@@ -6,7 +6,8 @@ from pathlib import Path
 out = Path('/out')
 manifest = json.loads(Path('/src/rootfs-inputs.json').read_text())
 files = {'Xwayland': out / 'Xwayland', 'anland-miniwm': out / 'anland-miniwm',
-         'anland-session': out / 'anland-session', 'xfdesktop': out / 'xfdesktop-root/usr/bin/xfdesktop'}
+         'anland-session': out / 'anland-session', 'xfdesktop': out / 'xfdesktop-root/usr/bin/xfdesktop',
+         'desktop-ime': out / 'libanland-desktop-ime.so'}
 manifest['patched_files'] = {name: hashlib.sha256(path.read_bytes()).hexdigest()
                              for name, path in files.items()}
 manifest['xfdesktop_files'] = {p.relative_to(out / 'xfdesktop-root').as_posix():

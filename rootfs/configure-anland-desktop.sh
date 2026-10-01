@@ -8,17 +8,20 @@ case "$ID" in
         run_root env DEBIAN_FRONTEND=noninteractive apt-get update
         run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             xfce4-session xfce4-panel xfdesktop4 xfwm4 xfce4-settings thunar xfce4-terminal \
-            xauth x11-utils xcompmgr python3 libdecor-0-0 libnotify4 libgarcon-gtk3-1-0 xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
+            xauth x11-utils xcompmgr python3 libdecor-0-0 libnotify4 libgarcon-gtk3-1-0 xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas \
+            fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
         ;;
     fedora)
         run_root dnf install -y --setopt=install_weak_deps=False \
             xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings Thunar xfce4-terminal \
-            xauth xprop xdpyinfo xcompmgr python3 libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
+            xauth xprop xdpyinfo xcompmgr python3 libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas \
+            fcitx5 fcitx5-gtk fcitx5-chinese-addons
         ;;
     arch|archarm|archlinux)
         run_root pacman -S --noconfirm --needed \
             xfce4-session xfce4-panel xfdesktop xfwm4 xfce4-settings thunar xfce4-terminal \
-            xorg-xauth xorg-xprop xorg-xdpyinfo xcompmgr python libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas
+            xorg-xauth xorg-xprop xorg-xdpyinfo xcompmgr python libdecor libnotify garcon xdg-desktop-portal xdg-desktop-portal-gtk gsettings-desktop-schemas \
+            fcitx5 fcitx5-gtk fcitx5-chinese-addons
         ;;
     *) echo "Unsupported desktop system: $ID" >&2; exit 1 ;;
 esac
