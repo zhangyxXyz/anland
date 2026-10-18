@@ -7,13 +7,12 @@ import android.util.Log;
 import android.view.Surface;
 
 import java.io.FileDescriptor;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 /**
  * Raw binder client of the anland daemon service "anland.host" (internal to
- * the library — third-party code uses {@link Awl}). Reflects into
- * ServiceManager.getService (hidden API, light-grey).
+ * the library — third-party code uses {@link Awl}). The host provider delivers
+ * the original Binder from the module's root discovery bridge.
  *
  * Protocol (matches the AWL_T_* codes in the daemon's waylandbridge.cpp; the
  * daemon scopes every transaction this library makes to the caller's own
@@ -145,16 +144,7 @@ final class AwlClient {
     private static IBinder get() {
         if (s != null && s.pingBinder()) return s;
         s = null;
-        try {
-            Class<?> sm = Class.forName("android.os.ServiceManager");
-            Method m = sm.getMethod("getService", String.class);
-            IBinder b = (IBinder) m.invoke(null, "anland.host");
-            if (b == null) Log.w(TAG, "getService(anland.host) = null");
-            else if (b.pingBinder()) s = b;
-            else Log.w(TAG, "anland.host pingBinder=false");
-        } catch (Exception e) {
-            Log.e(TAG, "getService failed", e);
-        }
+        s = HostConnection.get();
         return s;
     }
 

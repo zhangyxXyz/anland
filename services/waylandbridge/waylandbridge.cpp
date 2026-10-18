@@ -1569,9 +1569,9 @@ static void* host_on_create(void* args) { return args; }
 static void host_on_destroy(void* userData) {}
 
 /* ---------------- Caller verification (uid allowlist) ----------------
- * The service is reachable by every app on the device (sepolicy grants
- * find/call to all untrusted domains — SELinux cannot split packages within
- * one domain) while the transactions are powerful: input injection, clipboard
+ * The host provider distributes the original service Binder to client apps
+ * (only the module's root bridge performs ServiceManager discovery), while
+ * the transactions are powerful: input injection, clipboard
  * push, config writes, root `am start`, and a caller-chosen death/ctrl
  * binder in SURFACE. uid is the only reliable identity visible to the NDK:
  * assigned by the binder driver (not spoofable), valid for oneway calls too

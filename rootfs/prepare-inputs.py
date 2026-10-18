@@ -11,6 +11,7 @@ sys.path.insert(0, str(SOURCE / 'scripts/ci'))
 from release import sha256
 from rootfs_target import resolve
 from versions import read_versions, version_suffix
+from mount_policy import hashes as mount_policy_hashes
 
 out = Path(sys.argv[1])
 # A retry must not pick up output from a different target.
@@ -42,6 +43,7 @@ manifest = {
     'target': target,
     'target_config': config,
     'rootfs_version': versions['ROOTFS_VERSION'] + version_suffix(),
+    'service_mount_policy': mount_policy_hashes(),
     'release_version': versions['RELEASE_VERSION'],
     'source': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=SOURCE, text=True).strip(),
     'xserver_commit': subprocess.check_output(['git', '-C', str(SOURCE / 'third_party/xserver'),

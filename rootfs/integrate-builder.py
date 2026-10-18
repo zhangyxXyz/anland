@@ -23,6 +23,7 @@ def integrate(builder, inputs, target=None):
     shutil.copytree(inputs, context, dirs_exist_ok=True)
     shutil.copyfile(SOURCE / 'rootfs/install-overrides.sh', context / 'install.sh')
     shutil.copyfile(SOURCE / 'rootfs/verify-installed.py', context / 'verify-installed.py')
+    shutil.copyfile(SOURCE / 'rootfs/mount_policy.py', context / 'mount_policy.py')
     filename = package['filename']
     install = {
         'apt': f'apt-get install -y /tmp/{filename}',
@@ -48,7 +49,7 @@ def integrate(builder, inputs, target=None):
                         'RUN bash /src/build-components.sh\n\n'
                         'FROM customizer AS integrated\n'
                         'COPY --from=component-builder /out/ /tmp/anland-overrides/\n'
-                        'COPY anland-overrides/install.sh anland-overrides/verify-installed.py /tmp/anland-overrides/\n'
+                        'COPY anland-overrides/install.sh anland-overrides/verify-installed.py anland-overrides/mount_policy.py /tmp/anland-overrides/\n'
                         'RUN bash /tmp/anland-overrides/install.sh && rm -rf /tmp/anland-overrides /usr/local/sbin/assets\n\n'
                         'FROM scratch AS export\n')
     text = replace_once(text, 'COPY --from=customizer / /', 'COPY --from=integrated / /')

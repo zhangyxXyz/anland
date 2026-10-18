@@ -12,6 +12,8 @@
 
 ## 组件
 
+Root 模块通过 `service.sh` 启动原生 daemon 和 root Binder 桥接进程，无需覆盖 `/system`。模块携带 `skip_mount`，Hybrid Mount 可设为 `ignore`；这只跳过文件挂载，不能禁用模块脚本或 SELinux 规则。升级时需同时更新 Wayland APK 和模块，并重启以移除旧挂载。Shell 无需为此更换通信接口。桥接只分发 daemon 的原始 Binder，窗口操作仍按实际调用 App 的 UID 校验。当前桥接发布到 Android 主用户（user 0）。
+
 | 组件 | 用途 | 产物 |
 |---|---|---|
 | Shell App（`com.anland.shell`） | 容器选择与控制、应用列表、快捷方式、控制台、保存的本地/SSH 登录 | `anland-shell.apk` |
@@ -135,14 +137,14 @@ flowchart LR
 [`version.properties`](version.properties) 是唯一版本配置入口，各组件独立编号：
 
 ```properties
-RELEASE_VERSION=0.5.3
-SHELL_VERSION_NAME=0.2.6
-SHELL_VERSION_CODE=8
-WAYLAND_VERSION_NAME=0.2.5
-WAYLAND_VERSION_CODE=7
-MODULE_VERSION_NAME=0.5.3
-MODULE_VERSION_CODE=8
-ROOTFS_VERSION=0.1.2
+RELEASE_VERSION=0.5.4
+SHELL_VERSION_NAME=0.2.7
+SHELL_VERSION_CODE=9
+WAYLAND_VERSION_NAME=0.2.6
+WAYLAND_VERSION_CODE=8
+MODULE_VERSION_NAME=0.5.4
+MODULE_VERSION_CODE=9
+ROOTFS_VERSION=0.1.3
 ```
 
 Git tag 必须等于 `v` 加 `RELEASE_VERSION`，不要求各组件版本与 tag 相同。发布某个 App/模块的新版本时，递增该组件的整数版本号。未选择的组件不会重建，也不会重新标注版本。
@@ -220,13 +222,17 @@ python scripts/ci/signing.py sync --repo zhangyxXyz/anland
 | `Fedora-44` | Fedora 44 | `fedora44` |
 | `Arch` | Arch Linux ARM（滚动更新） | `arch` |
 
-表中各目标均包含 Anland Next 和完整 Xfce 桌面入口。目标定义、默认发行版、builder commit、Xfdesktop 源码及各发行版会话包的校验值统一存放在 [`rootfs/sources.json`](rootfs/sources.json)，workflow 下拉列表与其保持一致。所有发行版共用 [`version.properties`](version.properties) 中的 `ROOTFS_VERSION`，通过文件名中的发行版标识区分，例如 `anland-rootfs-fedora44-arm64-0.1.2.tar.xz`。
+表中各目标均包含 Anland Next 和完整 Xfce 桌面入口。目标定义、默认发行版、builder commit、Xfdesktop 源码及各发行版会话包的校验值统一存放在 [`rootfs/sources.json`](rootfs/sources.json)，workflow 下拉列表与其保持一致。所有发行版共用 [`version.properties`](version.properties) 中的 `ROOTFS_VERSION`，通过文件名中的发行版标识区分，例如 `anland-rootfs-fedora44-arm64-0.1.3.tar.xz`。
 
 独立的 Docker 编译阶段以所选运行镜像为基础，编译包含触控双击补丁的 Xfdesktop、包含 GPU/输入修复的 Xwayland，以及当前源码的 `anland-miniwm`。Xserver 使用仓库固定的 submodule。最终阶段安装编译后的 Xfdesktop 文件、`/usr/lib/anland/Xwayland`、会话脚本和 miniwm，校验发行版、会话包版本、AArch64 可执行文件、动态库依赖和文件哈希。编译依赖保留在临时阶段，导出镜像上传前再次检查可执行文件哈希。
 
 `/usr/share/anland/rootfs-components.json` 记录目标发行版、编译的 Xfdesktop 源码版本等来源信息。`/usr/share/anland/packages.tsv` 列出原生软件包。修复后的 Xfdesktop 文件覆盖发行版包中的对应文件，因此包管理器中的版本表示基础包版本，清单表示实际编译的修复来源。镜像通过 APT hold、DNF 排除项或 Pacman `IgnorePkg` 保护 Xfdesktop 和 `anland-session`，避免普通升级覆盖修复。需要主动替换时，Debian/Ubuntu 执行 `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session`。Fedora 修改 `/etc/dnf/dnf.conf` 的 `excludepkgs`。Arch 修改 `/etc/pacman.conf` 的 `IgnorePkg`。显式重装或上游 TUI 的组件替换仍可能覆盖修复文件。
 
 发行版软件源、基础镜像及其他上游下载没有完整快照固定，因此不承诺镜像逐字节可复现。每个所选目标都需要通过镜像构建检查，设备兼容性还需运行验证。
+
+RootFS 0.1.3 为 `systemd-resolved`、`systemd-networkd`、`systemd-logind`、`polkit`、`php8.4-fpm`、`mariadb` 六个服务预置 `MountFlags=slave`。配置位于 `/etc/systemd/system/<服务名>.service.d/90-anland-mountflags-slave.conf`，通常不会被软件包升级覆盖，构建时记录并验证其哈希。对应软件包尚未安装时也保留配置，但不会安装或启用服务。Docker 和 containerd 保持原有配置。服务改名（包括 PHP 版本变化）或新增服务需要单独评估。
+
+若只需基于已有镜像发布配置修订，先递增 `ROOTFS_VERSION`，再运行 `python3 rootfs/repack-image.py /path/to/base.tar.xz outputs/rootfs-new`。脚本应用与完整构建相同的六项配置，保留原有运行组件的来源信息，并在 `configuration_repack` 中记录基础镜像哈希。生成后逐项验证保留文件的内容及 tar 元数据，包括链接和扩展属性；原始压缩包保留。这种打包方式不会重新编译程序或升级软件包，也不替代新容器的导入启动验证。
 
 ## 开发与验证
 

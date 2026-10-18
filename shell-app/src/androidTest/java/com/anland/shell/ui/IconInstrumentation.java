@@ -11,7 +11,14 @@ public final class IconInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result=new Bundle();
         try {
-            if ("repository".equals(arguments.getString("mode"))) {
+            if ("binder-discovery".equals(arguments.getString("mode"))) {
+                Bundle reply = getTargetContext().getContentResolver().call(
+                        android.net.Uri.parse("content://com.anlandnext.sessions"), "windows", null, null);
+                if (reply == null || reply.getLongArray("window_ids") == null)
+                    throw new AssertionError("Shell launch preflight cannot reach the daemon: " + reply);
+                result.putString("stream", "PASS: Shell UID launch preflight reached daemon; windows="
+                        + reply.getLongArray("window_ids").length + "\n");
+            } else if ("repository".equals(arguments.getString("mode"))) {
                 result.putString("stream",RepositoryProbe.run(getTargetContext()));
             } else if ("maintenance".equals(arguments.getString("mode"))) {
                 result.putString("stream",MaintenanceProbe.run(getTargetContext()));

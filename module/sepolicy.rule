@@ -1,10 +1,10 @@
-# anland-awl: register the formal binder service anland.host (own type)
+# anland-awl: native endpoint discovered only by the root Binder bridge.
 # Syntax: ksud sepolicy patch — space separated, no colons (the colon form is
 # silently dropped!)
-type anland_host_service service_manager_type
-allow untrusted_app_29 anland_host_service service_manager find
-allow untrusted_app anland_host_service service_manager find
-allow shell anland_host_service service_manager find
+# No service_contexts overlay: unknown names use default_android_service.
+# Never grant untrusted apps find on this catch-all type. They receive only
+# the anland.host Binder from HostBinderProvider, authenticated at publication.
+allow ksu default_android_service service_manager find
 # APP ↔ daemon binder calls (Surface transfer / linkToDeath)
 allow untrusted_app_29 ksu binder { call transfer }
 allow untrusted_app ksu binder { call transfer }
@@ -26,7 +26,7 @@ allow ksu awl_daemon_exec file { execute getattr map open read relabelfrom relab
 allow awl_daemon awl_daemon_exec file { entrypoint execute getattr map open read }
 allow awl_daemon_exec labeledfs filesystem associate
 # servicemanager：注册 anland.host
-allow awl_daemon anland_host_service service_manager add
+allow awl_daemon default_android_service service_manager add
 allow awl_daemon servicemanager binder { call transfer }
 allow servicemanager awl_daemon binder { call transfer }
 allow servicemanager awl_daemon dir search

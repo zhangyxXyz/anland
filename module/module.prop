@@ -4,4 +4,4 @@ name=Anland Wayland Host
 version=@MODULE_VERSION_NAME@
 versionCode=@MODULE_VERSION_CODE@
 author=anland
-description=Wayland compositor root daemon waylandbridge (single ELF, contexts generated at flash time from the live system file by customize.sh)
+description=Wayland compositor and root Binder discovery bridge; no system mounts required

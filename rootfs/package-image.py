@@ -8,10 +8,12 @@ import sys
 import tarfile
 
 SOURCE = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SOURCE / 'rootfs'))
 sys.path.insert(0, str(SOURCE / 'scripts/ci'))
 from release import sha256
 from rootfs_target import resolve, archive_name
 from versions import read_versions, version_suffix
+from mount_policy import FILES as MOUNT_POLICY, hashes as mount_policy_hashes
 
 RUNTIME = {
     'usr/lib/anland/Xwayland': 'Xwayland',
@@ -23,12 +25,15 @@ RUNTIME = {
 METADATA = 'usr/share/anland/rootfs-components.json'
 
 
-def verify_archive(archive):
+def verify_archive(archive, *, require_mount_policy=True):
     found, manifest = {}, None
+    required = {*RUNTIME, METADATA}
+    if require_mount_policy:
+        required.update(MOUNT_POLICY)
     with tarfile.open(archive, mode='r|xz') as tar:
         for member in tar:
             name = member.name.removeprefix('./').lstrip('/')
-            if name not in {*RUNTIME, METADATA}:
+            if name not in required:
                 continue
             if name in found or not member.isfile():
                 raise ValueError(f'Duplicate or nonregular runtime entry: {name}')
@@ -39,15 +44,24 @@ def verify_archive(archive):
                 manifest = json.load(stream)
                 found[name] = True
             else:
+                if name in MOUNT_POLICY and (member.mode != 0o644 or member.uid != 0 or member.gid != 0):
+                    raise ValueError(f'Wrong service policy permissions: {name}')
                 digest = hashlib.sha256()
                 for chunk in iter(lambda: stream.read(1024 * 1024), b''):
                     digest.update(chunk)
                 found[name] = digest.hexdigest()
-    if set(found) != {*RUNTIME, METADATA}:
+    if set(found) != required:
         raise ValueError('Exported RootFS is missing patched runtime files')
     for path, name in RUNTIME.items():
         if found[path] != manifest['patched_files'][name]:
             raise ValueError(f'Exported runtime differs from build input: {name}')
+    if require_mount_policy:
+        expected = mount_policy_hashes()
+        if manifest.get('service_mount_policy') != expected:
+            raise ValueError('Exported RootFS has a different service mount policy manifest')
+        for path, digest in expected.items():
+            if found[path] != digest:
+                raise ValueError(f'Exported service mount policy differs: {path}')
     return manifest
 
 

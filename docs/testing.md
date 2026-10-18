@@ -67,6 +67,7 @@ Useful runtime locations:
 | Location | Purpose |
 |---|---|
 | `/data/local/tmp/awl_daemon.log` | Android daemon log |
+| `/data/local/tmp/awl_binder_bridge.log` | Root Binder bridge startup/errors (also logcat tag `anland-bridge`) |
 | `/data/adb/modules/anland-awl/config.json` | Daemon configuration |
 | `/run/anland` | Container-side host runtime mount |
 | `~/.anlandx-env` | Independent-application session environment |
@@ -74,3 +75,50 @@ Useful runtime locations:
 | `/usr/share/anland/rootfs-components.json` | Image component provenance |
 
 Keep recordings, screenshots, raw logs and device-specific notes in ignored local output directories.
+
+## Binder discovery without system mounts
+
+Install the matched Wayland APK and Root module, select `ignore` for `anland-awl`
+in Hybrid Mount, and reboot. Confirm that the module has `skip_mount`, contains
+no generated `system/etc/selinux/plat_service_contexts`, and contributes no mount
+in `/proc/1/mountinfo`. The bridge must log publication to `com.anlandnext.binder`.
+An ordinary app must not gain `find` on `default_android_service`.
+
+Exercise Shell's container selection, independent app launch, full desktop,
+existing-window activation, and Wayland settings. Kill/reopen the host App and
+restart the daemon separately; discovery must recover without restarting the
+container. Update the APK and verify the bridge supervisor loads the new APK.
+The `publish` provider method must reject non-root callers. A third-party libawl
+client must receive the native Binder and still see only its own windows, with
+host-only configuration/container transactions denied by the daemon.
+
+The native service remains registered as `anland.host` for root discovery; it
+uses `default_android_service` without a contexts overlay. No app-side
+ServiceManager lookup is used. The root bridge is discovery-only, not a proxy
+for privileged window/configuration transactions.
+
+After installing the matching signed test APKs, run the production discovery
+checks after boot (the first additionally verifies that direct app lookup is
+denied):
+
+```sh
+adb -s DEVICE_SERIAL shell am instrument -w -e mode binder-discovery -e expect_private 1 \
+  com.anlandnext.test/com.anlandnext.awl.TaskIdentityInstrumentation
+adb -s DEVICE_SERIAL shell am instrument -w -e mode binder-discovery \
+  com.anland.shell.test/com.anland.shell.ui.IconInstrumentation
+```
+
+Instrumentation terminates its target process on completion. Allow the root
+bridge to republish before the next cross-app check; HyperOS may deny a provider
+cold start with `Unknown authority`. The normal Shell launch handles this through
+its existing foreground preflight activity.
+
+For a separate UID security probe, build `tests/binder_bridge/build.py` with
+`ANDROID_HOME` and `JAVA_HOME`, install `outputs/binder-bridge-probe/probe.apk`,
+then run its `com.anlandnext.RootBinderBridge` entry point as root via
+`app_process`, with the APK as `CLASSPATH` and
+`com.anland.bridgeprobe.binder` as its authority argument. Execute
+`am instrument -w com.anland.bridgeprobe/.BridgeProbe`. The probe uses production
+provider/bridge sources and verifies publication rejection, native Binder
+delivery, window isolation and host-only configuration denial. Stop that helper
+and uninstall the disposable probe package afterward.

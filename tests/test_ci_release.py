@@ -232,10 +232,15 @@ class ReleaseTests(unittest.TestCase):
     def test_export_verifies_actual_runtime_bytes(self):
         manifest = {'patched_files': {name: release.hashlib.sha256(b'patched').hexdigest()
                                       for name in image.RUNTIME.values()}}
+        manifest['service_mount_policy'] = image.mount_policy_hashes()
         with tempfile.TemporaryDirectory() as temp:
             archive = Path(temp) / 'image.tar.xz'
             for content in (b'patched', b'upstream-overwrote-it'):
                 with tarfile.open(archive, 'w:xz') as tar:
+                    for path, data in image.MOUNT_POLICY.items():
+                        entry = tarfile.TarInfo(path)
+                        entry.size = len(data)
+                        tar.addfile(entry, io.BytesIO(data))
                     for path in image.RUNTIME:
                         entry = tarfile.TarInfo('./' + path)
                         entry.size = len(content)
@@ -253,7 +258,8 @@ class ReleaseTests(unittest.TestCase):
     def test_package_uses_selected_target_and_rejects_foreign_image(self):
         target, config = release.resolve('Arch')
         v = versions.read_versions()
-        inputs = dict(target=target, target_config=config, rootfs_version=v['ROOTFS_VERSION'])
+        inputs = dict(target=target, target_config=config, rootfs_version=v['ROOTFS_VERSION'],
+                      service_mount_policy=image.mount_policy_hashes())
         manifest = dict(inputs, xfdesktop_files={}, patched_files={
             name: release.hashlib.sha256(b'patched').hexdigest() for name in image.RUNTIME.values()})
         with tempfile.TemporaryDirectory() as temp:
@@ -263,6 +269,7 @@ class ReleaseTests(unittest.TestCase):
             archive = builder / 'upstream.tar.xz'
             with tarfile.open(archive, 'w:xz') as tar:
                 contents = {path: b'patched' for path in image.RUNTIME}
+                contents.update(image.MOUNT_POLICY)
                 contents[image.METADATA] = json.dumps(manifest).encode()
                 for path, data in contents.items():
                     entry = tarfile.TarInfo(path)

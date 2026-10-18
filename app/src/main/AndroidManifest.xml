@@ -28,6 +28,7 @@
                   android:taskAffinity="${applicationId}.launch"
                   android:excludeFromRecents="true"/>
         <provider android:name=".SessionWindowsProvider" android:authorities="com.anlandnext.sessions" android:exported="true"/>
+        <provider android:name=".HostBinderProvider" android:authorities="${applicationId}.binder" android:exported="true"/>
         <activity android:name=".SessionPreflightActivity" android:exported="true"
                   android:theme="@style/Theme.AnlandLaunch" android:excludeFromRecents="true"/>
 

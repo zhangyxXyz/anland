@@ -15,24 +15,14 @@ fi
 # flashed module should be right on its own (and readable in the manager).
 set_perm "$MODPATH/waylandbridge" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
+set_perm "$MODPATH/binder-bridge.sh" 0 0 0755
 
-# KernelSU does not consume a standalone *.anland service-context fragment.
-# Build a system overlay from the device's live platform file so
-# servicemanager labels anland.host with anland_host_service. Without this
-# entry root/su can see the service, but untrusted_app_29 cannot find it.
-PLAT_CTX_SRC=/system/etc/selinux/plat_service_contexts
-PLAT_CTX_DST="$MODPATH/system/etc/selinux/plat_service_contexts"
-if [ -r "$PLAT_CTX_SRC" ] && [ -f "$MODPATH/plat_service_contexts.anland" ]; then
-  mkdir -p "${PLAT_CTX_DST%/*}"
-  cp -f "$PLAT_CTX_SRC" "$PLAT_CTX_DST"
-  if ! grep -q '^anland[.]host[[:space:]]' "$PLAT_CTX_DST"; then
-    cat "$MODPATH/plat_service_contexts.anland" >> "$PLAT_CTX_DST"
-  fi
-  set_perm "$PLAT_CTX_DST" 0 0 0644
-  echo "anland: generated platform service-context overlay"
-else
-  echo "anland: platform service-context source unavailable; anland.host may be hidden from apps"
-fi
+# Apps receive the native Binder through the root bridge, not ServiceManager.
+# Remove only this module's legacy generated file on an in-place upgrade.
+rm -f "$MODPATH/system/etc/selinux/plat_service_contexts" "$MODPATH/plat_service_contexts.anland"
+rmdir "$MODPATH/system/etc/selinux" "$MODPATH/system/etc" "$MODPATH/system" 2>/dev/null || true
+touch "$MODPATH/skip_mount"
+set_perm "$MODPATH/skip_mount" 0 0 0644
 
 if [ -d "$MODPATH/pulse/bin" ]; then
   set_perm_recursive "$MODPATH/pulse/bin" 0 0 0755 0755

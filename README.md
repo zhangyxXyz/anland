@@ -12,6 +12,8 @@ This repository's `dev` branch contains the application and image build pipeline
 
 ## Components
 
+The Root module starts the native daemon and a root Binder discovery bridge from `service.sh`, without overlaying `/system`. It includes `skip_mount` and supports Hybrid Mount's `ignore` mode; module scripts and SELinux rules must still run. Upgrade the Wayland APK and module together, then reboot to remove legacy mounts. Shell keeps its existing interface. The bridge distributes the original daemon Binder, so window operations retain the actual calling App's UID checks. Bridge publication currently targets Android's primary user (user 0).
+
 | Component | Purpose | Deliverable |
 |---|---|---|
 | Shell App (`com.anland.shell`) | Container selection and controls, app grid, shortcuts, console, saved local/SSH logins | `anland-shell.apk` |
@@ -133,14 +135,14 @@ For manual runs, the dispatcher must also exist on GitHub's default branch; sele
 [`version.properties`](version.properties) is the single configuration entry point. Components have independent versions:
 
 ```properties
-RELEASE_VERSION=0.5.3
-SHELL_VERSION_NAME=0.2.6
-SHELL_VERSION_CODE=8
-WAYLAND_VERSION_NAME=0.2.5
-WAYLAND_VERSION_CODE=7
-MODULE_VERSION_NAME=0.5.3
-MODULE_VERSION_CODE=8
-ROOTFS_VERSION=0.1.2
+RELEASE_VERSION=0.5.4
+SHELL_VERSION_NAME=0.2.7
+SHELL_VERSION_CODE=9
+WAYLAND_VERSION_NAME=0.2.6
+WAYLAND_VERSION_CODE=8
+MODULE_VERSION_NAME=0.5.4
+MODULE_VERSION_CODE=9
+ROOTFS_VERSION=0.1.3
 ```
 
 The Git tag must be `v` plus `RELEASE_VERSION`. Component versions do not need to match the tag. Increase an App/module's integer code when issuing a newer version of that component. Unselected components are not rebuilt or relabeled.
@@ -218,13 +220,17 @@ Native/module builds require a Linux host, JDK, Android SDK/NDK, CMake, Meson, N
 | `Fedora-44` | Fedora 44 | `fedora44` |
 | `Arch` | Arch Linux ARM (rolling) | `arch` |
 
-Each listed target includes Anland Next and the full Xfce desktop launcher. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.2.tar.xz`.
+Each listed target includes Anland Next and the full Xfce desktop launcher. Target definitions, the default target, the builder commit, Xfdesktop source and per-distribution session package checksums are in [`rootfs/sources.json`](rootfs/sources.json). The workflow dropdown mirrors this list. All distributions share `ROOTFS_VERSION` in [`version.properties`](version.properties); the target identifier distinguishes their archives. For example: `anland-rootfs-fedora44-arm64-0.1.3.tar.xz`.
 
 A separate Docker build stage derives from the selected runtime image and compiles Xfdesktop with the touch double-tap patch, Xwayland with GPU/input fixes and the current `anland-miniwm`. Xserver uses the repository's pinned submodule. The final stage installs the compiled Xfdesktop files, `/usr/lib/anland/Xwayland`, the session and miniwm, then verifies the distribution, session package version, AArch64 executables, shared-library dependencies and file hashes. Build dependencies remain in the disposable stage. The exported archive is checked against the recorded executable hashes before upload.
 
 Provenance, including the target and compiled Xfdesktop source version, is stored in `/usr/share/anland/rootfs-components.json`; `/usr/share/anland/packages.tsv` lists the native packages. The patched Xfdesktop files overlay the distribution package, so the native package version describes its base package, while the manifest describes the compiled fix. APT holds, DNF exclusions or Pacman `IgnorePkg` protect Xfdesktop and `anland-session` from ordinary upgrades. To deliberately replace them, remove the corresponding protection: `sudo apt-mark unhold xfdesktop4 xfdesktop4-data anland-session` on Debian/Ubuntu, edit `excludepkgs` in `/etc/dnf/dnf.conf` on Fedora, or edit `IgnorePkg` in `/etc/pacman.conf` on Arch. Explicit reinstalls or the upstream TUI's component replacement can overwrite the fixes.
 
 The distribution repositories, base images and other upstream downloads are not fully snapshotted; images are not claimed to be bit-for-bit reproducible. Each selected target must pass its image-build checks; device compatibility also requires runtime validation.
+
+RootFS 0.1.3 adds persistent `MountFlags=slave` drop-ins for exactly `systemd-resolved`, `systemd-networkd`, `systemd-logind`, `polkit`, `php8.4-fpm` and `mariadb`. They live under `/etc/systemd/system/<name>.service.d/90-anland-mountflags-slave.conf` and normally survive package upgrades. The build records and verifies their hashes. Drop-ins are included even when the corresponding package is absent; they do not install or enable services. Docker and containerd retain their existing configuration. Service renames (including a new PHP major/minor version) and newly installed services require separate review.
+
+To produce a configuration-only revision from an existing image, bump `ROOTFS_VERSION` and run `python3 rootfs/repack-image.py /path/to/base.tar.xz outputs/rootfs-new`. This applies the same six drop-ins as the full build, preserves the original runtime provenance, and records the base archive hash in `configuration_repack`. It verifies every retained file's bytes and tar metadata, including links and extended attributes, before finalizing the archive. The base archive is retained. This operation does not rebuild executables or upgrade packages, and does not replace a fresh-import boot test.
 
 ## Development and validation
 

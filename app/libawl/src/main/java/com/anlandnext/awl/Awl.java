@@ -20,7 +20,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * anland client library — third-party apps host their own wayland windows on
  * the device's anland daemon (root-resident binder service "anland.host",
- * shipped by the anland-awl module).
+ * shipped by the anland-awl module). Install the matched Wayland host APK:
+ * its provider distributes the Binder without a system-file mount. Library
+ * initialization is automatic in the default app process; other processes
+ * must call {@link HostConnection#initialize(Context)} before using this API.
  *
  * All calls hit the daemon's per-uid ownership scope: a normal app only ever
  * sees, subscribes to, attaches and closes the windows of wayland clients

@@ -2,6 +2,7 @@
 # Runs after all upstream installers, using output from the disposable build stage.
 set -euo pipefail
 cd /tmp/anland-overrides
+python3 mount_policy.py /
 cp -a xfdesktop-root/. /
 install -m755 Xwayland /usr/lib/anland/Xwayland
 install -m755 anland-miniwm /usr/bin/anland-miniwm

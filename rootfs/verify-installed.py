@@ -4,8 +4,10 @@ import json
 from pathlib import Path
 import subprocess
 import shlex
+from mount_policy import verify as verify_mount_policy
 
 manifest = json.loads(Path('/usr/share/anland/rootfs-components.json').read_text())
+verify_mount_policy('/', manifest)
 config = manifest['target_config']
 os_release = dict(line.split('=', 1) for line in Path('/etc/os-release').read_text().splitlines()
                   if '=' in line and not line.startswith('#'))

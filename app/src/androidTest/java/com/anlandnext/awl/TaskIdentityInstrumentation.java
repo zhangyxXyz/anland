@@ -19,6 +19,11 @@ public final class TaskIdentityInstrumentation extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
+            if ("binder-discovery".equals(args.getString("mode"))) {
+                result.putString("stream", BinderDiscoveryProbe.run(getTargetContext(), args));
+                finish(Activity.RESULT_OK, result);
+                return;
+            }
             long id = Long.parseLong(args.getString("window_id", "-1"));
             if ("back".equals(args.getString("mode")) || "container-label".equals(args.getString("mode"))) {
                 testBack(id);

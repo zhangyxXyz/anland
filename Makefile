@@ -129,26 +129,23 @@ testapk: native
 
 # ---------------- SukiSU module zip ----------------
 # Template lives in module/ (module.prop / sepolicy.rule / service.sh /
-# customize.sh / the plat_service_contexts.anland fragment). The full
-# contexts file is NOT zipped — customize.sh generates it at flash time from
-# the device's live system original (guards against stale OTA shadowing);
-# update installs are idempotent. The build only merges in the latest
-# waylandbridge binary.
+# customize.sh / binder-bridge.sh / skip_mount). The module never overlays
+# system files. Its root bridge loads Java code from the matched host APK.
 module: native pulse
 	MOD="$(OUT)/module/anland-awl"
 	rm -rf "$(OUT)/module"
 	mkdir -p "$$MOD"
 	cp module/module.prop module/sepolicy.rule module/service.sh \
-	   module/customize.sh module/plat_service_contexts.anland "$$MOD/"
+	   module/customize.sh module/binder-bridge.sh module/skip_mount "$$MOD/"
 	$(PYTHON) scripts/ci/versions.py --module module/module.prop "$$MOD/module.prop"
 	cp module/appearance.sh "$$MOD/"
 	cp LICENSE "$$MOD/"
 	cp "$(OUT)/waylandbridge" "$$MOD/"
 	cp -r "$(PA_ROOT)" "$$MOD/pulse"   # PulseAudio tree (bin/lib/etc), see `make pulse`
-	chmod 755 "$$MOD/waylandbridge" "$$MOD/service.sh" "$$MOD/customize.sh" "$$MOD/appearance.sh" "$$MOD"/pulse/bin/*
+	chmod 755 "$$MOD/waylandbridge" "$$MOD/service.sh" "$$MOD/customize.sh" "$$MOD/appearance.sh" "$$MOD/binder-bridge.sh" "$$MOD"/pulse/bin/*
 	(cd "$$MOD" && zip -qr "$(OUT)/module/anland-awl.zip" \
 	  module.prop sepolicy.rule service.sh customize.sh appearance.sh \
-	  plat_service_contexts.anland waylandbridge pulse \
+	  binder-bridge.sh skip_mount waylandbridge pulse \
 	  LICENSE)
 	echo "OK: $(OUT)/module/anland-awl.zip"
 

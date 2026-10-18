@@ -30,6 +30,12 @@ start_daemon() {
   nohup "$MODDIR/waylandbridge" > /data/local/tmp/awl_daemon.log 2>&1 &
 }
 
+start_binder_bridge() {
+  # The supervisor holds a kernel file lock across retries and APK replacement.
+  nohup /system/bin/sh "$MODDIR/binder-bridge.sh" \
+    > /data/local/tmp/awl_binder_bridge.log 2>&1 &
+}
+
 # ---- PulseAudio (module pulse/: Termux OpenSL ES / AAudio sink) — the Linux
 #      container's apps play through Android ----
 # MUST run under the host APK's uid: Android 12+ AudioPolicyService rejects
@@ -257,6 +263,7 @@ recover_boot_pulse() {
 }
 
 case "${1:-}" in
+  bridge) start_binder_bridge ;;
   pulse) start_pulse ;;
   pulse-boot) recover_boot_pulse ;;
   *)
@@ -266,6 +273,7 @@ case "${1:-}" in
     start_pulse
     pulse_status=$?
     start_daemon
+    start_binder_bridge
     nohup /system/bin/sh "$MODDIR/appearance.sh" "$RT" > /data/local/tmp/awl_appearance.log 2>&1 &
     if [ "$pulse_status" -ne 0 ]; then
       cp "$LOG" /data/local/tmp/awl_pulse.boot-failure.log 2>/dev/null

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.anland.bridgeprobe">
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="29" />
+    <application android:label="Anland Binder Probe" android:debuggable="true" android:allowBackup="false">
+        <provider android:name="com.anlandnext.HostBinderProvider"
+            android:authorities="com.anland.bridgeprobe.binder" android:exported="true" />
+    </application>
+    <instrumentation android:name="com.anland.bridgeprobe.BridgeProbe"
+        android:targetPackage="com.anland.bridgeprobe" />
+</manifest>

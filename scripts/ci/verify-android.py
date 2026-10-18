@@ -36,9 +36,11 @@ if component == 'wayland' and not args.apps_only:
                            'versionCode': versions['MODULE_VERSION_CODE']}.items():
             if f'{key}={value}' not in props.splitlines():
                 raise SystemExit(f'Incorrect module {key}')
-        for name in ('appearance.sh', 'service.sh', 'pulse/bin/pulseaudio'):
+        for name in ('appearance.sh', 'service.sh', 'binder-bridge.sh', 'skip_mount', 'pulse/bin/pulseaudio'):
             if name not in archive.namelist():
                 raise SystemExit(f'Module missing {name}')
+        if any(name.startswith('system/') for name in archive.namelist()):
+            raise SystemExit('Mount-free module must not contain a system overlay')
         if archive.read('waylandbridge') != (args.directory / 'waylandbridge').read_bytes():
             raise SystemExit('Standalone and packaged daemons differ')
 print('Verified signing, component versions and packaged files')

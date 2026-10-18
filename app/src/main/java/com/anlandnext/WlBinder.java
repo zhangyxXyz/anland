@@ -4,7 +4,7 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.util.Log;
 
-import java.lang.reflect.Method;
+import com.anlandnext.awl.HostConnection;
 
 /**
  * Daemon config channel of the binder service "anland.host" — the ONLY
@@ -12,8 +12,7 @@ import java.lang.reflect.Method;
  * events / attach / close / spawning) goes through the libawl library, the
  * same API third-party consumer apps use; window hosting runs in
  * libawl's AwlWindowActivity.
- * Reflects into ServiceManager.getService (hidden API, light-grey — usable
- * at targetSdk 29).
+ * Shares the module Binder bridge with libawl; no system-file overlay is needed.
  */
 public final class WlBinder {
     private static final String TAG = "anland-binder";
@@ -27,17 +26,8 @@ public final class WlBinder {
     private static IBinder get() {
         if (s != null && s.pingBinder()) return s;
         s = null;
-        try {
-            Class<?> sm = Class.forName("android.os.ServiceManager");
-            Method m = sm.getMethod("getService", String.class);
-            IBinder b = (IBinder) m.invoke(null, "anland.host");
-            if (b == null) Log.w(TAG, "getService(anland.host) = null");
-            else if (b.pingBinder()) s = b;
-            else Log.w(TAG, "anland.host pingBinder=false");
-        } catch (Exception e) {
-            Log.e(TAG, "getService failed", e);
-        }
-        return s != null ? s : null;
+        s = HostConnection.get();
+        return s;
     }
 
     public static boolean available() { return get() != null; }
